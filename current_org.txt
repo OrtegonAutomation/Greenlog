@@ -1,0 +1,10 @@
+Connected as camilo.ortegon@strategy.com.co
+Connected to... Strategy AM And PSM (default)
+Organization Information
+  Org ID:                     8d333cd5-d6c0-4921-b2d7-68a5ee3874ca
+  Unique Name:                84d68dbbf0a741e2b1a395dd34575a
+  Friendly Name:              Strategy AM And PSM (default)
+  Org URL:                    https://orgf28acf13.crm2.dynamics.com/
+  User Email:                 camilo.ortegon@strategy.com.co
+  User ID:                    36cc5b39-a956-f011-bec2-002248e032c4
+  Environment ID:             Default-8bf4cc2d-4c11-4c12-9cc2-a472854e3bf2

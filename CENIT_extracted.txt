@@ -1,0 +1,496 @@
+PLAN DE PROYECTO GREENLOG
+CLIENTE: CLIENTE: CENIT
+Camilo Andres Ortegon Cuevas Diciembre 2025
+
+PLAN DE PROYECTO GREENLOG
+Contenido 1. Objetivo General ......................................................................................................... 4
+1.1 Objetivos específicos ............................................................................................. 4 2. Alcance........................................................................................................................ 5
+2.1 Desarrollo del Módulo de Seguimiento a la Planeación (Fase 1) .......................... 5 2.2 Desarrollo del Módulo de Seguimiento a la Ejecución y Cumplimiento (Fase 2) ... 5 2.3 Desarrollo del Dashboard Integral de Control Ambiental (Fase 3) ......................... 5 2.4 Estandarización de datos y documentación del producto (transversal) ................. 6 2.5 Formato de "Laboratorio" y aprobación (transversal)............................................. 6 3. Metodología del proyecto ............................................................................................ 7 3.1 Metodología general del proyecto.......................................................................... 7
+3.1.1 Gestión del proyecto ....................................................................................... 7 3.2 Metodología técnica del desarrollo (Control Ambiental)......................................... 8
+3.2.1 Levantamiento, diseño funcional y reglas del negocio .................................... 8 3.2.2 Modelo de datos y estandarización (gobernanza del dato) ............................. 9 3.2.3 Arquitectura y construcción modular ............................................................... 9 3.2.4 Seguridad, usuarios y auditoría....................................................................... 9 3.2.5 Gestión de evidencias y "Formato Laboratorio" (PDF firmado) ..................... 10 3.2.6 Pruebas, aseguramiento de calidad y validación (UAT) ................................ 10 3.2.7 Despliegue, ambientes y control de versiones .............................................. 10 3.3 Metodología por macrofases (ejecución detallada y entregables) ....................... 10 3.3.1 Fase 1 ­ Seguimiento a la Planeación y Monitoreo ...................................... 10 3.3.2 Fase 2 ­ Ejecución, Cumplimiento y Trazabilidad ......................................... 11 3.3.3 Fase 3 ­ Dashboard integral y analítica ........................................................ 11 4. Recursos, roles y responsabilidades......................................................................... 12 4.1 Estructura de recursos del proyecto .................................................................... 12 4.2 Roles del proyecto (definición)............................................................................. 12 4.3 Matriz de responsabilidades (RACI) .................................................................... 13 4.4 Mecanismos de coordinación y comunicación..................................................... 13 5 Supuestos, dependencias y exclusiones.................................................................... 15
+
+PLAN DE PROYECTO GREENLOG
+5.1 Supuestos............................................................................................................ 15 5.2 Dependencias...................................................................................................... 15 5.3 Exclusiones.......................................................................................................... 16 6 Propuesta económica y forma de pago ...................................................................... 17 6.1 Costos del producto (precio fijo ­ Power Apps) ................................................... 17
+6.1.1 Producto Base y Precio base ........................................................................ 17 6.2 Justificación del precio......................................................................................... 17 6.3 Forma de pago (por hitos, contra entregables).................................................... 18 6.4 Condiciones para sostener el precio fijo (control de alcance).............................. 18 6.5 Exclusiones.......................................................................................................... 18 6.6 Costos de terceros............................................................................................... 19
+
+PLAN DE PROYECTO GREENLOG
+1. Objetivo General
+El propósito de la presente oferta comercial por parte de Camilo Andrés Ortegon Cuevas (Freelancer) es desarrollar e implementar una aplicación para CENIT que permita optimizar y automatizar el seguimiento a la planeación, el control de la ejecución y la visualización integral de las operaciones de transporte en Colombia, mediante un enfoque sistemático orientado a la estandarización de datos, el control costo­efectivo, el monitoreo en tiempo real y el cumplimiento normativo, asegurando un modelo de operación eficiente, auditable, flexible y escalable que facilite la toma de decisiones y la mejora continua.
+1.1 Objetivos específicos
+· Automatización del seguimiento a la planeación: Centralizar y controlar las actividades programadas, responsables, recursos y estados, garantizando trazabilidad desde la programación.
+· Monitoreo y control en tiempo real: Proveer visibilidad continua del avance operativo y sus desviaciones frente al plan (tiempos, estados, novedades y riesgos).
+· Control de costos y desviaciones (planeado vs ejecutado): Capturar, comparar y reportar diferencias de costos para soportar decisiones de ajuste y reprogramación con información confiable.
+· Estandarización y gobernanza de datos: Consolidar una base de datos estructurada y normalizada, con reglas de calidad e integridad que habiliten análisis y auditoría.
+· Gestión de cumplimiento normativo y parámetros operativos: Parametrizar reglas, checklist y alertas para asegurar que la ejecución se mantenga dentro de los estándares CENIT y regulaciones aplicables.
+· Trazabilidad y evidencia operativa: Registrar ejecución, bitácora, evidencias y aprobaciones, asegurando historial completo por actividad (quién, qué, cuándo y por qué).
+· Dashboard integral para toma de decisiones: Consolidar indicadores (KPIs), alertas y analítica en un tablero interactivo por rol (operativo / coordinación / gerencial).
+· Formalización de aprobación mediante "formato laboratorio" (PDF firmado): Generar un documento estandarizado y firmable para validación, control y cierre formal de información crítica.
+
+PLAN DE PROYECTO GREENLOG
+2. Alcance El proyecto por parte de Camilo Andrés Ortegon Cuevas (Freelancer) contempla el diseño, desarrollo e implementación de una aplicación para Control Ambiental en CENIT, orientada al seguimiento de la planeación, el control de la ejecución, la trazabilidad de evidencias, el cumplimiento normativo y la visualización en tiempo real mediante dashboard, incluyendo las siguientes actividades:
+2.1 Desarrollo del Módulo de Seguimiento a la Planeación (Fase 1) · Identificación de oportunidades de mejora a partir de la revisión de procesos actuales relacionados con la planeación de actividades ambientales, flujos de aprobación y necesidades de control.
+· Ejecución de entrevistas y sesiones de levantamiento con los actores del proceso (área ambiental, operación, supervisión, costos y aprobadores) para definir reglas, campos mínimos y criterios de aceptación.
+· Construcción del módulo de planeación para:
+ Registro y consulta de actividades ambientales planeadas (tarea, responsable, fechas, ubicación, estado, recursos).
+ Definición de línea base y control de versiones del plan (cuando aplique).
+ Parametrización de catálogos (tipos de actividad, zonas, frentes, responsables, estados).
+2.2 Desarrollo del Módulo de Seguimiento a la Ejecución y Cumplimiento (Fase 2) · Construcción del módulo de ejecución para:
+ Registro de ejecución (fechas reales, tiempos, novedades, causas, consumos/recursos si aplica).
+ Cargue y administración de evidencias (adjuntos, fotografías, documentos) asociadas a la actividad.
+ Bitácora y trazabilidad completa (quién, qué, cuándo y por qué).
+· Implementación del componente de cumplimiento normativo y parámetros ambientales:
+ Configuración de checklist/validaciones por tipo de actividad.
+ Alertas por incumplimiento y registro de acciones correctivas.
+ Reportes de cumplimiento por periodo, responsable, zona y tipo de actividad.
+· Implementación de gestión de usuarios, roles y permisos, asegurando control de accesos, integridad de información y auditoría de cambios.
+2.3 Desarrollo del Dashboard Integral de Control Ambiental (Fase 3) · Construcción de un dashboard interactivo con visualización en tiempo real para:
+
+PLAN DE PROYECTO GREENLOG
+ Estado de actividades (planeadas, en ejecución, cerradas, retrasadas, reprogramadas).
+ Indicadores de cumplimiento normativo y hallazgos.
+ Desviaciones y alertas relevantes (tiempo, cumplimiento, registro incompleto, vencimientos).
+ Tendencias y análisis de desempeño para identificar riesgos y oportunidades de mejora.
+· Interactividad: filtros, vistas personalizadas por rol, y generación de reportes según necesidad operativa y gerencial.
+2.4 Estandarización de datos y documentación del producto (transversal) · Diseño e implementación del modelo de datos estandarizado (catálogos, transaccionales y auditoría).
+· Reglas de calidad de datos (campos obligatorios, validaciones, trazabilidad, control de cambios).
+· Entrega de documentación mínima:
+ Manual de usuario (flujos principales).
+ Manual técnico (despliegue/configuración).
+ Capacitación (dada por teams)
+2.5 Formato de "Laboratorio" y aprobación (transversal) · Implementación del formato tipo Laboratorio en PDF firmado, como mecanismo de validación/aprobación por parte de usuarios designados:
+ Generación automática del PDF por actividad o paquete (Aplica si IT Cenit aprueba el uso de conectores premium en Power Automate).
+ Flujo de aprobación (aprobado/rechazado/pendiente) y repositorio de trazabilidad.
+
+PLAN DE PROYECTO GREENLOG
+
+3. Metodología del proyecto
+
+3.1 Metodología general del proyecto
+
+3.1.1 Gestión del proyecto
+
+El servicio estará a cargo de Camilo Andrés Ortegon Cuevas (Freelancer), quien ha
+
+definido un modelo de gestión para asegurar y controlar la calidad del proyecto bajo
+
+lineamientos de gestión de proyectos basados en las buenas prácticas del PMI (Project
+
+Management Institute), integrando un enfoque incremental por macrofases para
+
+asegurar
+
+entregas
+
+funcionales
+
+y
+
+controladas.
+
+Este modelo contempla lineamientos de gestión en las siguientes fases: Inicio y
+
+Planeación ­ Ejecución ­ Seguimiento y Control ­ Cierre por fase.
+
+A continuación, se describe de acuerdo con el alcance de la presente propuesta las fases de gestión del proyecto:
+
+3.1.1.1 Inicio y planeación
+
+Dentro de la fase de planeación se realizará un Kickoff Meeting con CENIT, a través del cual se establecerán:
+
+· Responsables por ambas partes (Product Owner, usuarios clave, aprobadores, soporte TI y líder del proyecto).
+
+· Revisión y validación del alcance, supuestos, exclusiones y criterios de aceptación por macrofase.
+
+· Identificación preliminar de riesgos, dependencias y plan de mitigación.
+· Definición de canales de comunicación, periodicidad de reuniones y mecanismo de escalamiento.
+
+· Definición de la línea base de control: parámetros ambientales, reglas de cumplimiento, estructura de datos y estructura de costos (si aplica).
+
+· Definición del estándar del Formato Laboratorio (PDF firmado): contenido, responsables de aprobación y flujo de firma.
+
+· Definición de Usuario para el Desarrollo en Entorno Cenit. 3.1.1.2 Ejecución del proyecto
+
+El diseño del proyecto propone para la ejecución de las actividades un esquema de trabajo principalmente remoto, desarrollando el aplicativo por iteraciones e incrementos funcionales, distribuidos en tres macrofases:
+
+· Fase 1: Seguimiento a la planeación, monitoreo en tiempo real y estandarización de la base de datos.
+
+· Fase 2: Seguimiento a la ejecución, trazabilidad, cumplimiento normativo y gestión de usuarios/roles.
+
+· Fase 3: Dashboard integral, analítica, alertas y reportes.
+
+PLAN DE PROYECTO GREENLOG
+Durante la ejecución se aplicará un ciclo repetible por iteración: Planificación  Desarrollo  Pruebas  Validación con usuario  Entrega, garantizando entregables demostrables y controlados.
+Soporte Tecnológico: plataformas de comunicación y colaboración que combinan chat, videollamadas, compartición de pantalla, almacenamiento de archivos, grabación de sesiones y control de versiones/documentación (Teams y Sharepoint Cenit).
+3.1.1.3 Seguimiento y control
+De acuerdo con la estructura del proyecto, se proyectan reuniones de seguimiento con informes de avance por parte del Freelancer, con el fin de evidenciar el nivel de progreso respecto del plan de trabajo definido en la etapa de planeación y validado en conjunto con CENIT. El esquema de seguimiento y control incluirá:
+· Reunión semanal de avance (estado, bloqueos, próximos pasos, decisiones requeridas).
+· Comité mensual de cierre de iteración (demostración del incremento, validación y aprobación).
+· Control de alcance mediante backlog y gestión de cambios (requerimientos planeados y no planeados).
+· Seguimiento a hitos, entregables y criterios de aceptación por macrofase.
+· Control de calidad (pruebas funcionales, validación UAT, correcciones y estabilización).
+· Gestión de riesgos con acciones de mitigación y registro de decisiones.
+· Evidencia de aceptación: actas de entrega por fase y aprobación del Formato Laboratorio (PDF firmado) cuando aplique.
+3.2 Metodología técnica del desarrollo (Control Ambiental)
+La metodología técnica se orienta a asegurar que la aplicación sea auditable, segura, trazable y confiable, priorizando el control ambiental, el cumplimiento normativo y la calidad del dato. Se trabajará bajo un enfoque modular e incremental para facilitar validación temprana con CENIT y minimizar riesgos.
+3.2.1 Levantamiento, diseño funcional y reglas del negocio
+· Talleres con usuarios clave para definir:
+ Reglas de cumplimiento ambiental (checklists, parámetros y umbrales).
+ Criterios de aceptación por módulo (qué significa "cumple" y "está aprobado").
+· Definición de catálogos mínimos: tipos de actividad ambiental, ubicaciones/zonas, responsables, estados, tipos de evidencia, causas de desviación, etc.
+
+PLAN DE PROYECTO GREENLOG
+3.2.2 Modelo de datos y estandarización (gobernanza del dato) · Diseño del modelo de datos con estructura:  Maestros / Catálogos (parametrización del proceso).  Transaccionales (planeación, ejecución, cumplimiento, evidencias).  Auditoría (quién cambió qué y cuándo). · Reglas de integridad:  campos obligatorios, validaciones de formato/rango,  control de duplicados,  trazabilidad entre actividad planeada y ejecutada,  versionamiento básico del plan cuando aplique.
+3.2.3 Arquitectura y construcción modular · Construcción por módulos alineados a macrofases:  Planeación y monitoreo (Fase 1),  Ejecución, cumplimiento y roles (Fase 2),  Dashboard y analítica (Fase 3). · Separación lógica: interfaz (front), lógica de negocio (servicios) y datos (base de datos), para facilitar escalabilidad y mantenibilidad.
+3.2.4 Seguridad, usuarios y auditoría · Control de acceso basado en roles:  Operativo (registra),  Supervisor (valida),  Aprobador (firma),  Administrador (parametriza). · Auditoría de acciones críticas:  creación/edición/cierre de actividades,  cambios en reglas de cumplimiento,  aprobaciones y rechazos,  carga/eliminación de evidencias. · Reglas de confidencialidad y trazabilidad para soportar auditorías internas/externas.
+
+PLAN DE PROYECTO GREENLOG
+3.2.5 Gestión de evidencias y "Formato Laboratorio" (PDF firmado) · Evidencias asociadas a cada actividad (archivos/fotos/documentos), con metadatos mínimos:  tipo de evidencia, fecha, usuario, observación. · Generación del PDF firmado como salida formal del flujo:  consolidación de datos clave, checklist, evidencias referenciadas,  estado (aprobado/rechazado/pendiente),  repositorio de documentos por actividad y periodo.
+3.2.6 Pruebas, aseguramiento de calidad y validación (UAT) · Pruebas por niveles:  pruebas funcionales por módulo,  pruebas de flujo completo (planeación  cierre),  pruebas de roles/permisos (seguridad),  pruebas de reportes y dashboard. · Validación con usuarios (UAT) por fase:  demostración del incremento,  ajuste por hallazgos,  acta de aceptación por fase.
+3.2.7 Despliegue, ambientes y control de versiones · Manejo de ambientes (según definición con CENIT):  desarrollo / pruebas / producción. · Control de versiones para código y documentación. · Entrega de manuales y guía de operación/configuración.
+3.3 Metodología por macrofases (ejecución detallada y entregables) 3.3.1 Fase 1 ­ Seguimiento a la Planeación y Monitoreo Actividades principales
+· Levantamiento y definición del flujo de planeación ambiental y catálogos. · Construcción del módulo de planeación y estados. · Configuración del modelo de datos base + reglas de estandarización. · Implementación de monitoreo inicial (avance, novedades, desviaciones básicas).
+
+PLAN DE PROYECTO GREENLOG
+· Primera versión de control de costos si aplica (planeado vs proyectado). Entregables
+· Módulo de planeación operativo (MVP). · Base de datos estandarizada (catálogos + transaccionales). · Reportes básicos de avance y desviaciones. 3.3.2 Fase 2 ­ Ejecución, Cumplimiento y Trazabilidad Actividades principales · Construcción del módulo de ejecución con bitácora y evidencias. · Parametrización de reglas/checklist de cumplimiento ambiental. · Alertas por incumplimiento y registro de acciones correctivas. · Implementación de roles, permisos y auditoría. · Control de costos real vs planeado (si aplica) y reportes de desviación. Entregables · Módulo de ejecución + evidencias + bitácora. · Módulo de cumplimiento con alertas y reportes. · Gestión de usuarios/roles + auditoría. · Versión inicial del Formato Laboratorio PDF firmado. 3.3.3 Fase 3 ­ Dashboard integral y analítica Actividades principales · Construcción del dashboard por rol (operativo/gerencial). · Consolidación de KPIs ambientales, cumplimiento y desviaciones. · Alertas avanzadas y soporte a reprogramación (registro del cambio). · Reportes exportables y vistas personalizadas. Entregables · Dashboard integral (tiempo real o cuasi-tiempo real según fuente). · Reportes consolidados y exportables. · Ajustes finales, estabilización y cierre.
+
+PLAN DE PROYECTO GREENLOG
+4. Recursos, roles y responsabilidades
+4.1 Estructura de recursos del proyecto El proyecto se ejecutará con un esquema Freelancer + contrapartes CENIT, asegurando definición clara de responsables, validación oportuna y control de cambios.
+Recursos principales:
+· Freelancer (Camilo Andrés Ortegon Cuevas): líder funcional/técnico del desarrollo. Responsable de análisis, diseño, construcción, pruebas, despliegues y documentación.
+· CENIT (Sponsor): habilita decisiones de alto nivel y remueve bloqueos organizacionales.
+· CENIT (Product Owner ­ Proceso Ambiental): prioriza requerimientos, define criterios de aceptación y aprueba entregables.
+· CENIT (SME Ambiental): define reglas, parámetros, checklist, evidencias mínimas y criterios de cumplimiento.
+· CENIT (Operación / Supervisión): valida el flujo operativo y el registro en campo (planeación­ejecución­evidencias).
+· CENIT (Aprobadores): aprueban cierres y firman el Formato Laboratorio (PDF firmado).
+· CENIT (TI / Seguridad / Infraestructura ­ si aplica): gestiona accesos, ambientes, despliegues y lineamientos de seguridad.
+4.2 Roles del proyecto (definición) · Sponsor CENIT: patrocinio, decisiones ejecutivas, escalamiento.
+· Product Owner (PO) CENIT: priorización del backlog, aceptación por fase, control de cambios.
+· SME Ambiental (CENIT): definición de normativa/reglas y validación de cumplimiento.
+· Usuario Operativo (CENIT): registro diario, carga de evidencias, reporte de novedades.
+· Supervisor (CENIT): revisión de calidad de registros, validación operativa, gestión de correcciones.
+· Aprobador (CENIT): aprobación/rechazo y firma del PDF laboratorio.
+· Administrador de plataforma (CENIT o delegado): gestión de catálogos, usuarios y parametrizaciones (según modelo acordado).
+· Freelancer (Camilo): diseño, desarrollo, pruebas, documentación, capacitación y entregas por fase.
+
+PLAN DE PROYECTO GREENLOG
+
+4.3 Matriz de responsabilidades (RACI) Leyenda: R = Responsable | A = Aprobador | C = Consultado | I = Informado
+
+Actividad / Entregable
+
+Freelancer
+
+Sponsor
+
+PO
+
+SME Ambiental
+
+Operación/Supervisión
+
+Aprobador
+
+TI
+
+Kickoff, plan cronograma
+
+de
+
+trabajo
+
+yR
+
+I
+
+AC
+
+C
+
+I
+
+C
+
+Definición / checklist
+
+de
+
+reglas
+
+ambientales
+
+C
+
+I
+
+AR
+
+C
+
+I
+
+I
+
+Diseño del catálogos
+
+modelo
+
+de
+
+datos
+
+yR
+
+I
+
+AC
+
+C
+
+I
+
+C
+
+Desarrollo
+
+Fase
+
+(planeación/monitoreo)
+
+1R
+
+I
+
+AC
+
+C
+
+I
+
+C
+
+Desarrollo
+
+Fase
+
+(ejecución/compliance/roles)
+
+2R
+
+I
+
+AC
+
+C
+
+I
+
+C
+
+Desarrollo
+
+Fase
+
+(dashboard/reportes)
+
+3R
+
+I
+
+AC
+
+C
+
+I
+
+C
+
+Pruebas internas
+
+R
+
+I
+
+IC
+
+C
+
+I
+
+I
+
+UAT (validación con usuarios) C
+
+I
+
+AR
+
+R
+
+I
+
+I
+
+Aceptación fase
+
+de
+
+entregables
+
+por I
+
+I
+
+AC
+
+C
+
+R/A
+
+I
+
+Formato Laboratorio (definición)
+
+PDF R
+
+I
+
+AC
+
+C
+
+C
+
+I
+
+Formato Laboratorio (firma/aprobación)
+
+PDF I
+
+I
+
+IC
+
+C
+
+R/A
+
+I
+
+Despliegue aplica)
+
+a
+
+ambientes
+
+(si R
+
+I
+
+II
+
+I
+
+I
+
+A/R
+
+Documentación y capacitación R
+
+I
+
+AC
+
+C
+
+I
+
+I
+
+Gestión de cambios (backlog) R
+
+I
+
+AC
+
+C
+
+I
+
+I
+
+4.4 Mecanismos de coordinación y comunicación
+· Comité de cierre de fase: demostración del incremento, validación UAT, acta de aceptación y priorización del siguiente ciclo.
+
+PLAN DE PROYECTO GREENLOG
+· Canal único de requerimientos e incidencias: registro, trazabilidad y control de cambios. (Outlook)
+
+PLAN DE PROYECTO GREENLOG
+5 Supuestos, dependencias y exclusiones
+5.1 Supuestos Para asegurar el cumplimiento del alcance, tiempos y calidad del producto, se asume que:
+· Disponibilidad de usuarios clave: CENIT asignará un Product Owner y SMEs ambientales con disponibilidad para talleres, validaciones (UAT) y aprobaciones por fase.
+· Definición de reglas ambientales: CENIT entregará o definirá oportunamente las normas internas, parámetros, checklist y criterios de cumplimiento aplicables al control ambiental (incluyendo umbrales de alertas).
+· Definición del Formato Laboratorio (PDF firmado): CENIT entregará el estándar del formato (campos obligatorios, responsables de firma, flujo de aprobación y criterios de "aprobado/rechazado").
+· Accesos y autorizaciones: CENIT garantizará accesos, permisos y lineamientos necesarios (usuarios, conectividad, políticas de seguridad, ambientes) para desarrollo, pruebas y despliegue.
+· Datos y catálogos base: CENIT proporcionará catálogos iniciales (zonas/ubicaciones, tipos de actividad, roles, responsables, estados) y estructura mínima de información requerida.
+· Validación por entregables: Cada macrofase contará con una ventana de validación y aprobación formal, de manera que el avance a la siguiente fase se realice con aceptación de los entregables anteriores.
+5.2 Dependencias El proyecto depende de los siguientes insumos y condiciones para avanzar sin reprocesos:
+· Aprobación de alcance y prioridades: priorización del backlog por parte del PO para evitar cambios frecuentes durante iteraciones en curso.
+· Participación de TI (si aplica): disponibilidad de CENIT TI para:
+ habilitar ambientes (dev/test/prod),
+ gestionar políticas de seguridad y autenticación,
+ definir lineamientos de almacenamiento de evidencias,
+ apoyar despliegues o accesos a infraestructura corporativa.
+· Fuentes de información: disponibilidad de datos base o formatos de captura requeridos para:
+ planeación de actividades,
+ registro de ejecución,
+
+PLAN DE PROYECTO GREENLOG
+ control de cumplimiento,
+ soportes/evidencias y aprobaciones.
+· Definición de KPIs del dashboard: acuerdo temprano sobre indicadores, periodicidad y estructura de reportes.
+· Lineamientos corporativos: cumplimiento de políticas internas de CENIT (seguridad, tratamiento de información, retención documental, auditoría).
+5.3 Exclusiones Salvo que se acuerde mediante control de cambios y ajuste económico/cronograma, se excluye:
+· Integraciones corporativas complejas (SAP/ERP/SCADA/otros) mediante interfaces productivas, buses de integración o desarrollos a nivel corporativo (PI/PO, ESB, etc.).
+ Se contempla únicamente importación/exportación básica (CSV/Excel) o APIs simples si CENIT las habilita.
+· Aplicación móvil nativa (Android/iOS) y funcionalidad offline.
+· Infraestructura, licencias y servicios de terceros diferentes a Microsoft CENIT: hosting/cloud, dominios, certificados, licencias BI, servicios de mensajería (SMS), herramientas corporativas, almacenamiento especializado, etc. (estos costos se cotizan aparte).
+· Analítica avanzada (IA/ML), predicción, optimización automática o modelos avanzados, salvo fase posterior.
+· Mesa de ayuda 24/7 / operación permanente: soporte extendido se cotiza como servicio recurrente si se requiere.
+· Gestión documental corporativa fuera del repositorio definido para la app (p. ej., integración con gestores documentales propietarios), salvo acuerdo adicional.
+
+PLAN DE PROYECTO GREENLOG
+6 Propuesta económica y forma de pago
+6.1 Costos del producto (precio fijo ­ Power Apps) La presente oferta se presenta bajo modalidad Producto (precio fijo) para el desarrollo en Power Apps del aplicativo de Control Ambiental, incluyendo construcción, pruebas, puesta en marcha y transferencia de conocimiento. 6.1.1 Producto Base y Precio base El producto base tiene un precio de 19.900.000 COP, el cual incluye una solución operativa completa para control ambiental con trazabilidad y aprobación: Incluye (entregables funcionales):
+· Power Apps (Canvas App): o Registro y seguimiento de actividades ambientales planeadas. o Registro de ejecución (fechas, estado, observaciones, novedades). o Carga de evidencias (archivos/fotos) asociadas a la actividad. o Checklist de cumplimiento ambiental (parametrizable a nivel básico por tipo de actividad). o Consultas y filtros (estado, fecha, zona/ubicación, responsable).
+· Flujo de aprobación (Power Automate) con estados: Pendiente  Aprobado / Rechazado, con observaciones y trazabilidad.
+· Formato "Laboratorio" en PDF (generación automática desde plantilla), con: o datos clave de la actividad + checklist + resumen de evidencias referenciadas, o estado final aprobado/rechazado, o almacenamiento en repositorio definido por CENIT.
+· Roles y permisos operativos por perfil funcional: o Operativo, Supervisor, Aprobador, Administrador (catálogos).
+· Tablero básico dentro de la app (KPIs esenciales): actividades por estado, vencidas, cumplimiento.
+· Documentación mínima (manual corto de usuario + guía de administración de catálogos) y capacitación a usuarios clave.
+· Estabilización post salida (ajustes menores/correcciones dentro del alcance). 6.2 Justificación del precio El valor del producto se define como precio fijo debido a que:
+
+PLAN DE PROYECTO GREENLOG
+· La solución se construye en Power Apps, reduciendo esfuerzo de desarrollo tradicional, pero manteniendo trabajo especializado en: diseño de datos, modelado de procesos, seguridad por roles, automatización (Power Automate) y control documental (PDF + evidencias).
+· El precio incluye el ciclo completo: levantamiento y diseño, construcción de la app, configuración de flujos, pruebas funcionales, validación con usuarios (UAT), ajustes de estabilización, documentación y capacitación, asegurando un entregable operable y auditable.
+· CENIT cuenta con licenciamiento, por lo cual el valor corresponde únicamente al servicio de construcción y entrega del producto, no a costos de licencias.
+· El alcance se entrega por hitos con aceptación formal, garantizando control de calidad y cumplimiento del objetivo de control ambiental.
+6.3 Forma de pago (por hitos, contra entregables) Para el Producto Base ­ $19.900.000 COP:
+· 35% Inicio: Kickoff + diseño del flujo + catálogos + estructura de datos + prototipo navegable.
+· 45% Entrega y aceptación funcional: planeación + ejecución + evidencias + checklist + aprobación.
+· 20% Cierre: PDF laboratorio + tablero básico + documentación + capacitación + estabilización.
+La aceptación se realiza mediante demo y aprobación formal (acta o validación escrita del Product Owner).
+Este pago debe hacerse mediante el pago a cuenta de ahorros del desarrollador Freelancer (Camilo Andres Ortegon Cuevas)
+6.4 Condiciones para sostener el precio fijo (control de alcance) · Se contempla 1 aplicación (Canvas App).
+· Hasta 3 flujos principales en Power Automate (aprobación, generación PDF, notificación si aplica).
+· Checklist parametrizable en nivel operativo (sin motor avanzado de reglas).
+· Dashboard básico dentro de la app (KPIs esenciales, sin analítica avanzada/BI corporativo).
+· Ajustes menores incluidos dentro de estabilización, siempre que no impliquen ampliación de alcance.
+6.5 Exclusiones Salvo acuerdo mediante control de cambios:
+· Integraciones corporativas complejas (SAP/SSO/ESB/APIs corporativas).
+
+PLAN DE PROYECTO GREENLOG
+· BI corporativo dedicado o analítica avanzada (modelos/predicción/optimización). · Soporte recurrente mensual tipo mesa de ayuda. · Cambios mayores por nuevos requerimientos fuera del alcance descrito. 6.6 Costos de terceros Dado que CENIT cuenta con licenciamiento, esta propuesta no incluye licencias. Cualquier costo adicional dependerá de decisiones internas de CENIT (capacidad de almacenamiento, conectores específicos, repositorios corporativos o políticas TI).
+
+

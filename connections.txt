@@ -1,0 +1,15 @@
+Connected as camilo.ortegon@strategy.com.co
+Id                                                        Name                           API Id                                                              Status
+shared-sharepointonl-27242692-fbcc-4416-999f-9fc163ef3fc7 camilo.ortegon@strategy.com.co /providers/Microsoft.PowerApps/apis/shared_sharepointonline         Error
+fb218be903f944db9d35382ae0834684                          camilo.ortegon@strategy.com.co /providers/Microsoft.PowerApps/apis/shared_planner                  Error
+fac3dae296b64e47b08d0a545f49e445                          camilo.ortegon@strategy.com.co /providers/Microsoft.PowerApps/apis/shared_excelonlinebusiness      Error
+a0d06de722b8425dac2730cb31173d9b                          camilo.ortegon@strategy.com.co /providers/Microsoft.PowerApps/apis/shared_office365users           Error
+shared-planner-89e54402-ad08-40b7-943c-ed4dd27dfe32       camilo.ortegon@strategy.com.co /providers/Microsoft.PowerApps/apis/shared_planner                  Error
+shared-commondataser-0a3eaa5d-7e7a-46cf-a4ff-2f9ac5524be2 camilo.ortegon@strategy.com.co /providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps Error
+shared-office365user-fefc2079-92f8-40ca-9728-13cad0e199ca camilo.ortegon@strategy.com.co /providers/Microsoft.PowerApps/apis/shared_office365users           Error
+shared-teams-768b59e7-bd15-4c7c-9202-85ff6d0d1db4         camilo.ortegon@strategy.com.co /providers/Microsoft.PowerApps/apis/shared_teams                    Error
+shared-teams-6551b9d6-6193-4833-b40b-e0f504025286         camilo.ortegon@strategy.com.co /providers/Microsoft.PowerApps/apis/shared_teams                    Error
+shared-sharepointonl-b9d0ae28-12c8-4c99-b781-f58fc43101a2 camilo.ortegon@strategy.com.co /providers/Microsoft.PowerApps/apis/shared_sharepointonline         Error
+shared-approvals-7729b5e8-9f1a-48d3-a4c8-3ca274019534     Standard approvals             /providers/Microsoft.PowerApps/apis/shared_approvals                Connected
+39fb85a6-c6db-47bc-8928-a2ef980ea949                      camilo.ortegon@strategy.com.co /providers/Microsoft.PowerApps/apis/shared_commondataservice        Error
+

@@ -1,0 +1,14 @@
+App As appinfo:
+    BackEnabled: =true
+    OnStart: |-
+        =Set(gblColor_Primario, RGBA(0, 120, 212, 1));
+        Set(gblColor_SecPrimario, RGBA(0, 78, 140, 1));
+        Set(gblColor_Fondo, RGBA(243, 242, 241, 1));
+        Set(gblColor_Exito, RGBA(16, 124, 16, 1));
+        Set(gblColor_Advertencia, RGBA(255, 185, 0, 1));
+        Set(gblColor_Error, RGBA(164, 38, 44, 1));
+        Set(gblColor_Blanco, RGBA(255, 255, 255, 1));
+        Set(gblColor_TextoPrimario, RGBA(50, 49, 48, 1));
+        Set(gblColor_TextoSecundario, RGBA(96, 94, 92, 1));
+        Set(gblTareaSeleccionada, Blank());
+        Set(gblModoEdicion, false)

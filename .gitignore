@@ -1,0 +1,44 @@
+# Dependencies
+node_modules/
+package-lock.json
+yarn.lock
+
+# Build outputs
+dist/
+build/
+.cache/
+
+# IDE & Editor
+.vscode/
+.idea/
+.cursor/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Logs
+npm-debug.log
+yarn-debug.log
+yarn-error.log
+pnpm-debug.log
+
+# Agent/Claude files
+.agent/
+.agents/
+.claude/
+
+# Temporary files
+*.tmp
+connections.txt
+current_org.txt
+CENIT_extracted.txt
+
+# OS specific
+Thumbs.db
+.DS_Store

@@ -1,0 +1,254 @@
+Pantalla_Detalle As screen:
+    Fill: =RGBA(243, 242, 241, 1)
+    OnVisible: =Set(gblModoEdicion, false)
+
+    Rect_Header_Det As rectangle:
+        X: =0
+        Y: =0
+        Width: =Parent.Width
+        Height: =80
+        Fill: =RGBA(0, 120, 212, 1)
+        BorderThickness: =0
+
+    Btn_Volver As button:
+        X: =0
+        Y: =0
+        Width: =60
+        Height: =80
+        Text: ="←"
+        Size: =24
+        Fill: =RGBA(0, 0, 0, 0)
+        Color: =RGBA(255, 255, 255, 1)
+        HoverFill: =RGBA(255, 255, 255, 0.1)
+        BorderThickness: =0
+        OnSelect: =Navigate(Pantalla_Inicio, ScreenTransition.Fade)
+
+    Lbl_Header_Det As label:
+        X: =60
+        Y: =0
+        Width: =Parent.Width - 140
+        Height: =80
+        Text: ="Detalle de Tarea"
+        Color: =RGBA(255, 255, 255, 1)
+        Size: =18
+        FontWeight: =FontWeight.Bold
+        VerticalAlign: =VerticalAlign.Middle
+
+    Btn_Eliminar As button:
+        X: =Parent.Width - 80
+        Y: =0
+        Width: =80
+        Height: =80
+        Text: ="🗑"
+        Size: =22
+        Fill: =RGBA(0, 0, 0, 0)
+        Color: =RGBA(255, 255, 255, 1)
+        HoverFill: =RGBA(164, 38, 44, 0.3)
+        BorderThickness: =0
+        OnSelect: |-
+            =If(
+                Confirm("¿Eliminar esta tarea?", {ConfirmButton: "Eliminar", CancelButton: "Cancelar"}),
+                Remove(Tareas, LookUp(Tareas, ID = gblTareaSeleccionada.ID));
+                Navigate(Pantalla_Inicio, ScreenTransition.Fade)
+            )
+
+    Rect_Form_BG As rectangle:
+        X: =10
+        Y: =92
+        Width: =Parent.Width - 20
+        Height: =Parent.Height - 180
+        Fill: =RGBA(255, 255, 255, 1)
+        BorderThickness: =0
+        RadiusTopLeft: =10
+        RadiusTopRight: =10
+        RadiusBottomLeft: =10
+        RadiusBottomRight: =10
+
+    Lbl_Titulo_Campo As label:
+        X: =26
+        Y: =106
+        Width: =200
+        Height: =22
+        Text: ="Título *"
+        Size: =12
+        FontWeight: =FontWeight.Semibold
+        Color: =RGBA(50, 49, 48, 1)
+
+    Txt_Titulo_Det As text:
+        X: =26
+        Y: =130
+        Width: =Parent.Width - 52
+        Height: =44
+        Default: =gblTareaSeleccionada.Title
+        HintText: ="Título de la tarea"
+        BorderColor: =RGBA(200, 198, 196, 1)
+        BorderThickness: =1
+        Fill: =RGBA(255, 255, 255, 1)
+        Color: =RGBA(50, 49, 48, 1)
+        Size: =14
+        RadiusTopLeft: =6
+        RadiusTopRight: =6
+        RadiusBottomLeft: =6
+        RadiusBottomRight: =6
+
+    Lbl_Desc_Campo As label:
+        X: =26
+        Y: =186
+        Width: =200
+        Height: =22
+        Text: ="Descripción"
+        Size: =12
+        FontWeight: =FontWeight.Semibold
+        Color: =RGBA(50, 49, 48, 1)
+
+    Txt_Descripcion_Det As text:
+        X: =26
+        Y: =210
+        Width: =Parent.Width - 52
+        Height: =80
+        Default: =gblTareaSeleccionada.Descripcion
+        HintText: ="Describe la tarea..."
+        Mode: =TextMode.MultiLine
+        BorderColor: =RGBA(200, 198, 196, 1)
+        BorderThickness: =1
+        Fill: =RGBA(255, 255, 255, 1)
+        Color: =RGBA(50, 49, 48, 1)
+        Size: =13
+        RadiusTopLeft: =6
+        RadiusTopRight: =6
+        RadiusBottomLeft: =6
+        RadiusBottomRight: =6
+
+    Lbl_Estado_Campo As label:
+        X: =26
+        Y: =302
+        Width: =200
+        Height: =22
+        Text: ="Estado"
+        Size: =12
+        FontWeight: =FontWeight.Semibold
+        Color: =RGBA(50, 49, 48, 1)
+
+    Drp_Estado_Det As dropdown:
+        X: =26
+        Y: =326
+        Width: =(Parent.Width - 62) / 2
+        Height: =44
+        Items: =["Sin iniciar","En progreso","Completada"]
+        Default: =gblTareaSeleccionada.Estado
+        BorderColor: =RGBA(200, 198, 196, 1)
+        BorderThickness: =1
+        Fill: =RGBA(255, 255, 255, 1)
+        Color: =RGBA(50, 49, 48, 1)
+        Size: =13
+        RadiusTopLeft: =6
+        RadiusTopRight: =6
+        RadiusBottomLeft: =6
+        RadiusBottomRight: =6
+
+    Lbl_Prioridad_Campo As label:
+        X: =36 + (Parent.Width - 62) / 2
+        Y: =302
+        Width: =200
+        Height: =22
+        Text: ="Prioridad"
+        Size: =12
+        FontWeight: =FontWeight.Semibold
+        Color: =RGBA(50, 49, 48, 1)
+
+    Drp_Prioridad_Det As dropdown:
+        X: =36 + (Parent.Width - 62) / 2
+        Y: =326
+        Width: =(Parent.Width - 62) / 2
+        Height: =44
+        Items: =["Baja","Media","Alta"]
+        Default: =gblTareaSeleccionada.Prioridad
+        BorderColor: =RGBA(200, 198, 196, 1)
+        BorderThickness: =1
+        Fill: =RGBA(255, 255, 255, 1)
+        Color: =RGBA(50, 49, 48, 1)
+        Size: =13
+        RadiusTopLeft: =6
+        RadiusTopRight: =6
+        RadiusBottomLeft: =6
+        RadiusBottomRight: =6
+
+    Lbl_Fecha_Campo As label:
+        X: =26
+        Y: =382
+        Width: =200
+        Height: =22
+        Text: ="Fecha de vencimiento"
+        Size: =12
+        FontWeight: =FontWeight.Semibold
+        Color: =RGBA(50, 49, 48, 1)
+
+    Dtp_Fecha_Det As datepicker:
+        X: =26
+        Y: =406
+        Width: =Parent.Width - 52
+        Height: =44
+        SelectedDate: =gblTareaSeleccionada.FechaVencimiento
+        Format: =DateTimeFormat.ShortDate
+        BorderColor: =RGBA(200, 198, 196, 1)
+        BorderThickness: =1
+        Fill: =RGBA(255, 255, 255, 1)
+        Color: =RGBA(50, 49, 48, 1)
+        Size: =13
+        RadiusTopLeft: =6
+        RadiusTopRight: =6
+        RadiusBottomLeft: =6
+        RadiusBottomRight: =6
+
+    Rect_Separador_Det As rectangle:
+        X: =26
+        Y: =462
+        Width: =Parent.Width - 52
+        Height: =1
+        Fill: =RGBA(200, 198, 196, 1)
+        BorderThickness: =0
+
+    Lbl_Creado_Det As label:
+        X: =26
+        Y: =472
+        Width: =Parent.Width - 52
+        Height: =20
+        Text: ="Creado: " & Text(gblTareaSeleccionada.Created, "[$-es-ES]dd/mm/yyyy hh:mm")
+        Size: =11
+        Color: =RGBA(96, 94, 92, 1)
+
+    Btn_Guardar_Det As button:
+        X: =10
+        Y: =Parent.Height - 76
+        Width: =Parent.Width - 20
+        Height: =54
+        Text: ="Guardar cambios"
+        Size: =16
+        FontWeight: =FontWeight.Bold
+        Fill: =RGBA(0, 120, 212, 1)
+        Color: =RGBA(255, 255, 255, 1)
+        HoverFill: =RGBA(0, 78, 140, 1)
+        PressedFill: =RGBA(0, 56, 117, 1)
+        BorderThickness: =0
+        RadiusTopLeft: =10
+        RadiusTopRight: =10
+        RadiusBottomLeft: =10
+        RadiusBottomRight: =10
+        OnSelect: |-
+            =If(
+                IsBlank(Txt_Titulo_Det.Text),
+                Notify("El título es obligatorio", NotificationType.Error),
+                Patch(
+                    Tareas,
+                    LookUp(Tareas, ID = gblTareaSeleccionada.ID),
+                    {
+                        Title: Txt_Titulo_Det.Text,
+                        Descripcion: Txt_Descripcion_Det.Text,
+                        Estado: Drp_Estado_Det.Selected.Value,
+                        Prioridad: Drp_Prioridad_Det.Selected.Value,
+                        FechaVencimiento: Dtp_Fecha_Det.SelectedDate
+                    }
+                );
+                Notify("Tarea actualizada correctamente", NotificationType.Success);
+                Navigate(Pantalla_Inicio, ScreenTransition.Fade)
+            )

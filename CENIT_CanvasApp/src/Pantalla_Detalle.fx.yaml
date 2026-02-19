@@ -1,0 +1,470 @@
+Pantalla_Detalle As screen:
+    Fill: =RGBA(249, 250, 251, 1)
+    OnVisible: =UpdateContext({locModoEdicion: false})
+
+    # ── HEADER ──────────────────────────────────────────────────
+    Rect_Header_Det As rectangle:
+        X: =0
+        Y: =0
+        Width: =Parent.Width
+        Height: =72
+        Fill: =RGBA(0, 34, 102, 1)
+        BorderThickness: =0
+
+    Btn_Det_Volver As button:
+        X: =0
+        Y: =0
+        Width: =56
+        Height: =72
+        Text: ="←"
+        Size: =22
+        Fill: =RGBA(0, 0, 0, 0)
+        Color: =RGBA(255, 255, 255, 1)
+        HoverFill: =RGBA(255, 255, 255, 0.1)
+        BorderThickness: =0
+        OnSelect: =Navigate(Pantalla_Planeacion, ScreenTransition.Fade)
+
+    Lbl_Det_Header As label:
+        X: =56
+        Y: =0
+        Width: =Parent.Width - 160
+        Height: =72
+        Text: ="Detalle de Actividad"
+        Color: =RGBA(255, 255, 255, 1)
+        Size: =16
+        FontWeight: =FontWeight.Bold
+        VerticalAlign: =VerticalAlign.Middle
+
+    Btn_Det_Eliminar As button:
+        X: =Parent.Width - 100
+        Y: =0
+        Width: =100
+        Height: =72
+        Text: ="Eliminar"
+        Size: =12
+        Fill: =RGBA(0, 0, 0, 0)
+        Color: =RGBA(252, 165, 165, 1)
+        HoverFill: =RGBA(239, 68, 68, 0.2)
+        BorderThickness: =0
+        OnSelect: |-
+            =If(
+                Confirm("¿Eliminar esta actividad?", {ConfirmButton: "Eliminar", CancelButton: "Cancelar"}),
+                Remove(ActividadesAmbientales, LookUp(ActividadesAmbientales, ID = gblActividadSeleccionada.ID));
+                Notify("Actividad eliminada", NotificationType.Success);
+                Navigate(Pantalla_Planeacion, ScreenTransition.Fade)
+            )
+
+    # ── BADGE ESTADO ─────────────────────────────────────────────
+    Lbl_Det_Estado_Badge As label:
+        X: =Parent.Width - 160
+        Y: =82
+        Width: =150
+        Height: =28
+        Text: =gblActividadSeleccionada.Estado
+        Size: =12
+        FontWeight: =FontWeight.Bold
+        Align: =Align.Center
+        Color: =RGBA(255, 255, 255, 1)
+        Fill: =If(
+            gblActividadSeleccionada.Estado = "Cerrada",                 RGBA(140, 198,  63, 1),
+            If(gblActividadSeleccionada.Estado = "En Ejecución",         RGBA(245, 158,  11, 1),
+            If(gblActividadSeleccionada.Estado = "Pendiente Aprobación", RGBA(139,  92, 246, 1),
+            RGBA(0, 51, 160, 1)))
+        )
+        RadiusTopLeft: =14
+        RadiusTopRight: =14
+        RadiusBottomLeft: =14
+        RadiusBottomRight: =14
+
+    # ── FORMULARIO DESPLAZABLE ───────────────────────────────────
+    Rect_Form_Det As rectangle:
+        X: =10
+        Y: =120
+        Width: =Parent.Width - 20
+        Height: =Parent.Height - 210
+        Fill: =RGBA(255, 255, 255, 1)
+        BorderThickness: =0
+        RadiusTopLeft: =12
+        RadiusTopRight: =12
+        RadiusBottomLeft: =12
+        RadiusBottomRight: =12
+
+    # Tarea (Title)
+    Lbl_Det_Tarea_Campo As label:
+        X: =26
+        Y: =130
+        Width: =200
+        Height: =20
+        Text: ="Tarea / Actividad *"
+        Size: =11
+        FontWeight: =FontWeight.Semibold
+        Color: =RGBA(75, 85, 99, 1)
+
+    Txt_Det_Tarea As text:
+        X: =26
+        Y: =152
+        Width: =Parent.Width - 52
+        Height: =42
+        Default: =gblActividadSeleccionada.Title
+        HintText: ="Nombre de la actividad ambiental"
+        BorderColor: =RGBA(229, 231, 235, 1)
+        BorderThickness: =1
+        Fill: =RGBA(249, 250, 251, 1)
+        Color: =RGBA(31, 41, 55, 1)
+        Size: =13
+        RadiusTopLeft: =8
+        RadiusTopRight: =8
+        RadiusBottomLeft: =8
+        RadiusBottomRight: =8
+
+    # Tipo + Prioridad (misma fila)
+    Lbl_Det_Tipo_Campo As label:
+        X: =26
+        Y: =204
+        Width: =160
+        Height: =20
+        Text: ="Tipo de Actividad"
+        Size: =11
+        FontWeight: =FontWeight.Semibold
+        Color: =RGBA(75, 85, 99, 1)
+
+    Drp_Det_Tipo As dropdown:
+        X: =26
+        Y: =226
+        Width: =(Parent.Width - 62) / 2
+        Height: =42
+        Items: =["Monitoreo","Auditoría","Mantenimiento","Inspección","Capacitación","Otro"]
+        Default: =gblActividadSeleccionada.TipoActividad
+        BorderColor: =RGBA(229, 231, 235, 1)
+        BorderThickness: =1
+        Fill: =RGBA(249, 250, 251, 1)
+        Color: =RGBA(31, 41, 55, 1)
+        Size: =12
+        RadiusTopLeft: =8
+        RadiusTopRight: =8
+        RadiusBottomLeft: =8
+        RadiusBottomRight: =8
+
+    Lbl_Det_Prio_Campo As label:
+        X: =36 + (Parent.Width - 62) / 2
+        Y: =204
+        Width: =160
+        Height: =20
+        Text: ="Prioridad"
+        Size: =11
+        FontWeight: =FontWeight.Semibold
+        Color: =RGBA(75, 85, 99, 1)
+
+    Drp_Det_Prioridad As dropdown:
+        X: =36 + (Parent.Width - 62) / 2
+        Y: =226
+        Width: =(Parent.Width - 62) / 2
+        Height: =42
+        Items: =["Alta","Media","Baja"]
+        Default: =gblActividadSeleccionada.Prioridad
+        BorderColor: =RGBA(229, 231, 235, 1)
+        BorderThickness: =1
+        Fill: =RGBA(249, 250, 251, 1)
+        Color: =RGBA(31, 41, 55, 1)
+        Size: =12
+        RadiusTopLeft: =8
+        RadiusTopRight: =8
+        RadiusBottomLeft: =8
+        RadiusBottomRight: =8
+
+    # Estado
+    Lbl_Det_Estado_Campo As label:
+        X: =26
+        Y: =278
+        Width: =160
+        Height: =20
+        Text: ="Estado"
+        Size: =11
+        FontWeight: =FontWeight.Semibold
+        Color: =RGBA(75, 85, 99, 1)
+
+    Drp_Det_Estado As dropdown:
+        X: =26
+        Y: =300
+        Width: =(Parent.Width - 62) / 2
+        Height: =42
+        Items: =["Planeada","En Ejecución","Pendiente Aprobación","Cerrada"]
+        Default: =gblActividadSeleccionada.Estado
+        BorderColor: =RGBA(229, 231, 235, 1)
+        BorderThickness: =1
+        Fill: =RGBA(249, 250, 251, 1)
+        Color: =RGBA(31, 41, 55, 1)
+        Size: =12
+        RadiusTopLeft: =8
+        RadiusTopRight: =8
+        RadiusBottomLeft: =8
+        RadiusBottomRight: =8
+
+    # % Avance
+    Lbl_Det_Avance_Campo As label:
+        X: =36 + (Parent.Width - 62) / 2
+        Y: =278
+        Width: =160
+        Height: =20
+        Text: ="% Avance"
+        Size: =11
+        FontWeight: =FontWeight.Semibold
+        Color: =RGBA(75, 85, 99, 1)
+
+    Txt_Det_Avance As text:
+        X: =36 + (Parent.Width - 62) / 2
+        Y: =300
+        Width: =(Parent.Width - 62) / 2
+        Height: =42
+        Default: =Text(gblActividadSeleccionada.PorcentajeAvance)
+        HintText: ="0 - 100"
+        BorderColor: =RGBA(229, 231, 235, 1)
+        BorderThickness: =1
+        Fill: =RGBA(249, 250, 251, 1)
+        Color: =RGBA(31, 41, 55, 1)
+        Size: =13
+        RadiusTopLeft: =8
+        RadiusTopRight: =8
+        RadiusBottomLeft: =8
+        RadiusBottomRight: =8
+
+    # Responsable
+    Lbl_Det_Resp_Campo As label:
+        X: =26
+        Y: =352
+        Width: =200
+        Height: =20
+        Text: ="Responsable"
+        Size: =11
+        FontWeight: =FontWeight.Semibold
+        Color: =RGBA(75, 85, 99, 1)
+
+    Txt_Det_Responsable As text:
+        X: =26
+        Y: =374
+        Width: =Parent.Width - 52
+        Height: =42
+        Default: =gblActividadSeleccionada.Responsable
+        HintText: ="Nombre del responsable"
+        BorderColor: =RGBA(229, 231, 235, 1)
+        BorderThickness: =1
+        Fill: =RGBA(249, 250, 251, 1)
+        Color: =RGBA(31, 41, 55, 1)
+        Size: =13
+        RadiusTopLeft: =8
+        RadiusTopRight: =8
+        RadiusBottomLeft: =8
+        RadiusBottomRight: =8
+
+    # Fechas planeadas
+    Lbl_Det_FIni_Campo As label:
+        X: =26
+        Y: =426
+        Width: =160
+        Height: =20
+        Text: ="Fecha Inicio Planeada"
+        Size: =11
+        FontWeight: =FontWeight.Semibold
+        Color: =RGBA(75, 85, 99, 1)
+
+    Dtp_Det_FechaInicio As datepicker:
+        X: =26
+        Y: =448
+        Width: =(Parent.Width - 62) / 2
+        Height: =42
+        SelectedDate: =gblActividadSeleccionada.FechaInicio
+        Format: =DateTimeFormat.ShortDate
+        BorderColor: =RGBA(229, 231, 235, 1)
+        BorderThickness: =1
+        Fill: =RGBA(249, 250, 251, 1)
+        Color: =RGBA(31, 41, 55, 1)
+        Size: =12
+        RadiusTopLeft: =8
+        RadiusTopRight: =8
+        RadiusBottomLeft: =8
+        RadiusBottomRight: =8
+
+    Lbl_Det_FFin_Campo As label:
+        X: =36 + (Parent.Width - 62) / 2
+        Y: =426
+        Width: =160
+        Height: =20
+        Text: ="Fecha Fin Planeada"
+        Size: =11
+        FontWeight: =FontWeight.Semibold
+        Color: =RGBA(75, 85, 99, 1)
+
+    Dtp_Det_FechaFin As datepicker:
+        X: =36 + (Parent.Width - 62) / 2
+        Y: =448
+        Width: =(Parent.Width - 62) / 2
+        Height: =42
+        SelectedDate: =gblActividadSeleccionada.FechaFin
+        Format: =DateTimeFormat.ShortDate
+        BorderColor: =RGBA(229, 231, 235, 1)
+        BorderThickness: =1
+        Fill: =RGBA(249, 250, 251, 1)
+        Color: =RGBA(31, 41, 55, 1)
+        Size: =12
+        RadiusTopLeft: =8
+        RadiusTopRight: =8
+        RadiusBottomLeft: =8
+        RadiusBottomRight: =8
+
+    # Zona
+    Lbl_Det_Zona_Campo As label:
+        X: =26
+        Y: =500
+        Width: =200
+        Height: =20
+        Text: ="Ubicación / Zona"
+        Size: =11
+        FontWeight: =FontWeight.Semibold
+        Color: =RGBA(75, 85, 99, 1)
+
+    Drp_Det_Zona As dropdown:
+        X: =26
+        Y: =522
+        Width: =Parent.Width - 52
+        Height: =42
+        Items: =["Zona Norte - Planta Principal","Zona Sur - Orilla del Río","Bodega Central","Zona Industrial","Área Administrativa","Campo - Oleoducto Norte","Campo - Oleoducto Sur","Estación de Bombeo 1","Estación de Bombeo 2","Otra"]
+        Default: =gblActividadSeleccionada.UbicacionZona
+        BorderColor: =RGBA(229, 231, 235, 1)
+        BorderThickness: =1
+        Fill: =RGBA(249, 250, 251, 1)
+        Color: =RGBA(31, 41, 55, 1)
+        Size: =12
+        RadiusTopLeft: =8
+        RadiusTopRight: =8
+        RadiusBottomLeft: =8
+        RadiusBottomRight: =8
+
+    # Norma
+    Lbl_Det_Norma_Campo As label:
+        X: =26
+        Y: =574
+        Width: =200
+        Height: =20
+        Text: ="Norma / Reglamentación"
+        Size: =11
+        FontWeight: =FontWeight.Semibold
+        Color: =RGBA(75, 85, 99, 1)
+
+    Txt_Det_Norma As text:
+        X: =26
+        Y: =596
+        Width: =Parent.Width - 52
+        Height: =42
+        Default: =gblActividadSeleccionada.CumplimientoNormativo
+        HintText: ="Ej: Res. 2254/2017 MADS"
+        BorderColor: =RGBA(229, 231, 235, 1)
+        BorderThickness: =1
+        Fill: =RGBA(249, 250, 251, 1)
+        Color: =RGBA(31, 41, 55, 1)
+        Size: =12
+        RadiusTopLeft: =8
+        RadiusTopRight: =8
+        RadiusBottomLeft: =8
+        RadiusBottomRight: =8
+
+    # Descripción
+    Lbl_Det_Desc_Campo As label:
+        X: =26
+        Y: =648
+        Width: =200
+        Height: =20
+        Text: ="Descripción"
+        Size: =11
+        FontWeight: =FontWeight.Semibold
+        Color: =RGBA(75, 85, 99, 1)
+
+    Txt_Det_Descripcion As text:
+        X: =26
+        Y: =670
+        Width: =Parent.Width - 52
+        Height: =70
+        Default: =gblActividadSeleccionada.Descripcion
+        HintText: ="Descripción detallada de la actividad..."
+        Mode: =TextMode.MultiLine
+        BorderColor: =RGBA(229, 231, 235, 1)
+        BorderThickness: =1
+        Fill: =RGBA(249, 250, 251, 1)
+        Color: =RGBA(31, 41, 55, 1)
+        Size: =12
+        RadiusTopLeft: =8
+        RadiusTopRight: =8
+        RadiusBottomLeft: =8
+        RadiusBottomRight: =8
+
+    # Novedades
+    Lbl_Det_Nov_Campo As label:
+        X: =26
+        Y: =750
+        Width: =200
+        Height: =20
+        Text: ="Novedades / Bitácora"
+        Size: =11
+        FontWeight: =FontWeight.Semibold
+        Color: =RGBA(75, 85, 99, 1)
+
+    Txt_Det_Novedades As text:
+        X: =26
+        Y: =772
+        Width: =Parent.Width - 52
+        Height: =70
+        Default: =gblActividadSeleccionada.Novedades
+        HintText: ="Registra novedades o avances del día..."
+        Mode: =TextMode.MultiLine
+        BorderColor: =RGBA(229, 231, 235, 1)
+        BorderThickness: =1
+        Fill: =RGBA(249, 250, 251, 1)
+        Color: =RGBA(31, 41, 55, 1)
+        Size: =12
+        RadiusTopLeft: =8
+        RadiusTopRight: =8
+        RadiusBottomLeft: =8
+        RadiusBottomRight: =8
+
+    # ── BOTÓN GUARDAR ─────────────────────────────────────────────
+    Btn_Det_Guardar As button:
+        X: =10
+        Y: =Parent.Height - 76
+        Width: =Parent.Width - 20
+        Height: =54
+        Text: ="Guardar cambios"
+        Size: =16
+        FontWeight: =FontWeight.Bold
+        Fill: =RGBA(0, 51, 160, 1)
+        Color: =RGBA(255, 255, 255, 1)
+        HoverFill: =RGBA(0, 86, 210, 1)
+        PressedFill: =RGBA(0, 34, 102, 1)
+        BorderThickness: =0
+        RadiusTopLeft: =12
+        RadiusTopRight: =12
+        RadiusBottomLeft: =12
+        RadiusBottomRight: =12
+        OnSelect: |-
+            =If(
+                IsBlank(Txt_Det_Tarea.Text),
+                Notify("El campo Tarea es obligatorio", NotificationType.Error),
+                Patch(
+                    ActividadesAmbientales,
+                    LookUp(ActividadesAmbientales, ID = gblActividadSeleccionada.ID),
+                    {
+                        Title:                 Txt_Det_Tarea.Text,
+                        TipoActividad:         Drp_Det_Tipo.Selected.Value,
+                        Prioridad:             Drp_Det_Prioridad.Selected.Value,
+                        Estado:                Drp_Det_Estado.Selected.Value,
+                        PorcentajeAvance:      Value(Txt_Det_Avance.Text),
+                        Responsable:           Txt_Det_Responsable.Text,
+                        FechaInicio:           Dtp_Det_FechaInicio.SelectedDate,
+                        FechaFin:              Dtp_Det_FechaFin.SelectedDate,
+                        UbicacionZona:         Drp_Det_Zona.Selected.Value,
+                        CumplimientoNormativo: Txt_Det_Norma.Text,
+                        Descripcion:           Txt_Det_Descripcion.Text,
+                        Novedades:             Txt_Det_Novedades.Text
+                    }
+                );
+                Notify("Actividad actualizada correctamente", NotificationType.Success);
+                Navigate(Pantalla_Planeacion, ScreenTransition.Fade)
+            )

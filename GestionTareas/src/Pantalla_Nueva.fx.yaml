@@ -1,0 +1,229 @@
+Pantalla_Nueva As screen:
+    Fill: =RGBA(243, 242, 241, 1)
+    OnVisible: =Reset(Txt_Titulo_Nva)
+
+    Rect_Header_Nva As rectangle:
+        X: =0
+        Y: =0
+        Width: =Parent.Width
+        Height: =80
+        Fill: =RGBA(0, 120, 212, 1)
+        BorderThickness: =0
+
+    Btn_Cancelar_Nva As button:
+        X: =0
+        Y: =0
+        Width: =60
+        Height: =80
+        Text: ="←"
+        Size: =24
+        Fill: =RGBA(0, 0, 0, 0)
+        Color: =RGBA(255, 255, 255, 1)
+        HoverFill: =RGBA(255, 255, 255, 0.1)
+        BorderThickness: =0
+        OnSelect: =Navigate(Pantalla_Inicio, ScreenTransition.Fade)
+
+    Lbl_Header_Nva As label:
+        X: =60
+        Y: =0
+        Width: =Parent.Width - 60
+        Height: =80
+        Text: ="Nueva Tarea"
+        Color: =RGBA(255, 255, 255, 1)
+        Size: =18
+        FontWeight: =FontWeight.Bold
+        VerticalAlign: =VerticalAlign.Middle
+
+    Rect_Form_Nva_BG As rectangle:
+        X: =10
+        Y: =92
+        Width: =Parent.Width - 20
+        Height: =Parent.Height - 180
+        Fill: =RGBA(255, 255, 255, 1)
+        BorderThickness: =0
+        RadiusTopLeft: =10
+        RadiusTopRight: =10
+        RadiusBottomLeft: =10
+        RadiusBottomRight: =10
+
+    Lbl_Titulo_Nva_Campo As label:
+        X: =26
+        Y: =106
+        Width: =200
+        Height: =22
+        Text: ="Título *"
+        Size: =12
+        FontWeight: =FontWeight.Semibold
+        Color: =RGBA(50, 49, 48, 1)
+
+    Txt_Titulo_Nva As text:
+        X: =26
+        Y: =130
+        Width: =Parent.Width - 52
+        Height: =44
+        Default: =""
+        HintText: ="Escribe el título de la tarea"
+        BorderColor: =RGBA(200, 198, 196, 1)
+        BorderThickness: =1
+        Fill: =RGBA(255, 255, 255, 1)
+        Color: =RGBA(50, 49, 48, 1)
+        Size: =14
+        RadiusTopLeft: =6
+        RadiusTopRight: =6
+        RadiusBottomLeft: =6
+        RadiusBottomRight: =6
+
+    Lbl_Desc_Nva_Campo As label:
+        X: =26
+        Y: =186
+        Width: =200
+        Height: =22
+        Text: ="Descripción"
+        Size: =12
+        FontWeight: =FontWeight.Semibold
+        Color: =RGBA(50, 49, 48, 1)
+
+    Txt_Descripcion_Nva As text:
+        X: =26
+        Y: =210
+        Width: =Parent.Width - 52
+        Height: =80
+        Default: =""
+        HintText: ="Describe brevemente la tarea..."
+        Mode: =TextMode.MultiLine
+        BorderColor: =RGBA(200, 198, 196, 1)
+        BorderThickness: =1
+        Fill: =RGBA(255, 255, 255, 1)
+        Color: =RGBA(50, 49, 48, 1)
+        Size: =13
+        RadiusTopLeft: =6
+        RadiusTopRight: =6
+        RadiusBottomLeft: =6
+        RadiusBottomRight: =6
+
+    Lbl_Estado_Nva_Campo As label:
+        X: =26
+        Y: =302
+        Width: =200
+        Height: =22
+        Text: ="Estado"
+        Size: =12
+        FontWeight: =FontWeight.Semibold
+        Color: =RGBA(50, 49, 48, 1)
+
+    Drp_Estado_Nva As dropdown:
+        X: =26
+        Y: =326
+        Width: =(Parent.Width - 62) / 2
+        Height: =44
+        Items: =["Sin iniciar","En progreso","Completada"]
+        Default: ="Sin iniciar"
+        BorderColor: =RGBA(200, 198, 196, 1)
+        BorderThickness: =1
+        Fill: =RGBA(255, 255, 255, 1)
+        Color: =RGBA(50, 49, 48, 1)
+        Size: =13
+        RadiusTopLeft: =6
+        RadiusTopRight: =6
+        RadiusBottomLeft: =6
+        RadiusBottomRight: =6
+
+    Lbl_Prioridad_Nva_Campo As label:
+        X: =36 + (Parent.Width - 62) / 2
+        Y: =302
+        Width: =200
+        Height: =22
+        Text: ="Prioridad"
+        Size: =12
+        FontWeight: =FontWeight.Semibold
+        Color: =RGBA(50, 49, 48, 1)
+
+    Drp_Prioridad_Nva As dropdown:
+        X: =36 + (Parent.Width - 62) / 2
+        Y: =326
+        Width: =(Parent.Width - 62) / 2
+        Height: =44
+        Items: =["Baja","Media","Alta"]
+        Default: ="Media"
+        BorderColor: =RGBA(200, 198, 196, 1)
+        BorderThickness: =1
+        Fill: =RGBA(255, 255, 255, 1)
+        Color: =RGBA(50, 49, 48, 1)
+        Size: =13
+        RadiusTopLeft: =6
+        RadiusTopRight: =6
+        RadiusBottomLeft: =6
+        RadiusBottomRight: =6
+
+    Lbl_Fecha_Nva_Campo As label:
+        X: =26
+        Y: =382
+        Width: =200
+        Height: =22
+        Text: ="Fecha de vencimiento (opcional)"
+        Size: =12
+        FontWeight: =FontWeight.Semibold
+        Color: =RGBA(50, 49, 48, 1)
+
+    Dtp_Fecha_Nva As datepicker:
+        X: =26
+        Y: =406
+        Width: =Parent.Width - 52
+        Height: =44
+        SelectedDate: =Today() + 7
+        Format: =DateTimeFormat.ShortDate
+        BorderColor: =RGBA(200, 198, 196, 1)
+        BorderThickness: =1
+        Fill: =RGBA(255, 255, 255, 1)
+        Color: =RGBA(50, 49, 48, 1)
+        Size: =13
+        RadiusTopLeft: =6
+        RadiusTopRight: =6
+        RadiusBottomLeft: =6
+        RadiusBottomRight: =6
+
+    Lbl_Tip_Nva As label:
+        X: =26
+        Y: =462
+        Width: =Parent.Width - 52
+        Height: =36
+        Text: ="* El campo Título es obligatorio. La tarea se creará en tu lista de SharePoint."
+        Size: =11
+        Color: =RGBA(96, 94, 92, 1)
+        Overflow: =Overflow.Auto
+
+    Btn_Crear_Tarea As button:
+        X: =10
+        Y: =Parent.Height - 76
+        Width: =Parent.Width - 20
+        Height: =54
+        Text: ="Crear tarea"
+        Size: =16
+        FontWeight: =FontWeight.Bold
+        Fill: =RGBA(0, 120, 212, 1)
+        Color: =RGBA(255, 255, 255, 1)
+        HoverFill: =RGBA(0, 78, 140, 1)
+        PressedFill: =RGBA(0, 56, 117, 1)
+        BorderThickness: =0
+        RadiusTopLeft: =10
+        RadiusTopRight: =10
+        RadiusBottomLeft: =10
+        RadiusBottomRight: =10
+        OnSelect: |-
+            =If(
+                IsBlank(Txt_Titulo_Nva.Text),
+                Notify("El título es obligatorio", NotificationType.Error),
+                Patch(
+                    Tareas,
+                    Defaults(Tareas),
+                    {
+                        Title: Txt_Titulo_Nva.Text,
+                        Descripcion: Txt_Descripcion_Nva.Text,
+                        Estado: Drp_Estado_Nva.Selected.Value,
+                        Prioridad: Drp_Prioridad_Nva.Selected.Value,
+                        FechaVencimiento: Dtp_Fecha_Nva.SelectedDate
+                    }
+                );
+                Notify("Tarea creada correctamente", NotificationType.Success);
+                Navigate(Pantalla_Inicio, ScreenTransition.Fade)
+            )

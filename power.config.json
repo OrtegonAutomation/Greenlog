@@ -1,0 +1,13 @@
+{
+  "appId": "75ea5d50-bf6e-4b9a-b595-9aa8d8e307c6",
+  "appDisplayName": "Cenit - Greenlog",
+  "description": "Sistema de Control Ambiental - GreenLog",
+  "environmentId": "Default-8bf4cc2d-4c11-4c12-9cc2-a472854e3bf2",
+  "buildPath": "./dist",
+  "buildEntryPoint": "index.html",
+  "logoPath": "Default",
+  "localAppUrl": "http://localhost:3000/",
+  "region": "prod",
+  "connectionReferences": {},
+  "databaseReferences": {}
+}

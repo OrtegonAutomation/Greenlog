@@ -1,0 +1,315 @@
+Pantalla_Inicio As screen:
+    Fill: =RGBA(243, 242, 241, 1)
+    OnVisible: =Set(gblTareaSeleccionada, Blank())
+
+    Rect_Header As rectangle:
+        X: =0
+        Y: =0
+        Width: =Parent.Width
+        Height: =80
+        Fill: =RGBA(0, 120, 212, 1)
+        BorderThickness: =0
+
+    Lbl_Titulo_App As label:
+        X: =20
+        Y: =0
+        Width: =Parent.Width - 40
+        Height: =80
+        Text: ="Gestión de Tareas"
+        Color: =RGBA(255, 255, 255, 1)
+        Size: =22
+        FontWeight: =FontWeight.Bold
+        VerticalAlign: =VerticalAlign.Middle
+
+    Rect_Buscar_BG As rectangle:
+        X: =10
+        Y: =92
+        Width: =Parent.Width - 20
+        Height: =44
+        Fill: =RGBA(255, 255, 255, 1)
+        BorderColor: =RGBA(200, 198, 196, 1)
+        BorderThickness: =1
+        RadiusTopLeft: =8
+        RadiusTopRight: =8
+        RadiusBottomLeft: =8
+        RadiusBottomRight: =8
+
+    Ico_Lupa As icon:
+        X: =22
+        Y: =103
+        Width: =24
+        Height: =24
+        Icon: =Icon.Search
+        Color: =RGBA(96, 94, 92, 1)
+
+    Txt_Buscar As text:
+        X: =54
+        Y: =92
+        Width: =Parent.Width - 75
+        Height: =44
+        Default: =""
+        HintText: ="Buscar tarea..."
+        BorderThickness: =0
+        Fill: =RGBA(0, 0, 0, 0)
+        Color: =RGBA(50, 49, 48, 1)
+        Size: =14
+
+    Rect_Stat_Total As rectangle:
+        X: =10
+        Y: =150
+        Width: =(Parent.Width - 40) / 3
+        Height: =64
+        Fill: =RGBA(255, 255, 255, 1)
+        BorderThickness: =0
+        RadiusTopLeft: =8
+        RadiusTopRight: =8
+        RadiusBottomLeft: =8
+        RadiusBottomRight: =8
+
+    Lbl_Num_Total As label:
+        X: =10
+        Y: =155
+        Width: =(Parent.Width - 40) / 3
+        Height: =30
+        Text: =Text(CountRows(Tareas))
+        Size: =22
+        FontWeight: =FontWeight.Bold
+        Align: =Align.Center
+        Color: =RGBA(0, 120, 212, 1)
+
+    Lbl_Txt_Total As label:
+        X: =10
+        Y: =185
+        Width: =(Parent.Width - 40) / 3
+        Height: =24
+        Text: ="Total"
+        Size: =11
+        Align: =Align.Center
+        Color: =RGBA(96, 94, 92, 1)
+
+    Rect_Stat_Progreso As rectangle:
+        X: =20 + (Parent.Width - 40) / 3
+        Y: =150
+        Width: =(Parent.Width - 40) / 3
+        Height: =64
+        Fill: =RGBA(255, 255, 255, 1)
+        BorderThickness: =0
+        RadiusTopLeft: =8
+        RadiusTopRight: =8
+        RadiusBottomLeft: =8
+        RadiusBottomRight: =8
+
+    Lbl_Num_Progreso As label:
+        X: =20 + (Parent.Width - 40) / 3
+        Y: =155
+        Width: =(Parent.Width - 40) / 3
+        Height: =30
+        Text: =Text(CountRows(Filter(Tareas, Estado = "En progreso")))
+        Size: =22
+        FontWeight: =FontWeight.Bold
+        Align: =Align.Center
+        Color: =RGBA(255, 185, 0, 1)
+
+    Lbl_Txt_Progreso As label:
+        X: =20 + (Parent.Width - 40) / 3
+        Y: =185
+        Width: =(Parent.Width - 40) / 3
+        Height: =24
+        Text: ="En progreso"
+        Size: =11
+        Align: =Align.Center
+        Color: =RGBA(96, 94, 92, 1)
+
+    Rect_Stat_Completadas As rectangle:
+        X: =30 + 2 * (Parent.Width - 40) / 3
+        Y: =150
+        Width: =(Parent.Width - 40) / 3
+        Height: =64
+        Fill: =RGBA(255, 255, 255, 1)
+        BorderThickness: =0
+        RadiusTopLeft: =8
+        RadiusTopRight: =8
+        RadiusBottomLeft: =8
+        RadiusBottomRight: =8
+
+    Lbl_Num_Completadas As label:
+        X: =30 + 2 * (Parent.Width - 40) / 3
+        Y: =155
+        Width: =(Parent.Width - 40) / 3
+        Height: =30
+        Text: =Text(CountRows(Filter(Tareas, Estado = "Completada")))
+        Size: =22
+        FontWeight: =FontWeight.Bold
+        Align: =Align.Center
+        Color: =RGBA(16, 124, 16, 1)
+
+    Lbl_Txt_Completadas As label:
+        X: =30 + 2 * (Parent.Width - 40) / 3
+        Y: =185
+        Width: =(Parent.Width - 40) / 3
+        Height: =24
+        Text: ="Completadas"
+        Size: =11
+        Align: =Align.Center
+        Color: =RGBA(96, 94, 92, 1)
+
+    Lbl_Seccion_Tareas As label:
+        X: =20
+        Y: =228
+        Width: =200
+        Height: =28
+        Text: ="Mis Tareas"
+        Size: =16
+        FontWeight: =FontWeight.Bold
+        Color: =RGBA(50, 49, 48, 1)
+
+    Gal_Tareas As gallery.flexible.height:
+        X: =0
+        Y: =260
+        Width: =Parent.Width
+        Height: =Parent.Height - 330
+        Items: =If(
+            IsBlank(Txt_Buscar.Text),
+            Sort(Tareas, FechaVencimiento, SortOrder.Ascending),
+            Filter(Tareas, Title in Txt_Buscar.Text)
+        )
+        TemplatePadding: =8
+        TemplateSize: =90
+        ShowScrollbar: =false
+
+        Rect_Item_BG As rectangle:
+            X: =10
+            Y: =4
+            Width: =Parent.Width - 20
+            Height: =82
+            Fill: =RGBA(255, 255, 255, 1)
+            BorderThickness: =0
+            RadiusTopLeft: =10
+            RadiusTopRight: =10
+            RadiusBottomLeft: =10
+            RadiusBottomRight: =10
+
+        Rect_Estado_Barra As rectangle:
+            X: =10
+            Y: =4
+            Width: =6
+            Height: =82
+            Fill: =If(
+                ThisItem.Estado = "Completada", RGBA(16, 124, 16, 1),
+                If(ThisItem.Estado = "En progreso", RGBA(255, 185, 0, 1),
+                RGBA(0, 120, 212, 1))
+            )
+            BorderThickness: =0
+            RadiusTopLeft: =10
+            RadiusBottomLeft: =10
+
+        Lbl_Titulo_Item As label:
+            X: =28
+            Y: =12
+            Width: =Parent.Width - 140
+            Height: =28
+            Text: =ThisItem.Title
+            Size: =14
+            FontWeight: =FontWeight.Semibold
+            Color: =RGBA(50, 49, 48, 1)
+            Overflow: =Overflow.Hidden
+
+        Lbl_Estado_Badge As label:
+            X: =Parent.Width - 120
+            Y: =12
+            Width: =110
+            Height: =26
+            Text: =ThisItem.Estado
+            Size: =11
+            Align: =Align.Center
+            Color: =RGBA(255, 255, 255, 1)
+            Fill: =If(
+                ThisItem.Estado = "Completada", RGBA(16, 124, 16, 1),
+                If(ThisItem.Estado = "En progreso", RGBA(255, 185, 0, 1),
+                RGBA(0, 120, 212, 1))
+            )
+            RadiusTopLeft: =13
+            RadiusTopRight: =13
+            RadiusBottomLeft: =13
+            RadiusBottomRight: =13
+
+        Lbl_Desc_Item As label:
+            X: =28
+            Y: =42
+            Width: =Parent.Width - 140
+            Height: =20
+            Text: =ThisItem.Descripcion
+            Size: =12
+            Color: =RGBA(96, 94, 92, 1)
+            Overflow: =Overflow.Hidden
+
+        Lbl_Fecha_Item As label:
+            X: =28
+            Y: =64
+            Width: =180
+            Height: =18
+            Text: =If(
+                IsBlank(ThisItem.FechaVencimiento),
+                "Sin fecha límite",
+                "Vence: " & Text(ThisItem.FechaVencimiento, "[$-es-ES]dd/mm/yyyy")
+            )
+            Size: =11
+            Color: =If(
+                !IsBlank(ThisItem.FechaVencimiento) &&
+                ThisItem.FechaVencimiento < Today() &&
+                ThisItem.Estado <> "Completada",
+                RGBA(164, 38, 44, 1),
+                RGBA(96, 94, 92, 1)
+            )
+
+        Ico_Prioridad_Item As icon:
+            X: =Parent.Width - 50
+            Y: =58
+            Width: =26
+            Height: =26
+            Icon: =If(
+                ThisItem.Prioridad = "Alta", Icon.Warning,
+                If(ThisItem.Prioridad = "Media", Icon.Information, Icon.Accept)
+            )
+            Color: =If(
+                ThisItem.Prioridad = "Alta", RGBA(164, 38, 44, 1),
+                If(ThisItem.Prioridad = "Media", RGBA(255, 185, 0, 1),
+                RGBA(0, 120, 212, 1))
+            )
+
+        Btn_Abrir_Tarea As button:
+            X: =10
+            Y: =4
+            Width: =Parent.Width - 20
+            Height: =82
+            Text: =""
+            Fill: =RGBA(0, 0, 0, 0)
+            HoverFill: =RGBA(0, 0, 0, 0.04)
+            PressedFill: =RGBA(0, 0, 0, 0.08)
+            BorderThickness: =0
+            RadiusTopLeft: =10
+            RadiusTopRight: =10
+            RadiusBottomLeft: =10
+            RadiusBottomRight: =10
+            OnSelect: |-
+                =Set(gblTareaSeleccionada, ThisItem);
+                Navigate(Pantalla_Detalle, ScreenTransition.Fade)
+
+    Btn_FAB_Nueva As button:
+        X: =Parent.Width - 70
+        Y: =Parent.Height - 80
+        Width: =58
+        Height: =58
+        Text: ="+"
+        Size: =30
+        FontWeight: =FontWeight.Bold
+        Fill: =RGBA(0, 120, 212, 1)
+        Color: =RGBA(255, 255, 255, 1)
+        HoverFill: =RGBA(0, 78, 140, 1)
+        PressedFill: =RGBA(0, 56, 117, 1)
+        BorderThickness: =0
+        RadiusTopLeft: =29
+        RadiusTopRight: =29
+        RadiusBottomLeft: =29
+        RadiusBottomRight: =29
+        OnSelect: =Navigate(Pantalla_Nueva, ScreenTransition.Cover)
