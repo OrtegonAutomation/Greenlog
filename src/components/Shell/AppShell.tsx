@@ -3,7 +3,7 @@
 // Estética: sidebar oscuro con gradiente, header glassmorphism,
 // fondo mesh-gradient, nav pills redondeados
 // ============================================================
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   makeStyles, shorthands, tokens, mergeClasses,
   Body1Strong, Caption1, Tooltip, Avatar,
@@ -25,7 +25,7 @@ import { PlaneacionModule } from '../Planeacion/PlaneacionModule';
 import { EjecucionModule } from '../Ejecucion/EjecucionModule';
 import { ReportesModule } from '../Reportes/ReportesModule';
 import { CENIT_COLORS } from '../../theme/cenitTheme';
-import { startTour } from '../Tour/TourGuide';
+import { startTour, maybeAutoStartTour } from '../Tour/TourGuide';
 import GreenLogBlanco from '../../assets/GreenLog Blanco.png';
 
 // ... (existing code)
@@ -371,6 +371,11 @@ export const AppShell: React.FC<AppShellProps> = ({ onBack }) => {
 
   const onEnter = () => { if (timer.current) clearTimeout(timer.current); setCollapsed(false); };
   const onLeave = () => { timer.current = setTimeout(() => setCollapsed(true), COLLAPSE_DELAY); };
+
+  // Disparar tour automático la PRIMERA vez que el usuario abre la app
+  useEffect(() => {
+    maybeAutoStartTour(setSeccion);
+  }, []);
 
   const renderContent = () => {
     switch (seccion) {

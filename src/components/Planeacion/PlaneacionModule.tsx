@@ -352,6 +352,7 @@ export const PlaneacionModule: React.FC = () => {
                 color: '#0056D2',
                 fontWeight: 600,
               }}
+              id="planeacion-export-financiera"
               onClick={() => exportOpexToExcel(actividades)}
             >
               Exportar Matriz Financiera
@@ -367,6 +368,7 @@ export const PlaneacionModule: React.FC = () => {
                 borderRadius: '12px',
                 border: '1px solid rgba(0,0,0,0.1)',
               }}
+              id="planeacion-export-detalle"
               onClick={() => exportDetalleInternoToExcel(actividades)}
             >
               Detalle Interno
@@ -382,6 +384,7 @@ export const PlaneacionModule: React.FC = () => {
                 borderRadius: '12px',
                 border: '1px solid rgba(0,0,0,0.1)',
               }}
+              id="planeacion-bulk-btn"
               onClick={() => setBulkAbierto(true)}
             >
               Carga Masiva
@@ -398,6 +401,7 @@ export const PlaneacionModule: React.FC = () => {
               fontWeight: 600,
               boxShadow: '0 4px 10px rgba(0, 176, 80, 0.4)'
             }}
+            id="planeacion-new-btn"
             onClick={() => setWizardAbierto(true)}
           >
             Nueva planeación
@@ -432,12 +436,14 @@ export const PlaneacionModule: React.FC = () => {
       )}
 
       {/* Tabla */}
-      <ActivityTable
-        actividades={actividades}
-        cargando={cargando}
-        onNueva={() => setWizardAbierto(true)}
-        onItemClick={handleItemClick}
-      />
+      <div id="planeacion-table">
+        <ActivityTable
+          actividades={actividades}
+          cargando={cargando}
+          onNueva={() => setWizardAbierto(true)}
+          onItemClick={handleItemClick}
+        />
+      </div>
 
       {/* Drawer de formulario manual / edición */}
       <ActivityForm
