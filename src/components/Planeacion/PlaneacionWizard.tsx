@@ -1,0 +1,3201 @@
+// ============================================================
+// PlaneacionWizard — Unified multi-step wizard for creating
+// environmental planning activities across all líneas operativas.
+// Steps: Línea → Zona → Lugar → Ítems/Parámetros → Clasificación → Programación
+// Replaces the old MonitoreosWizard + ServicioOpexWizard split.
+// ============================================================
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import {
+  makeStyles, shorthands, tokens, mergeClasses,
+  Title2, Title3, Body1, Body2, Caption1,
+  Button, Input, Checkbox, Spinner, Portal,
+  Popover, PopoverTrigger, PopoverSurface,
+  Combobox, Option,
+} from '@fluentui/react-components';
+import {
+  DismissRegular,
+  ArrowLeftRegular,
+  ArrowRightRegular,
+  CheckmarkRegular,
+  SearchRegular,
+  EditRegular,
+  AddRegular,
+} from '@fluentui/react-icons';
+import { MonitoreosMatrizService, MonitoreoRow } from '../../services/MonitoreosMatrizService';
+import { ItemsLineaService, ItemLinea, ITEMS_LOGISTICA } from '../../services/ItemsLineaService';
+import { DEPARTAMENTOS_MUNICIPIOS, DEPARTAMENTOS_LIST } from '../../data/jurisdiccionesCompensaciones';
+import { CENIT_COLORS } from '../../theme/cenitTheme';
+import {
+  LineaOperativa, LineaPlaneacionConfig, TipoLugar, TipoPlaneacion, FuentePresupuesto,
+  LINEAS_PLANEACION, TIPOS_LUGAR, TIPOS_PLANEACION, FUENTES_PRESUPUESTO,
+  ZONAS_ESTACIONES, ZONAS, MATRICES_AMBIENTALES,
+} from '../../types';
+
+// ── Result types ──
+
+export interface PlaneacionMensualParam {
+  key: string;
+  nombre: string;
+  precio: number;      // Unit price
+  cantidad: number;    // Units this month
+  frecuencia: number;  // Composite multiplier (monitoreos) or 1
+  total: number;       // precio × cantidad × frecuencia
+}
+
+export interface PlaneacionMensual {
+  mes: string;
+  mesIndex: number;
+  cantidad: number;       // Puntos/Q for monitoreos, Cantidad for items
+  frecuencia: number;     // Comp for monitoreos, 1 for items
+  precio: number;         // Sum of individual prices
+  preciosIndividuales: PlaneacionMensualParam[];
+  total: number;          // cantidad × frecuencia × precio
+}
+
+export interface PlaneacionWizardResult {
+  lineaOperativa: LineaOperativa;
+  zona: string;
+  tipoLugar: TipoLugar;
+  estacion?: string;
+  pk?: string;
+  fuentePresupuesto: FuentePresupuesto;
+  tipoPlaneacion: TipoPlaneacion;
+  anioPlaneacion: number;
+  parametrosSeleccionados: MonitoreoRow[];
+  itemsSeleccionados: ItemLinea[];
+  logisticaSeleccionada: ItemLinea[];
+  programacion: PlaneacionMensual[];
+  valorTotal: number;
+  // Cambio 5: tipo muestra por param
+  paramTipoMuestra?: Record<string, 'simple' | 'compuesto'>;
+  paramCantCompuestos?: Record<string, number>;
+  // Cambio 4: IPC global
+  ipcGlobalActivo?: boolean;
+  ipcGlobalPorcentaje?: number;
+  ipcMeses?: number[];
+  // IVA global por ítem (acordado en reunión martes 9:16)
+  ivaGlobalActivo?: boolean;
+  ivaGlobalPorcentaje?: number;
+  ivaItemsExcluidos?: string[];
+  // Compensaciones: Sistema + Sector
+  sistema?: string;
+  sector?: string;
+  // Compensaciones: Obligación metadata
+  obligacion?: {
+    id: string;
+    fechaCreacion: string;
+    actoAdministrativo: { tipo: string; numero: string; fecha: string; };
+    permiso: string;
+    autoridad: string;
+    jurisdiccion: {
+      corporacion: string;
+      departamento: string;
+      municipio: string;
+      veredaPredio: string;
+    };
+    expediente: string;
+    categoria: string;
+  };
+  // Compensaciones: Clasificación extendida
+  asignacionRecursos?: boolean;
+  saldoDisponible?: number;
+  aniosAPlanear?: number;
+  contratoSeleccionado?: string;
+  // Compensaciones: Programación multi-año (Año 2 / Año 3 anualizados)
+  programacionY2?: ProgramacionAnualItem[];
+  programacionY3?: ProgramacionAnualItem[];
+  itemsCambianPorAnio?: boolean;
+  selectedItemsY2?: string[];
+  selectedItemsY3?: string[];
+}
+
+// Compensaciones: ítem anual simplificado (Año 2 y Año 3)
+export interface ProgramacionAnualItem {
+  key: string;
+  nombre: string;
+  precio: number;
+  cantidad: number;
+  total: number;
+}
+
+export interface PlaneacionInitialData {
+  lineaOperativa?: LineaOperativa;
+  zona?: string;
+  tipoLugar?: TipoLugar;
+  estacion?: string;
+  pk?: string;
+  fuentePresupuesto?: FuentePresupuesto;
+  tipoPlaneacion?: TipoPlaneacion;
+  anioPlaneacion?: number;
+  programacion?: PlaneacionMensual[];
+}
+
+// ── Constants ──
+
+const MESES = [
+  'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+  'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre',
+];
+const MESES_SHORT = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+
+const fmtCOP = (n: number) => `$${n.toLocaleString('es-CO')}`;
+
+const CATEGORIAS_ORDEN: string[] = ['Gestión Ambiental', 'Iniciativas Tecnológicas', 'Servicios HSE'];
+
+const UNIDADES_CONTRATO = [
+  'Global', 'Mes', 'Día', 'Kg', 'Und', 'Visita', 'Ha', 'Árbol', 'ml',
+  'Informe', 'Pago', 'Año', 'Sprint', 'Reporte', 'Evento', 'Sesión', 'Viaje',
+];
+
+// Compensaciones constants — tomados de la Matriz Provisiones 2 (valores reales)
+export const ZONAS_COMPENSACIONES = [
+  'Caño Limón','Centro','Coveñas','Llanos','Norte',
+  'Occidente Norte','Occidente Sur','Oriente',
+];
+
+export const SISTEMAS_CENIT = [
+  '30000003-01 Oleoducto Castilla-Apiay',
+  '30000003-02 Oleoducto Araguaney-El Porvenir',
+  '30000003-02-08 Oleoducto Araguaney-El Porvenir',
+  '30000003-03 Oleoducto Santiago-El Porvenir',
+  '30000003-04 Derivación Oleoducto Santiago El Porvenir-Planta Monterrey',
+  '30000003-05 Oleoducto Apiay-El Porvenir',
+  '30000003-06 Oleoducto Vasconia-CIB y Vasconia-Velasquez',
+  '30000003-07 Oleoducto Yaguará-Tenay',
+  '30000003-09 Poliducto Yumbo-Buenaventura',
+  '30000003-10 Poliducto Puerto Salgar-Neiva',
+  '30000003-11 Poliducto y Propanoducto Puerto Salgar-Bogotá',
+  '30000003-12 Oleoducto San Miguel Orito - Churuyaco - Orito - Mansoyá - Orito (OSO-OCHO-OMO)',
+  '30000003-13 Oleoducto Trasandino',
+  '30000003-14 Terminal Marítimo Coveñas',
+  '30000003-15 Terminal Marítimo Pozos Colorados',
+  '30000003-16 Poliducto Cartagena-Baranoa',
+  '30000003-17 Propanoducto Galan-Salgar 8',
+  '30000003-18 Combustoleoducto Galán-Ayacucho-Coveñas-Cartagena',
+  '30000003-19 Oleoducto Ayacucho - Galán 14”',
+  '30000003-19 Oleoducto Caño Limón-Coveñas',
+  '30000003-20 Poliducto Sebastopol-Medellín-Cartago',
+  '30000003-21 Poliducto Puerto Salgar-Cartago-Yumbo',
+  '30000003-22 Poliducto Pozos Colorados - Galán 14” y Oleoducto Ayacucho - Galán 14”',
+  '30000003-23 Poliducto Galan - Puerto Salgar 12” y 16”',
+  '30000003-25 Poliducto Andino',
+  '30000003-26 Poliducto de Oriente',
+  '30000003-27 Poliducto Galan-Chimita',
+  '30000003-28 Oleoducto Galán - Ayacucho - Coveñas 8”',
+  '30000003-29 Estación San Fernando',
+  '30000003-40 Oleoducto Bicentenario',
+  'Otro',
+];
+
+export const TIPOS_ACTO = ['Resolución', 'Comunicado'];
+
+export const TIPOS_PERMISO = [
+  'COMPENSACIÓN POR PÉRDIDA DE BIODIVERSIDAD',
+  'COMPENSACIÓN POR PÉRDIDA DE BIODIVERSIDAD Y POR CAMBIO DEL USO DEL SUELO',
+  'COMPENSACIÓN POR CAMBIO DEL USO DEL SUELO',
+  'COMPENSACIÓN POR INTERVENCIÓN DE LA COBERTURA VEGETAL Y POR CAMBIO DEL USO DEL SUELO',
+  'COMPENSACIÓN POR APROVECHAMIENTO DE LA COBERTURA VEGETAL',
+  'COMPENSACIÓN POR PERMISO DE APROVECHAMIENTO FORESTAL',
+  'COMPENSACIÓN POR PERMISO DE TALA Y PODA',
+  'COMPENSACIÓN POR PERMISO DE OCUPACIÓN DE CAUCE',
+  'COMPENSACIÓN POR PERMISO DE OCUPACIÓN DE CAUCE Y VERTIMIENTO',
+  'COMPENSACIÓN POR PERMISO DE VERTIMIENTO',
+  'COMPENSACIÓN POR PERMISO DE VERTIMIENTO Y CONCESIÓN DE AGUAS',
+  'COMPENSACIÓN POR PERMISO DE VERTIMIENTOS, APROVECHAMIENTO FORESTAL Y CONCESIÓN DE AGUAS',
+  'COMPENSACIÓN POR CONCESIÓN DE AGUAS',
+  'COMPENSACIÓN POR LEVANTAMIENTO DE VEDA',
+  'COMPENSACIÓN POR AFECTACIÓN DEL PAISAJE',
+  'COMPENSACIÓN POR LICENCIA AMBIENTAL',
+  'COMPENSACIÓN POR MODIFICACIÓN DE LA LICENCIA AMBIENTAL',
+  'COMPENSACIÓN POR ESTABLECIMIENTO DEL PLAN DE MANEJO AMBIENTAL',
+  'COMPENSACIÓN POR MODIFICACIÓN DEL PLAN DE MANEJO AMBIENTAL',
+  'COMPENSACIÓN POR EL CUMPLIMIENTO DE FICHAS DEL PLAN DE MANEJO AMBIENTAL',
+  'COMPENSACIÓN POR SUSTRACCIÓN DE RESERVA FORESTAL NACIONAL',
+  'COMPENSACIÓN POR SUSTRACCIÓN DE ÁREAS PROTEGIDAS REGIONALES',
+  'COMPENSACIÓN POR MULTAS / SANCIONES',
+  'COMPENSACIÓN POR CONTINGENCIAS',
+  'COMPENSACIONES DEL COMPONENTE BIÓTICO',
+  'INVERSIÓN DEL 1%',
+  'Otro',
+];
+
+export const AUTORIDADES_AMBIENTALES = [
+  'ANLA','MADS','CAR','CAR (Bajo Magdalena).',
+  'CAR Dirección Regional Bajo Magdalena (DRBM)',
+  'CAR Dirección Regional Gualivá (DRG)',
+  'CAR Dirección Regional Sabana Centro (DRSC)',
+  'CAM','CAS','CARDER','CARDIQUE','CARSUCRE','CDMB',
+  'CORANTIOQUIA','CORMACARENA','CORNARE','CORPAMAG','CORPOAMAZONIA',
+  'CORPOBOYACA','CORPOCALDAS','CORPOCESAR','CORPONOR','CORPONariño',
+  'CORPORINOQUIA','CORTOLIMA','CRA','CSB','CVC',
+  'CVC DAR BRUT','CVC DAR Centro Sur','CVC DAR Norte','CVC DARPE',
+  'AMVA','DADSA','EPA','SDA',
+  'Alcaldía Municipal Puerto Parra','Alcaldía de Puerto Boyacá (UGAM)',
+  'Municipio de Villavicencio','No Aplica','OTRO',
+];
+
+export const CATEGORIAS_COMPENSACION = [
+  'PSA',
+  'Restauración Ecológica',
+  'Bancos de Habitat',
+  'Compra de Predios',
+  'Concertación',
+  'Cosecha de agua',
+  'Estudios Ambientales - Manejo Ciatea',
+  'Manejo de Epifitas',
+  'Obras biomecanicas',
+  'Pago por compensación',
+  'Sistemas Productivos Sostenibles',
+  'No aplica',
+];
+
+// Contratos / contratistas vigentes para Compensaciones.
+// Solo BQS por ahora — los demás (Terrazos, Agricultura, Apluso) se agregarán
+// cuando se entreguen sus matrices de tarifas.
+export const CONTRATOS_COMPENSACIONES = ['BQS'];
+
+const getStepLabels = (isMonitoreo: boolean, isCompensaciones: boolean) => {
+  const base = [
+    { label: 'Línea',         icon: '📋' },
+    { label: 'Zona',          icon: '📍' },
+    { label: 'Lugar',         icon: '🏭' },
+  ];
+  if (isCompensaciones) {
+    base.push({ label: 'Descripción',   icon: '📄' });
+  }
+  base.push({ label: 'Clasificación', icon: '⚙️' });
+  base.push({ label: isMonitoreo ? 'Parámetros' : 'Ítems', icon: '🧪' });
+  base.push({ label: 'Programación',  icon: '📅' });
+  return base;
+};
+
+// ── Styles ──
+
+const useStyles = makeStyles({
+  // Overlay + card
+  overlay: {
+    position: 'fixed',
+    top: 0, left: 0, right: 0, bottom: 0,
+    background: 'rgba(0,12,36,0.5)',
+    backdropFilter: 'blur(8px)',
+    zIndex: 200,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    animationName: { from: { opacity: '0' }, to: { opacity: '1' } },
+    animationDuration: '0.25s',
+    animationFillMode: 'both',
+  },
+  wizard: {
+    width: '960px',
+    maxWidth: '95vw',
+    maxHeight: '90vh',
+    background: '#fff',
+    borderRadius: '24px',
+    boxShadow: '0 32px 80px rgba(0,0,0,0.25)',
+    display: 'flex',
+    flexDirection: 'column',
+    overflow: 'hidden',
+    animationName: {
+      from: { opacity: '0', transform: 'scale(0.95) translateY(20px)' },
+      to:   { opacity: '1', transform: 'scale(1) translateY(0)' },
+    },
+    animationDuration: '0.35s',
+    animationTimingFunction: 'cubic-bezier(0.16,1,0.3,1)',
+    animationFillMode: 'both',
+  },
+
+  // Header
+  wizardHeader: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    ...shorthands.padding('20px', '28px'),
+    ...shorthands.borderBottom('1px', 'solid', 'rgba(0,0,0,0.06)'),
+    flexShrink: 0,
+  },
+  headerLeft: {
+    display: 'flex',
+    flexDirection: 'column',
+    ...shorthands.gap('2px'),
+  },
+  closeBtn: {
+    width: '36px', height: '36px', minWidth: '36px',
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    borderRadius: '10px', cursor: 'pointer',
+    transition: 'background 0.15s ease',
+    color: tokens.colorNeutralForeground2,
+    ':hover': { background: 'rgba(0,0,0,0.06)' },
+  },
+
+  // Steps indicator
+  stepsBar: {
+    display: 'flex',
+    alignItems: 'center',
+    ...shorthands.gap('0'),
+    ...shorthands.padding('12px', '28px'),
+    background: 'rgba(0,48,87,0.02)',
+    ...shorthands.borderBottom('1px', 'solid', 'rgba(0,0,0,0.04)'),
+    flexShrink: 0,
+  },
+  step: {
+    display: 'flex',
+    alignItems: 'center',
+    ...shorthands.gap('6px'),
+    flex: 1,
+  },
+  stepDot: {
+    width: '30px', height: '30px',
+    borderRadius: '50%',
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    fontSize: '12px', fontWeight: '700',
+    ...shorthands.border('2px', 'solid', 'rgba(0,0,0,0.1)'),
+    background: '#f8fafc',
+    color: '#94a3b8',
+    transition: 'all 0.3s ease',
+    flexShrink: 0,
+  },
+  stepDotActive: {
+    background: CENIT_COLORS.blueBrand,
+    ...shorthands.border('2px', 'solid', CENIT_COLORS.blueBrand),
+    color: '#fff',
+    boxShadow: '0 0 0 4px rgba(0,51,160,0.15)',
+  },
+  stepDotDone: {
+    background: CENIT_COLORS.green,
+    ...shorthands.border('2px', 'solid', CENIT_COLORS.green),
+    color: '#fff',
+  },
+  stepLabel: {
+    fontSize: '11px',
+    fontWeight: '600',
+    color: '#94a3b8',
+    display: 'none',
+    '@media (min-width: 768px)': { display: 'block' },
+  },
+  stepLabelActive: {
+    color: CENIT_COLORS.blueBrand,
+    fontWeight: '700',
+  },
+  stepLine: {
+    flex: 1,
+    height: '2px',
+    background: 'rgba(0,0,0,0.06)',
+    marginLeft: '4px',
+    marginRight: '4px',
+  },
+  stepLineDone: {
+    background: CENIT_COLORS.green,
+  },
+
+  // Body
+  wizardBody: {
+    flexGrow: 1, flexShrink: 1, flexBasis: 'auto',
+    minHeight: 0,
+    overflowY: 'auto',
+    ...shorthands.padding('24px', '28px'),
+  },
+
+  // Footer
+  wizardFooter: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    ...shorthands.padding('14px', '28px'),
+    ...shorthands.borderTop('1px', 'solid', 'rgba(0,0,0,0.06)'),
+    flexShrink: 0,
+    background: 'rgba(0,0,0,0.01)',
+  },
+
+  // ── Step 0 – Línea operativa cards ──
+  lineaGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))',
+    ...shorthands.gap('10px'),
+    marginTop: '10px',
+  },
+  categoriaLabel: {
+    fontSize: '11px',
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: '0.05em',
+    color: tokens.colorNeutralForeground3,
+    marginTop: '16px',
+    marginBottom: '4px',
+  },
+  lineaCard: {
+    ...shorthands.padding('14px', '16px'),
+    borderRadius: '14px',
+    ...shorthands.border('2px', 'solid', 'rgba(0,0,0,0.06)'),
+    background: 'rgba(255,255,255,0.8)',
+    cursor: 'pointer',
+    transition: 'all 0.2s ease',
+    display: 'flex',
+    alignItems: 'flex-start',
+    ...shorthands.gap('12px'),
+    ':hover': {
+      ...shorthands.border('2px', 'solid', CENIT_COLORS.blueBrand),
+      transform: 'translateY(-2px)',
+      boxShadow: '0 8px 24px rgba(0,51,160,0.08)',
+    },
+  },
+  lineaCardActive: {
+    ...shorthands.border('2px', 'solid', CENIT_COLORS.blueBrand),
+    background: 'rgba(0,51,160,0.03)',
+    boxShadow: '0 6px 20px rgba(0,51,160,0.1)',
+  },
+  lineaIcon: {
+    fontSize: '22px',
+    width: '36px', height: '36px',
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    borderRadius: '10px',
+    background: 'rgba(0,51,160,0.04)',
+    flexShrink: 0,
+  },
+  lineaInfo: {
+    display: 'flex',
+    flexDirection: 'column',
+    ...shorthands.gap('2px'),
+    minWidth: 0,
+  },
+
+  // ── Selection grid (Zona, Estación) ──
+  selectionGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fill, minmax(170px, 1fr))',
+    ...shorthands.gap('10px'),
+    marginTop: '14px',
+  },
+  selectionCard: {
+    ...shorthands.padding('14px', '18px'),
+    borderRadius: '14px',
+    ...shorthands.border('2px', 'solid', 'rgba(0,0,0,0.06)'),
+    cursor: 'pointer',
+    transition: 'all 0.2s ease',
+    display: 'flex',
+    alignItems: 'center',
+    ...shorthands.gap('10px'),
+    ':hover': {
+      ...shorthands.border('2px', 'solid', CENIT_COLORS.blueBrand),
+      background: 'rgba(0,51,160,0.02)',
+    },
+  },
+  selectionCardActive: {
+    ...shorthands.border('2px', 'solid', CENIT_COLORS.blueBrand),
+    background: 'rgba(0,51,160,0.04)',
+    boxShadow: '0 4px 16px rgba(0,51,160,0.08)',
+  },
+  selectionDot: {
+    width: '12px', height: '12px',
+    borderRadius: '50%',
+    ...shorthands.border('2px', 'solid', 'rgba(0,0,0,0.15)'),
+    flexShrink: 0,
+    transition: 'all 0.2s ease',
+  },
+  selectionDotActive: {
+    ...shorthands.border('2px', 'solid', CENIT_COLORS.blueBrand),
+    background: CENIT_COLORS.blueBrand,
+    boxShadow: '0 0 0 3px rgba(0,51,160,0.2)',
+  },
+
+  // ── Tipo Lugar cards ──
+  tipoLugarGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(3, 1fr)',
+    ...shorthands.gap('12px'),
+    marginTop: '14px',
+    marginBottom: '18px',
+  },
+  tipoLugarCard: {
+    ...shorthands.padding('18px', '16px'),
+    borderRadius: '16px',
+    ...shorthands.border('2px', 'solid', 'rgba(0,0,0,0.06)'),
+    background: 'rgba(255,255,255,0.8)',
+    textAlign: 'center' as const,
+    cursor: 'pointer',
+    transition: 'all 0.25s cubic-bezier(0.16,1,0.3,1)',
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    ...shorthands.gap('6px'),
+    ':hover': {
+      ...shorthands.border('2px', 'solid', CENIT_COLORS.blueBrand),
+      transform: 'translateY(-2px)',
+      boxShadow: '0 8px 24px rgba(0,51,160,0.08)',
+    },
+  },
+  tipoLugarCardActive: {
+    ...shorthands.border('2px', 'solid', CENIT_COLORS.blueBrand),
+    background: 'rgba(0,51,160,0.03)',
+    boxShadow: '0 6px 20px rgba(0,51,160,0.1)',
+  },
+
+  // ── Matrix filter bar ──
+  matrizFilterBar: {
+    display: 'flex',
+    flexWrap: 'wrap',
+    ...shorthands.gap('8px'),
+    marginBottom: '12px',
+    ...shorthands.padding('10px', '14px'),
+    borderRadius: '12px',
+    background: 'rgba(0,48,87,0.03)',
+  },
+  matrizChip: {
+    ...shorthands.padding('4px', '12px'),
+    borderRadius: '20px',
+    fontSize: '12px',
+    fontWeight: '600',
+    cursor: 'pointer',
+    ...shorthands.border('1px', 'solid', 'rgba(0,0,0,0.1)'),
+    background: '#fff',
+    transition: 'all 0.15s ease',
+    ':hover': { ...shorthands.border('1px', 'solid', CENIT_COLORS.blueBrand) },
+  },
+  matrizChipActive: {
+    background: CENIT_COLORS.blueBrand,
+    color: '#fff',
+    ...shorthands.border('1px', 'solid', CENIT_COLORS.blueBrand),
+  },
+
+  // ── Params / Items table ──
+  paramTableWrap: {
+    background: 'rgba(255,255,255,0.7)',
+    backdropFilter: 'blur(12px)',
+    borderRadius: '16px',
+    ...shorthands.border('1px', 'solid', 'rgba(255,255,255,0.5)'),
+    overflow: 'auto',
+    maxHeight: '320px',
+  },
+  paramTable: {
+    width: '100%',
+    borderCollapse: 'collapse',
+    fontSize: '12px',
+  },
+  paramTh: {
+    ...shorthands.padding('10px', '12px'),
+    textAlign: 'left',
+    fontWeight: '700',
+    color: '#003057',
+    fontSize: '11px',
+    letterSpacing: '0.03em',
+    textTransform: 'uppercase',
+    ...shorthands.borderBottom('2px', 'solid', 'rgba(0,0,0,0.06)'),
+    whiteSpace: 'nowrap',
+    position: 'sticky',
+    top: 0,
+    background: 'rgba(255,255,255,0.98)',
+    zIndex: 1,
+  },
+  paramTd: {
+    ...shorthands.padding('8px', '12px'),
+    ...shorthands.borderBottom('1px', 'solid', 'rgba(0,0,0,0.04)'),
+    color: tokens.colorNeutralForeground1,
+  },
+  paramTr: {
+    transition: 'background 0.15s ease',
+    cursor: 'pointer',
+    ':hover': { background: 'rgba(0,51,160,0.02)' },
+  },
+  paramTrSelected: {
+    background: 'rgba(0,51,160,0.04)',
+  },
+
+  // ── Logística section ──
+  logisticaSection: {
+    marginTop: '16px',
+    ...shorthands.padding('14px', '16px'),
+    borderRadius: '12px',
+    background: 'rgba(0,176,80,0.04)',
+    ...shorthands.border('1px', 'solid', 'rgba(0,176,80,0.12)'),
+  },
+
+  // ── Clasificación step ──
+  clasificacionGroup: {
+    marginBottom: '20px',
+  },
+  clasificacionCards: {
+    display: 'flex',
+    ...shorthands.gap('10px'),
+    marginTop: '8px',
+    flexWrap: 'wrap',
+  },
+  clasificacionCard: {
+    ...shorthands.padding('14px', '20px'),
+    borderRadius: '14px',
+    ...shorthands.border('2px', 'solid', 'rgba(0,0,0,0.06)'),
+    cursor: 'pointer',
+    transition: 'all 0.2s ease',
+    display: 'flex',
+    flexDirection: 'column',
+    ...shorthands.gap('2px'),
+    flex: '1 1 120px',
+    ':hover': {
+      ...shorthands.border('2px', 'solid', CENIT_COLORS.blueBrand),
+      background: 'rgba(0,51,160,0.02)',
+    },
+  },
+  clasificacionCardActive: {
+    ...shorthands.border('2px', 'solid', CENIT_COLORS.blueBrand),
+    background: 'rgba(0,51,160,0.04)',
+  },
+
+  // ── Monthly grid ──
+  monthGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))',
+    ...shorthands.gap('10px'),
+    marginTop: '14px',
+  },
+  monthCard: {
+    ...shorthands.padding('14px', '18px'),
+    borderRadius: '14px',
+    ...shorthands.border('1px', 'solid', 'rgba(0,0,0,0.06)'),
+    background: 'rgba(255,255,255,0.7)',
+    display: 'flex',
+    flexDirection: 'column',
+    ...shorthands.gap('8px'),
+  },
+  monthHeader: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  monthLabel: {
+    fontSize: '14px',
+    fontWeight: '700',
+    color: '#003057',
+  },
+  monthTotal: {
+    fontSize: '14px',
+    fontWeight: '800',
+    color: CENIT_COLORS.blueBrand,
+  },
+  monthFields: {
+    display: 'grid',
+    gridTemplateColumns: '1fr 1fr 1fr',
+    ...shorthands.gap('8px'),
+  },
+  monthFieldsTwo: {
+    display: 'grid',
+    gridTemplateColumns: '1fr 1fr',
+    ...shorthands.gap('8px'),
+  },
+  fieldGroup: {
+    display: 'flex',
+    flexDirection: 'column',
+    ...shorthands.gap('3px'),
+    minWidth: 0,
+  },
+  fieldLabel: {
+    fontSize: '10px',
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: '0.04em',
+    color: tokens.colorNeutralForeground3,
+  },
+
+  // ── Programming matrix (Step 5) ──
+  progMatrixWrap: {
+    marginTop: '14px',
+    overflowX: 'auto',
+    borderRadius: '12px',
+    ...shorthands.border('1px', 'solid', 'rgba(0,0,0,0.08)'),
+  },
+  progMatrixTable: {
+    borderCollapse: 'collapse',
+    width: '100%',
+    minWidth: '1100px',
+    fontSize: '12px',
+  },
+  progMatrixItemTh: {
+    ...shorthands.padding('10px', '12px'),
+    textAlign: 'left',
+    fontWeight: '700',
+    color: '#fff',
+    background: '#003057',
+    fontSize: '11px',
+    minWidth: '200px',
+    position: 'sticky',
+    left: '0',
+    zIndex: '2',
+    whiteSpace: 'nowrap',
+  },
+  progMatrixMonthTh: {
+    ...shorthands.padding('10px', '4px'),
+    textAlign: 'center',
+    fontWeight: '700',
+    color: '#fff',
+    background: '#003057',
+    fontSize: '11px',
+    minWidth: '78px',
+  },
+  progMatrixTotalTh: {
+    ...shorthands.padding('10px', '12px'),
+    textAlign: 'right',
+    fontWeight: '700',
+    color: '#fff',
+    background: '#003057',
+    fontSize: '11px',
+    minWidth: '110px',
+  },
+  progMatrixItemTd: {
+    ...shorthands.padding('10px', '12px'),
+    ...shorthands.borderBottom('1px', 'solid', 'rgba(0,0,0,0.05)'),
+    verticalAlign: 'top',
+    background: 'rgba(255,255,255,0.98)',
+    position: 'sticky',
+    left: '0',
+    zIndex: '1',
+    minWidth: '200px',
+  },
+  progMatrixMonthTd: {
+    ...shorthands.padding('6px', '4px'),
+    ...shorthands.borderBottom('1px', 'solid', 'rgba(0,0,0,0.04)'),
+    verticalAlign: 'top',
+    textAlign: 'center',
+  },
+  progMatrixTotalTd: {
+    ...shorthands.padding('8px', '12px'),
+    ...shorthands.borderBottom('1px', 'solid', 'rgba(0,0,0,0.04)'),
+    textAlign: 'right',
+    fontWeight: '600',
+    color: CENIT_COLORS.blueBrand,
+    background: 'rgba(0,51,160,0.03)',
+    fontSize: '12px',
+    verticalAlign: 'middle',
+  },
+  progMatrixRow: {
+    ':hover': { background: 'rgba(0,51,160,0.015)' },
+  },
+  progMatrixLogRow: {
+    background: 'rgba(0,176,80,0.03)',
+    ':hover': { background: 'rgba(0,176,80,0.05)' },
+  },
+  progMatrixTotalesRow: {
+    background: 'rgba(0,51,160,0.04)',
+    ...shorthands.borderTop('2px', 'solid', 'rgba(0,51,160,0.15)'),
+  },
+
+  // Footer elements
+  footerTotals: {
+    display: 'flex',
+    alignItems: 'center',
+    ...shorthands.gap('24px'),
+  },
+  footerTotal: {
+    display: 'flex',
+    flexDirection: 'column',
+    ...shorthands.gap('2px'),
+  },
+
+  // Search
+  searchWrap: {
+    display: 'flex',
+    alignItems: 'center',
+    ...shorthands.gap('12px'),
+    marginBottom: '12px',
+  },
+  selectedCount: {
+    fontSize: '13px',
+    fontWeight: '600',
+    color: CENIT_COLORS.blueBrand,
+    ...shorthands.padding('6px', '14px'),
+    borderRadius: '20px',
+    background: 'rgba(0,51,160,0.06)',
+  },
+  spinnerWrap: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...shorthands.padding('48px'),
+  },
+  pkInput: {
+    marginTop: '12px',
+    maxWidth: '320px',
+  },
+  infoBox: {
+    ...shorthands.padding('16px'),
+    borderRadius: '12px',
+    background: 'rgba(0,51,160,0.04)',
+    marginTop: '12px',
+    color: '#003057',
+    fontSize: '14px',
+  },
+  addLineaCard: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '8px',
+    ...shorthands.padding('16px'),
+    borderRadius: '14px',
+    ...shorthands.border('2px', 'dashed', tokens.colorNeutralStroke2),
+    cursor: 'pointer',
+    color: tokens.colorNeutralForeground3,
+    fontSize: '14px',
+    fontWeight: '500',
+    ':hover': {
+      ...shorthands.border('2px', 'dashed', CENIT_COLORS.blueBrand),
+      color: CENIT_COLORS.blueBrand,
+      background: 'rgba(0,51,160,0.03)',
+    },
+  },
+  newLineaOverlay: {
+    ...shorthands.padding('20px'),
+    borderRadius: '14px',
+    background: 'rgba(0,51,160,0.04)',
+    marginTop: '12px',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '12px',
+  },
+  newLineaRow: {
+    display: 'flex',
+    gap: '12px',
+    alignItems: 'flex-end',
+    flexWrap: 'wrap',
+  },
+  tempItemsTableWrap: {
+    borderRadius: '8px',
+    ...shorthands.border('1px', 'solid', tokens.colorNeutralStroke2),
+    overflow: 'hidden',
+    marginBottom: '8px',
+  },
+  tempItemRow: {
+    display: 'flex',
+    gap: '8px',
+    alignItems: 'flex-end',
+    flexWrap: 'wrap',
+    marginTop: '4px',
+  },
+  addItemCard: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '6px',
+    ...shorthands.padding('8px', '14px'),
+    borderRadius: '8px',
+    ...shorthands.border('2px', 'dashed', tokens.colorNeutralStroke2),
+    cursor: 'pointer',
+    color: tokens.colorNeutralForeground3,
+    fontSize: '13px',
+    fontWeight: '500',
+    marginTop: '8px',
+    ':hover': {
+      ...shorthands.border('2px', 'dashed', CENIT_COLORS.blueBrand),
+      color: CENIT_COLORS.blueBrand,
+    },
+  },
+});
+
+// ── Component ──
+
+interface TempItem { id: string; nombre: string; unidad: string; precio: number; }
+
+interface Props {
+  open: boolean;
+  onClose: () => void;
+  onComplete: (result: PlaneacionWizardResult) => void;
+  initialData?: PlaneacionInitialData | null;
+}
+
+export const PlaneacionWizard: React.FC<Props> = ({ open, onClose, onComplete, initialData }) => {
+  const styles = useStyles();
+
+  // ── State ──
+  const [step, setStep] = useState(0);
+
+  // Step 0: Línea
+  const [selectedLinea, setSelectedLinea] = useState<LineaPlaneacionConfig | null>(null);
+
+  // Custom líneas (session-only)
+  const [customLineas, setCustomLineas] = useState<LineaPlaneacionConfig[]>([]);
+  const [creandoLinea, setCreandoLinea] = useState(false);
+  const [newLineaNombre, setNewLineaNombre] = useState('');
+  const [newLineaDesc, setNewLineaDesc] = useState('');
+  const [newLineaCategoria, setNewLineaCategoria] = useState<string>(CATEGORIAS_ORDEN[0]);
+  const [newLineaLugar, setNewLineaLugar] = useState<TipoLugar>('Estación');
+  const [tempItems, setTempItems] = useState<TempItem[]>([]);
+  const [tempItemNombre, setTempItemNombre] = useState('');
+  const [tempItemUnidad, setTempItemUnidad] = useState(UNIDADES_CONTRATO[0]);
+  const [tempItemPrecio, setTempItemPrecio] = useState('');
+
+  // Custom items registry (session-only; keyed by linea.value)
+  const [customItemsMap, setCustomItemsMap] = useState<Record<string, ItemLinea[]>>({});
+
+  // Step 3 inline add-item form
+  const [addingItemStep3, setAddingItemStep3] = useState(false);
+  const [s3Nombre, setS3Nombre] = useState('');
+  const [s3Unidad, setS3Unidad] = useState(UNIDADES_CONTRATO[0]);
+  const [s3Precio, setS3Precio] = useState('');
+
+  // Step 1: Zona
+  const [selectedZona, setSelectedZona] = useState<string | null>(null);
+
+  // Step 2: Lugar
+  const [tipoLugar, setTipoLugar] = useState<TipoLugar>('Estación');
+  const [availableEstaciones, setAvailableEstaciones] = useState<string[]>([]);
+  const [selectedEstacion, setSelectedEstacion] = useState<string | null>(null);
+  const [pk, setPk] = useState('');
+
+  // Step 4: Parámetros / Ítems
+  const [availableMatrices, setAvailableMatrices] = useState<string[]>([]);
+  const [selectedMatrices, setSelectedMatrices] = useState<Set<string>>(new Set());
+  const [availableParams, setAvailableParams] = useState<MonitoreoRow[]>([]);
+  const [selectedParams, setSelectedParams] = useState<Set<string>>(new Set());
+  // Cambio 5: Simple/Compuesto per parameter
+  const [paramTipoMuestra, setParamTipoMuestra] = useState<Map<string, 'simple' | 'compuesto'>>(new Map());
+  const [paramCantCompuestos, setParamCantCompuestos] = useState<Map<string, number>>(new Map());
+  // Cambio 4: IPC global (uno solo para toda la planeación)
+  const [ipcGlobalActivo, setIpcGlobalActivo] = useState<boolean>(false);
+  const [ipcGlobalPorcentaje, setIpcGlobalPorcentaje] = useState<number>(0);
+  // IVA global por ítem (acordado en reunión martes 9:16): toggle global + opción por ítem
+  const [ivaGlobalActivo, setIvaGlobalActivo] = useState<boolean>(false);
+  const [ivaGlobalPorcentaje, setIvaGlobalPorcentaje] = useState<number>(19);
+  // Cuando IVA está activo, todos los ítems aplican por defecto; el usuario excluye los que NO
+  const [ivaItemsExcluidos, setIvaItemsExcluidos] = useState<Set<string>>(new Set());
+  const [customMonitoreoRows, setCustomMonitoreoRows] = useState<MonitoreoRow[]>([]);
+  const [addingParamStep3, setAddingParamStep3] = useState(false);
+  const [s3ParamEstacion, setS3ParamEstacion] = useState('');
+  const [s3ParamNombre, setS3ParamNombre] = useState('');
+  const [s3ParamMatriz, setS3ParamMatriz] = useState<string>(MATRICES_AMBIENTALES[0]?.value ?? 'ARD');
+  const [s3ParamNorma, setS3ParamNorma] = useState('');
+  const [s3ParamPermiso, setS3ParamPermiso] = useState('');
+  const [s3ParamRequerimiento, setS3ParamRequerimiento] = useState('');
+  const [s3ParamReceptor, setS3ParamReceptor] = useState('');
+  const [s3ParamPrecio, setS3ParamPrecio] = useState('');
+  const [availableItems, setAvailableItems] = useState<ItemLinea[]>([]);
+  const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
+  const [selectedLogistica, setSelectedLogistica] = useState<Set<string>>(new Set(ITEMS_LOGISTICA.map(it => it.id)));
+  const [paramSearch, setParamSearch] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  // Step 4: Clasificación
+  const [fuentePresupuesto, setFuentePresupuesto] = useState<FuentePresupuesto>('OPEX');
+  const [tipoPlaneacion, setTipoPlaneacion] = useState<TipoPlaneacion>('Plan');
+  const [anioPlaneacion, setAnioPlaneacion] = useState(new Date().getFullYear() + 1);
+
+  // Step 5: Programación
+  const [monthlyData, setMonthlyData] = useState<PlaneacionMensual[]>([]);
+  // IPC per month toggle (which months apply IPC adjustment)
+  const [ipcMeses, setIpcMeses] = useState<Set<number>>(new Set());
+
+  // Step 2: Sistema + Sector (Compensaciones only)
+  const [selectedSistema, setSelectedSistema] = useState('');
+  const [selectedSector, setSelectedSector] = useState('');
+
+  // Step 3 (Compensaciones): Descripción de la obligación
+  const [obligacionId, setObligacionId] = useState('');
+  const [obligacionFechaCreacion, setObligacionFechaCreacion] = useState(() => new Date().toISOString().split('T')[0]);
+  const [obligacionActoTipo, setObligacionActoTipo] = useState<string>('Resolución');
+  const [obligacionActoNumero, setObligacionActoNumero] = useState('');
+  const [obligacionActoFecha, setObligacionActoFecha] = useState('');
+  const [obligacionPermiso, setObligacionPermiso] = useState('');
+  const [obligacionAutoridad, setObligacionAutoridad] = useState('');
+  // Jurisdicción dividida en 4 campos (Compensaciones)
+  const [obligacionJurisdiccionCorp, setObligacionJurisdiccionCorp] = useState('');
+  const [obligacionDepartamento, setObligacionDepartamento] = useState('');
+  const [obligacionMunicipio, setObligacionMunicipio] = useState('');
+  const [obligacionVeredaPredio, setObligacionVeredaPredio] = useState('');
+  const [obligacionExpediente, setObligacionExpediente] = useState('');
+  const [obligacionCategoria, setObligacionCategoria] = useState('');
+
+  // Compensaciones: Clasificación extendida
+  const [asignacionRecursos, setAsignacionRecursos] = useState<boolean>(false);
+  const [saldoDisponible, setSaldoDisponible] = useState<number>(0);
+  const [aniosAPlanear, setAniosAPlanear] = useState<number>(1);
+  const [contratoSeleccionado, setContratoSeleccionado] = useState<string>('');
+
+  // Compensaciones: Programación multi-año (anualizada)
+  const [progY2, setProgY2] = useState<ProgramacionAnualItem[]>([]);
+  const [progY3, setProgY3] = useState<ProgramacionAnualItem[]>([]);
+  // Compensaciones: pestaña activa en Programación (1, 2 o 3)
+  const [tabAnio, setTabAnio] = useState<number>(1);
+  // Compensaciones: ¿las actividades del Año 2/3 son distintas a las del Año 1?
+  // Si true, cada año mantiene su propia selección de ítems (independiente).
+  const [itemsCambianPorAnio, setItemsCambianPorAnio] = useState<boolean>(false);
+  const [selectedItemsY2, setSelectedItemsY2] = useState<Set<string>>(new Set());
+  const [selectedItemsY3, setSelectedItemsY3] = useState<Set<string>>(new Set());
+
+  // Derived
+  const isMonitoreo = selectedLinea?.usaMatriz === true;
+  const isCompensaciones = selectedLinea?.value === 'Compensaciones estaciones' || selectedLinea?.value === 'Compensaciones e Inv';
+
+  // Step index offsets for Compensaciones (new Obligación step inserted at index 3)
+  const STEP_CLASIFICACION = isCompensaciones ? 4 : 3;
+  const STEP_PARAMETROS    = isCompensaciones ? 5 : 4;
+  const STEP_PROGRAMACION  = isCompensaciones ? 6 : 5;
+  const TOTAL_STEPS        = isCompensaciones ? 7 : 6;
+
+  const STEPS = useMemo(() => getStepLabels(isMonitoreo, isCompensaciones), [isMonitoreo, isCompensaciones]);
+
+  // ── Reset on open ──
+  useEffect(() => {
+    if (!open) return;
+    setParamSearch('');
+    if (initialData) {
+      const cfg = LINEAS_PLANEACION.find(l => l.value === initialData.lineaOperativa) ?? null;
+      setSelectedLinea(cfg);
+      setStep(0);
+      setSelectedZona(initialData.zona ?? null);
+      setTipoLugar(initialData.tipoLugar ?? cfg?.lugarPorDefecto ?? 'Estación');
+      setSelectedEstacion(initialData.estacion ?? null);
+      setPk(initialData.pk ?? '');
+      setFuentePresupuesto(initialData.fuentePresupuesto ?? 'OPEX');
+      setTipoPlaneacion(initialData.tipoPlaneacion ?? 'Plan');
+      setAnioPlaneacion(initialData.anioPlaneacion ?? new Date().getFullYear() + 1);
+      setSelectedParams(new Set());
+      setSelectedItems(new Set());
+      setSelectedLogistica(new Set(ITEMS_LOGISTICA.map(it => it.id)));
+      setSelectedMatrices(new Set());
+      setMonthlyData(initialData.programacion ?? []);
+    } else {
+      setStep(0);
+      setSelectedLinea(null);
+      setSelectedZona(null);
+      setTipoLugar('Estación');
+      setSelectedEstacion(null);
+      setPk('');
+      setAvailableEstaciones([]);
+      setAvailableMatrices([]);
+      setAvailableParams([]);
+      setAvailableItems([]);
+      setSelectedParams(new Set());
+      setSelectedItems(new Set());
+      setSelectedLogistica(new Set(ITEMS_LOGISTICA.map(it => it.id)));
+      setSelectedMatrices(new Set());
+      setFuentePresupuesto('OPEX');
+      setTipoPlaneacion('Plan');
+      setAnioPlaneacion(new Date().getFullYear() + 1);
+      setMonthlyData([]);
+      setSelectedSistema('');
+      setSelectedSector('');
+      setObligacionId('');
+      setObligacionFechaCreacion(new Date().toISOString().split('T')[0]);
+      setObligacionActoTipo('Resolución');
+      setObligacionActoNumero('');
+      setObligacionActoFecha('');
+      setObligacionPermiso('');
+      setObligacionAutoridad('');
+      setObligacionJurisdiccionCorp('');
+      setObligacionDepartamento('');
+      setObligacionMunicipio('');
+      setObligacionVeredaPredio('');
+      setObligacionExpediente('');
+      setObligacionCategoria('');
+      setAsignacionRecursos(false);
+      setSaldoDisponible(0);
+      setAniosAPlanear(1);
+      setContratoSeleccionado('');
+      setProgY2([]);
+      setProgY3([]);
+      setTabAnio(1);
+      setItemsCambianPorAnio(false);
+      setSelectedItemsY2(new Set());
+      setSelectedItemsY3(new Set());
+      setIvaGlobalActivo(false);
+      setIvaGlobalPorcentaje(19);
+      setIvaItemsExcluidos(new Set());
+    }
+  }, [open, initialData]);
+
+  // ── Load estaciones when zona + tipoLugar change ──
+  useEffect(() => {
+    if (!selectedZona || tipoLugar !== 'Estación') {
+      setAvailableEstaciones([]);
+      return;
+    }
+    if (isMonitoreo) {
+      MonitoreosMatrizService.getEstaciones(selectedZona).then(setAvailableEstaciones);
+    } else {
+      setAvailableEstaciones(ZONAS_ESTACIONES[selectedZona] ?? []);
+    }
+  }, [selectedZona, tipoLugar, isMonitoreo]);
+
+  // ── Load matrices + params when entering Parámetros step (monitoreos) ──
+  useEffect(() => {
+    if (step !== STEP_PARAMETROS || !isMonitoreo) return;
+    const z = selectedZona;
+    const e = tipoLugar === 'Estación' ? selectedEstacion : undefined;
+    if (!z) return;
+    if (tipoLugar === 'Estación' && !e) return;
+
+    setLoading(true);
+    (async () => {
+      let baseRows: MonitoreoRow[] = [];
+      if (tipoLugar === 'Zona') {
+        baseRows = await MonitoreosMatrizService.getParametros(z);
+      } else if (e) {
+        baseRows = await MonitoreosMatrizService.getParametros(z, e);
+      }
+
+      const customRows = customMonitoreoRows.filter(r =>
+        r.zona === z && (tipoLugar === 'Zona' ? true : r.estacion === e)
+      );
+      const rows = [...baseRows, ...customRows];
+      const mats = [...new Set(rows.map(r => r.matriz))].sort();
+
+      setAvailableMatrices(mats);
+      setAvailableParams(rows);
+      setLoading(false);
+    })();
+  }, [step, isMonitoreo, selectedZona, selectedEstacion, tipoLugar, customMonitoreoRows]);
+
+  // ── Load items when entering Parámetros step (non-monitoreos) ──
+  useEffect(() => {
+    if (step !== STEP_PARAMETROS || isMonitoreo || !selectedLinea) return;
+    // Para Compensaciones la zona ES la estación (columnas del consolidado BQS)
+    const estacionParaTarifa = isCompensaciones ? (selectedZona ?? undefined) : undefined;
+    const serviceItems = ItemsLineaService.getItems(selectedLinea.value, estacionParaTarifa);
+    const custom = customItemsMap[selectedLinea.value] ?? [];
+    let merged = [...serviceItems, ...custom];
+    // Compensaciones: filtrar adicionalmente por contrato seleccionado si los ítems traen campo `contrato`
+    if (isCompensaciones && contratoSeleccionado) {
+      merged = merged.filter(it => {
+        const c = (it as any).contrato;
+        return !c || c === contratoSeleccionado;
+      });
+    }
+    setAvailableItems(merged);
+  }, [step, isMonitoreo, selectedLinea, customItemsMap, isCompensaciones, selectedZona, contratoSeleccionado]);
+
+  // ── Build monthly data when entering Programación step ──
+  useEffect(() => {
+    if (step !== STEP_PROGRAMACION) return;
+
+    // Build individual price entries from selected params/items + logística
+    const buildEntry = (
+      key: string, nombre: string, basePrice: number,
+      prev?: PlaneacionMensual, defaultFrec = 1,
+      forcePrice = false, // si true, siempre usa basePrice (ignora el precio guardado)
+    ): PlaneacionMensualParam => {
+      const ex = prev?.preciosIndividuales?.find(p => p.key === key);
+      const precio    = (forcePrice || !ex) ? basePrice : ex.precio;
+      const cantidad  = ex?.cantidad  ?? 0;
+      const frecuencia = ex?.frecuencia ?? defaultFrec;
+      return { key, nombre, precio, cantidad, frecuencia, total: precio * cantidad * frecuencia };
+    };
+
+    setMonthlyData(prev => {
+      return MESES.map((mes, i) => {
+        const existing = prev.length > i ? prev[i] : undefined;
+        const list: PlaneacionMensualParam[] = [];
+
+        if (isMonitoreo) {
+          // Group selected params by Matriz for programming
+          const selParams = availableParams.filter(r => selectedParams.has(paramKey(r)));
+          const matrizMap = new Map<string, MonitoreoRow[]>();
+          for (const r of selParams) {
+            const arr = matrizMap.get(r.matriz) || [];
+            arr.push(r);
+            matrizMap.set(r.matriz, arr);
+          }
+          for (const [matriz, rows] of matrizMap) {
+            // Precio matriz = Σ(precio_param × compuestos_param)
+            // compuestos_param = cantCompuestos si tipo=compuesto, sino 1 (simple)
+            const matrizPrecio = rows.reduce((s, r) => {
+              const key = paramKey(r);
+              const precioParam = r.preciosMensuales?.[i] ?? r.chemilab;
+              const compuestos = paramTipoMuestra.get(key) === 'compuesto'
+                ? (paramCantCompuestos.get(key) || 1) : 1;
+              return s + precioParam * compuestos;
+            }, 0);
+            list.push(buildEntry(`MATRIZ|${matriz}`, `${matriz} (${rows.length} params)`, matrizPrecio, existing, 1, true));
+          }
+        } else {
+          for (const it of availableItems.filter(it => selectedItems.has(it.id))) {
+            list.push(buildEntry(it.id, it.item, ItemsLineaService.getPrecioEfectivo(it, i), existing, 1));
+          }
+        }
+
+        // Logística — solo en Monitoreos (no aplica para Compensaciones u otras líneas)
+        if (isMonitoreo) {
+          for (const log of ITEMS_LOGISTICA.filter(l => selectedLogistica.has(l.id))) {
+            list.push(buildEntry(log.id, log.item, ItemsLineaService.getPrecioEfectivo(log, i), existing, 1));
+          }
+        }
+
+        return {
+          mes, mesIndex: i,
+          cantidad: 0,
+          frecuencia: 1,
+          precio: list.reduce((s, p) => s + p.precio, 0),
+          preciosIndividuales: list,
+          total: list.reduce((s, p) => s + p.total, 0),
+        };
+      });
+    });
+  }, [step, paramTipoMuestra, paramCantCompuestos]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Filtered params (monitoreos) ──
+  const filteredParams = useMemo(() => {
+    let rows = availableParams;
+    // Apply matrix filter
+    if (selectedMatrices.size > 0) {
+      rows = rows.filter(r => selectedMatrices.has(r.matriz));
+    }
+    // Apply text search
+    if (paramSearch) {
+      const q = paramSearch.toLowerCase();
+      rows = rows.filter(r =>
+        r.parametro.toLowerCase().includes(q) ||
+        r.estacion.toLowerCase().includes(q) ||
+        r.matriz.toLowerCase().includes(q) ||
+        r.norma.toLowerCase().includes(q) ||
+        r.permiso.toLowerCase().includes(q)
+      );
+    }
+    return rows;
+  }, [availableParams, selectedMatrices, paramSearch]);
+
+  // ── Filtered items (non-monitoreos) ──
+  const filteredItems = useMemo(() => {
+    if (!paramSearch) return availableItems;
+    const q = paramSearch.toLowerCase();
+    return availableItems.filter(it =>
+      it.item.toLowerCase().includes(q) ||
+      it.descripcion.toLowerCase().includes(q)
+    );
+  }, [availableItems, paramSearch]);
+
+  const totalSelectedCount = isMonitoreo
+    ? selectedParams.size
+    : (isCompensaciones && itemsCambianPorAnio && tabAnio === 2 ? selectedItemsY2.size
+       : isCompensaciones && itemsCambianPorAnio && tabAnio === 3 ? selectedItemsY3.size
+       : selectedItems.size);
+
+  // ── Param key helper ──
+  const paramKey = useCallback((r: MonitoreoRow) => `${r.estacion}|${r.parametro}|${r.matriz}|${r.norma}`, []);
+
+  // ── Toggle helpers ──
+  const toggleParam = useCallback((r: MonitoreoRow) => {
+    const key = paramKey(r);
+    setSelectedParams(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key); else next.add(key);
+      return next;
+    });
+  }, [paramKey]);
+
+  const toggleAllParams = useCallback(() => {
+    if (selectedParams.size === filteredParams.length && filteredParams.length > 0) {
+      setSelectedParams(new Set());
+    } else {
+      setSelectedParams(new Set(filteredParams.map(r => paramKey(r))));
+    }
+  }, [filteredParams, selectedParams, paramKey]);
+
+  const toggleItem = useCallback((it: ItemLinea) => {
+    const reselect = isCompensaciones && itemsCambianPorAnio && tabAnio > 1 && step === STEP_PARAMETROS;
+    const setter = reselect
+      ? (tabAnio === 2 ? setSelectedItemsY2 : setSelectedItemsY3)
+      : setSelectedItems;
+    setter(prev => {
+      const next = new Set(prev);
+      if (next.has(it.id)) next.delete(it.id); else next.add(it.id);
+      return next;
+    });
+  }, [isCompensaciones, itemsCambianPorAnio, tabAnio, step, STEP_PARAMETROS]);
+
+  const toggleAllItems = useCallback(() => {
+    const reselect = isCompensaciones && itemsCambianPorAnio && tabAnio > 1 && step === STEP_PARAMETROS;
+    const cur = reselect
+      ? (tabAnio === 2 ? selectedItemsY2 : selectedItemsY3)
+      : selectedItems;
+    const setter = reselect
+      ? (tabAnio === 2 ? setSelectedItemsY2 : setSelectedItemsY3)
+      : setSelectedItems;
+    if (cur.size === filteredItems.length && filteredItems.length > 0) {
+      setter(new Set());
+    } else {
+      setter(new Set(filteredItems.map(it => it.id)));
+    }
+  }, [filteredItems, selectedItems, selectedItemsY2, selectedItemsY3, isCompensaciones, itemsCambianPorAnio, tabAnio, step, STEP_PARAMETROS]);
+
+  const toggleLogistica = useCallback((log: ItemLinea) => {
+    setSelectedLogistica(prev => {
+      const next = new Set(prev);
+      if (next.has(log.id)) next.delete(log.id); else next.add(log.id);
+      return next;
+    });
+  }, []);
+
+  const toggleMatriz = useCallback((m: string) => {
+    setSelectedMatrices(prev => {
+      const next = new Set(prev);
+      if (next.has(m)) next.delete(m); else next.add(m);
+      return next;
+    });
+  }, []);
+
+  const handleAddParametroStep3 = useCallback(() => {
+    if (!selectedZona || !s3ParamNombre.trim()) return;
+
+    const estacionValue = tipoLugar === 'Zona'
+      ? (s3ParamEstacion || availableEstaciones[0] || '')
+      : (selectedEstacion ?? '');
+
+    if (!estacionValue) return;
+
+    const row: MonitoreoRow = {
+      zona: selectedZona,
+      estacion: estacionValue,
+      matriz: s3ParamMatriz,
+      permiso: s3ParamPermiso.trim() || '-',
+      receptor: s3ParamReceptor.trim() || '-',
+      requerimiento: s3ParamRequerimiento.trim() || '-',
+      norma: s3ParamNorma.trim() || '-',
+      parametro: s3ParamNombre.trim(),
+      chemilab: Number(s3ParamPrecio) || 0,
+      puntos: 0,
+      compuesto: 1,
+    };
+
+    setCustomMonitoreoRows(prev => [...prev, row]);
+    setAvailableParams(prev => [...prev, row]);
+    setAvailableMatrices(prev => prev.includes(row.matriz) ? prev : [...prev, row.matriz].sort());
+    setSelectedMatrices(prev => prev.size > 0 ? new Set([...prev, row.matriz]) : prev);
+    setSelectedParams(prev => new Set([...prev, paramKey(row)]));
+
+    setAddingParamStep3(false);
+    setS3ParamNombre('');
+    setS3ParamNorma('');
+    setS3ParamPermiso('');
+    setS3ParamRequerimiento('');
+    setS3ParamReceptor('');
+    setS3ParamPrecio('');
+    if (tipoLugar === 'Zona') setS3ParamEstacion('');
+  }, [selectedZona, selectedEstacion, tipoLugar, s3ParamEstacion, s3ParamNombre, s3ParamMatriz, s3ParamNorma, s3ParamPermiso, s3ParamRequerimiento, s3ParamReceptor, s3ParamPrecio, availableEstaciones, paramKey]);
+
+  // ── Helper: factor IPC × IVA por mes/ítem ──
+  const computeFactor = useCallback((mesIndex: number, itemKey: string) => {
+    const ipcFactor = (ipcGlobalActivo && ipcMeses.has(mesIndex) && ipcGlobalPorcentaje > 0)
+      ? (1 + (ipcGlobalPorcentaje / 100)) : 1;
+    const ivaFactor = (ivaGlobalActivo && !ivaItemsExcluidos.has(itemKey) && ivaGlobalPorcentaje > 0)
+      ? (1 + (ivaGlobalPorcentaje / 100)) : 1;
+    return ipcFactor * ivaFactor;
+  }, [ipcMeses, ipcGlobalActivo, ipcGlobalPorcentaje, ivaGlobalActivo, ivaGlobalPorcentaje, ivaItemsExcluidos]);
+
+  // ── Monthly per-item update ──
+  const updateItemMonth = useCallback((mesIndex: number, itemKey: string, field: 'cantidad' | 'frecuencia', value: number) => {
+    setMonthlyData(prev => {
+      const next = [...prev];
+      const month = { ...next[mesIndex] };
+      const list = [...month.preciosIndividuales];
+      const idx = list.findIndex(p => p.key === itemKey);
+      if (idx >= 0) {
+        const entry = { ...list[idx], [field]: value };
+        entry.total = entry.precio * entry.cantidad * entry.frecuencia * computeFactor(mesIndex, itemKey);
+        list[idx] = entry;
+      }
+      month.preciosIndividuales = list;
+      month.total = list.reduce((s, p) => s + p.total, 0);
+      next[mesIndex] = month;
+      return next;
+    });
+  }, [computeFactor]);
+
+  const updateItemPrice = useCallback((itemKey: string, newPrice: number) => {
+    setMonthlyData(prev => prev.map((month, mi) => {
+      const idx = month.preciosIndividuales.findIndex(p => p.key === itemKey);
+      if (idx < 0) return month;
+      const list = [...month.preciosIndividuales];
+      const entry = { ...list[idx], precio: newPrice };
+      entry.total = entry.precio * entry.cantidad * entry.frecuencia * computeFactor(mi, itemKey);
+      list[idx] = entry;
+      return { ...month, preciosIndividuales: list, total: list.reduce((s, p) => s + p.total, 0) };
+    }));
+    // Persist to service
+    if (isMonitoreo) {
+      const row = availableParams.find(r => paramKey(r) === itemKey);
+      if (row) {
+        MESES.forEach((_, i) => MonitoreosMatrizService.updateChemilabMensual(row.zona, row.estacion, row.parametro, row.matriz, i, newPrice));
+      }
+    } else {
+      MESES.forEach((_, i) => ItemsLineaService.updatePrecioMensual(itemKey, i, newPrice));
+    }
+  }, [isMonitoreo, availableParams, paramKey]);
+
+  // ── Recalculate totals when IPC / IVA toggles change ──
+  useEffect(() => {
+    if (monthlyData.length === 0) return;
+    setMonthlyData(prev => prev.map((month, mi) => {
+      const list = month.preciosIndividuales.map(entry => ({
+        ...entry,
+        total: entry.precio * entry.cantidad * entry.frecuencia * computeFactor(mi, entry.key),
+      }));
+      return { ...month, preciosIndividuales: list, total: list.reduce((s, p) => s + p.total, 0) };
+    }));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ipcMeses, ipcGlobalActivo, ipcGlobalPorcentaje, ivaGlobalActivo, ivaGlobalPorcentaje, ivaItemsExcluidos]);
+
+  // ── Totals ──
+  const valorTotalY1 = useMemo(() => monthlyData.reduce((s, m) => s + m.total, 0), [monthlyData]);
+  const valorTotalY2 = useMemo(() => progY2.reduce((s, p) => s + p.total, 0), [progY2]);
+  const valorTotalY3 = useMemo(() => progY3.reduce((s, p) => s + p.total, 0), [progY3]);
+  const valorTotal = useMemo(() => {
+    if (!isCompensaciones) return valorTotalY1;
+    let total = valorTotalY1;
+    if (aniosAPlanear >= 2) total += valorTotalY2;
+    if (aniosAPlanear >= 3) total += valorTotalY3;
+    return total;
+  }, [isCompensaciones, aniosAPlanear, valorTotalY1, valorTotalY2, valorTotalY3]);
+
+  // Compensaciones: validación de tope (no superar saldo asignado)
+  const excedeTope = isCompensaciones && asignacionRecursos && saldoDisponible > 0 && valorTotal > saldoDisponible;
+
+  // Compensaciones: sincronizar Año 2 y Año 3.
+  // - Si itemsCambianPorAnio=false → usa los mismos ítems del Año 1.
+  // - Si itemsCambianPorAnio=true  → usa la selección propia del año (selectedItemsY2/Y3) tomando
+  //   precio/nombre desde availableItems o desde monthlyData[0].
+  useEffect(() => {
+    if (!isCompensaciones) return;
+    if (aniosAPlanear < 2) { setProgY2([]); return; }
+    setProgY2(prev => {
+      let items: { key: string; nombre: string; precio: number }[];
+      if (itemsCambianPorAnio) {
+        items = availableItems
+          .filter(it => selectedItemsY2.has(it.id))
+          .map(it => ({ key: it.id, nombre: it.item, precio: ItemsLineaService.getPrecioEfectivo(it, 0) }));
+      } else {
+        items = (monthlyData[0]?.preciosIndividuales ?? []).map(it => ({ key: it.key, nombre: it.nombre, precio: it.precio }));
+      }
+      return items.map(it => {
+        const ex = prev.find(p => p.key === it.key);
+        const cantidad = ex?.cantidad ?? 0;
+        const precio = ex?.precio ?? it.precio;
+        return { key: it.key, nombre: it.nombre, precio, cantidad, total: precio * cantidad };
+      });
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isCompensaciones, aniosAPlanear, monthlyData, itemsCambianPorAnio, selectedItemsY2, availableItems]);
+
+  useEffect(() => {
+    if (!isCompensaciones) return;
+    if (aniosAPlanear < 3) { setProgY3([]); return; }
+    setProgY3(prev => {
+      let items: { key: string; nombre: string; precio: number }[];
+      if (itemsCambianPorAnio) {
+        items = availableItems
+          .filter(it => selectedItemsY3.has(it.id))
+          .map(it => ({ key: it.id, nombre: it.item, precio: ItemsLineaService.getPrecioEfectivo(it, 0) }));
+      } else {
+        items = (monthlyData[0]?.preciosIndividuales ?? []).map(it => ({ key: it.key, nombre: it.nombre, precio: it.precio }));
+      }
+      return items.map(it => {
+        const ex = prev.find(p => p.key === it.key);
+        const cantidad = ex?.cantidad ?? 0;
+        const precio = ex?.precio ?? it.precio;
+        return { key: it.key, nombre: it.nombre, precio, cantidad, total: precio * cantidad };
+      });
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isCompensaciones, aniosAPlanear, monthlyData, itemsCambianPorAnio, selectedItemsY3, availableItems]);
+
+  // Cuando el usuario activa "ítems cambian por año", precargar Y2/Y3 con la selección del Año 1
+  // (para que no empiece de cero, sólo modifique lo que cambia).
+  useEffect(() => {
+    if (!isCompensaciones || !itemsCambianPorAnio) return;
+    if (selectedItemsY2.size === 0 && selectedItems.size > 0) {
+      setSelectedItemsY2(new Set(selectedItems));
+    }
+    if (selectedItemsY3.size === 0 && selectedItems.size > 0) {
+      setSelectedItemsY3(new Set(selectedItems));
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isCompensaciones, itemsCambianPorAnio]);
+
+  const updateProgYItem = useCallback((anio: 2 | 3, key: string, field: 'cantidad' | 'precio', value: number) => {
+    const setter = anio === 2 ? setProgY2 : setProgY3;
+    setter(prev => prev.map(p => {
+      if (p.key !== key) return p;
+      const next = { ...p, [field]: value };
+      next.total = next.precio * next.cantidad;
+      return next;
+    }));
+  }, []);
+
+  // ── Navigation ──
+  const canNext = (): boolean => {
+    switch (step) {
+      case 0: return !!selectedLinea;
+      case 1: return !!selectedZona;
+      case 2: {
+        if (isCompensaciones) return true; // Sistema + Sector optional
+        if (tipoLugar === 'Estación') return !!selectedEstacion;
+        if (tipoLugar === 'Línea') return pk.trim().length > 0;
+        return true; // 'Zona'
+      }
+      case 3: {
+        if (isCompensaciones) return obligacionId.trim().length > 0; // ID obligación required
+        return true; // Clasificación always valid
+      }
+      default: {
+        if (step === STEP_CLASIFICACION) {
+          // Compensaciones: contrato obligatorio (filtra los ítems del siguiente step)
+          if (isCompensaciones && !contratoSeleccionado) return false;
+          return true;
+        }
+        if (step === STEP_PARAMETROS) {
+          // Si estamos planeando Año 2/3 con itemsCambian, validar contra Y2/Y3
+          if (isCompensaciones && itemsCambianPorAnio && tabAnio === 2) return selectedItemsY2.size > 0;
+          if (isCompensaciones && itemsCambianPorAnio && tabAnio === 3) return selectedItemsY3.size > 0;
+          return totalSelectedCount > 0;
+        }
+        if (step === STEP_PROGRAMACION) {
+          // Compensaciones: bloquear si excede el saldo asignado (validación final)
+          if (excedeTope) return false;
+          return true;
+        }
+        return false;
+      }
+    }
+  };
+
+  // Compensaciones: ¿hay más años por planear después del actual?
+  const hayMasAnios = isCompensaciones && tabAnio < aniosAPlanear;
+
+  // Compensaciones: cuando el step Items se está usando para reseleccionar para Año 2/3,
+  // el set efectivo es selectedItemsY2 / selectedItemsY3 en lugar de selectedItems.
+  const isItemsReselect = isCompensaciones && itemsCambianPorAnio && tabAnio > 1 && step === STEP_PARAMETROS;
+  const itemsSelSet = isItemsReselect
+    ? (tabAnio === 2 ? selectedItemsY2 : selectedItemsY3)
+    : selectedItems;
+  const setItemsSelSet: (s: Set<string>) => void = isItemsReselect
+    ? (tabAnio === 2 ? setSelectedItemsY2 : setSelectedItemsY3)
+    : setSelectedItems;
+
+  const handleNext = () => {
+    // Caso especial: en STEP_PARAMETROS planeando Año 2/3 → saltar Clasificación e ir directo a Programación
+    if (step === STEP_PARAMETROS && isCompensaciones && itemsCambianPorAnio && tabAnio > 1) {
+      setStep(STEP_PROGRAMACION);
+      return;
+    }
+    if (step < STEP_PROGRAMACION) {
+      setStep(step + 1);
+      return;
+    }
+    // step === STEP_PROGRAMACION
+    // Caso multi-año: si quedan años por planear, avanzar al siguiente año
+    if (hayMasAnios) {
+      const next = (tabAnio + 1) as 1 | 2 | 3;
+      setTabAnio(next);
+      if (itemsCambianPorAnio) {
+        // Regresar a Items para reseleccionar
+        setStep(STEP_PARAMETROS);
+      }
+      // Si no, queda en Programación viendo el año siguiente (que hereda los ítems)
+      return;
+    }
+    // Último año → Completar
+    {
+      // Complete
+      const selRows = isMonitoreo ? availableParams.filter(r => selectedParams.has(paramKey(r))) : [];
+      const selItems = !isMonitoreo ? availableItems.filter(it => selectedItems.has(it.id)) : [];
+      const selLog = isMonitoreo ? ITEMS_LOGISTICA.filter(l => selectedLogistica.has(l.id)) : [];
+      onComplete({
+        lineaOperativa: selectedLinea!.value,
+        zona: selectedZona!,
+        tipoLugar,
+        estacion: tipoLugar === 'Estación' ? selectedEstacion ?? undefined : undefined,
+        pk: tipoLugar === 'Línea' ? pk : undefined,
+        fuentePresupuesto,
+        tipoPlaneacion,
+        anioPlaneacion,
+        parametrosSeleccionados: selRows,
+        itemsSeleccionados: selItems,
+        logisticaSeleccionada: selLog,
+        programacion: monthlyData,
+        valorTotal,
+        paramTipoMuestra: Object.fromEntries(paramTipoMuestra),
+        paramCantCompuestos: Object.fromEntries(paramCantCompuestos),
+        ipcGlobalActivo,
+        ipcGlobalPorcentaje,
+        ipcMeses: [...ipcMeses],
+        ivaGlobalActivo,
+        ivaGlobalPorcentaje,
+        ivaItemsExcluidos: [...ivaItemsExcluidos],
+        ...(isCompensaciones && {
+          sistema: selectedSistema || undefined,
+          sector: selectedSector || undefined,
+          obligacion: {
+            id: obligacionId,
+            fechaCreacion: obligacionFechaCreacion,
+            actoAdministrativo: {
+              tipo: obligacionActoTipo,
+              numero: obligacionActoNumero,
+              fecha: obligacionActoFecha,
+            },
+            permiso: obligacionPermiso,
+            autoridad: obligacionAutoridad,
+            jurisdiccion: {
+              corporacion: obligacionJurisdiccionCorp,
+              departamento: obligacionDepartamento,
+              municipio: obligacionMunicipio,
+              veredaPredio: obligacionVeredaPredio,
+            },
+            expediente: obligacionExpediente,
+            categoria: obligacionCategoria,
+          },
+          asignacionRecursos,
+          saldoDisponible: asignacionRecursos ? saldoDisponible : undefined,
+          aniosAPlanear,
+          contratoSeleccionado: contratoSeleccionado || undefined,
+          programacionY2: aniosAPlanear >= 2 ? progY2 : undefined,
+          programacionY3: aniosAPlanear >= 3 ? progY3 : undefined,
+          itemsCambianPorAnio,
+          selectedItemsY2: itemsCambianPorAnio && aniosAPlanear >= 2 ? [...selectedItemsY2] : undefined,
+          selectedItemsY3: itemsCambianPorAnio && aniosAPlanear >= 3 ? [...selectedItemsY3] : undefined,
+        }),
+      });
+    }
+  };
+
+  const handleBack = () => {
+    // Caso especial: en STEP_PARAMETROS reseleccionando para Año 2/3 → regresar a Programación del año anterior
+    if (isItemsReselect) {
+      setTabAnio((tabAnio - 1) as 1 | 2 | 3);
+      setStep(STEP_PROGRAMACION);
+      return;
+    }
+    // Caso especial: en STEP_PROGRAMACION viendo Año 2/3 sin re-selección → retroceder un año
+    if (step === STEP_PROGRAMACION && isCompensaciones && tabAnio > 1) {
+      if (itemsCambianPorAnio) {
+        // Volver a Items del año actual (donde se reseleccionó)
+        setStep(STEP_PARAMETROS);
+      } else {
+        setTabAnio((tabAnio - 1) as 1 | 2 | 3);
+      }
+      return;
+    }
+    if (step > 0) setStep(step - 1);
+  };
+
+  // ── Selection handlers with reset cascade ──
+  const handleSelectLinea = useCallback((cfg: LineaPlaneacionConfig) => {
+    setSelectedLinea(cfg);
+    setTipoLugar(cfg.lugarPorDefecto);
+    // Reset downstream
+    setSelectedEstacion(null);
+    setPk('');
+    setSelectedParams(new Set());
+    setSelectedItems(new Set());
+    setSelectedMatrices(new Set());
+    setMonthlyData([]);
+  }, []);
+
+  const handleSelectZona = useCallback((z: string) => {
+    setSelectedZona(z);
+    setSelectedEstacion(null);
+    setPk('');
+    setSelectedParams(new Set());
+    setSelectedItems(new Set());
+    setSelectedMatrices(new Set());
+    setMonthlyData([]);
+  }, []);
+
+  const handleSelectEstacion = useCallback((e: string) => {
+    setSelectedEstacion(e);
+    setSelectedParams(new Set());
+    setSelectedMatrices(new Set());
+    setMonthlyData([]);
+  }, []);
+
+  // ── Ítems custom: temp form (Step 0) ──
+  const handleAddTempItem = useCallback(() => {
+    if (!tempItemNombre.trim()) return;
+    setTempItems(prev => [...prev, {
+      id: `TMPITEM-${Date.now()}`,
+      nombre: tempItemNombre.trim(),
+      unidad: tempItemUnidad,
+      precio: parseFloat(tempItemPrecio) || 0,
+    }]);
+    setTempItemNombre('');
+    setTempItemPrecio('');
+  }, [tempItemNombre, tempItemUnidad, tempItemPrecio]);
+
+  const handleRemoveTempItem = useCallback((id: string) => {
+    setTempItems(prev => prev.filter(it => it.id !== id));
+  }, []);
+
+  // ── Crear línea custom ──
+  const handleCreateLinea = useCallback(() => {
+    if (!newLineaNombre.trim()) return;
+    const cfg: LineaPlaneacionConfig = {
+      value: newLineaNombre.trim().toLowerCase().replace(/\s+/g, '_') as LineaOperativa,
+      label: newLineaNombre.trim(),
+      icon: '📌',
+      descripcion: newLineaDesc.trim() || newLineaNombre.trim(),
+      usaMatriz: false,
+      lugarPorDefecto: newLineaLugar,
+      categoria: newLineaCategoria as LineaPlaneacionConfig['categoria'],
+    };
+    if (tempItems.length > 0) {
+      const items: ItemLinea[] = tempItems.map(ti => ({
+        id: `CUSTOM-${cfg.value}-${ti.id}`,
+        lineaOperativa: cfg.value as LineaOperativa,
+        item: ti.nombre,
+        descripcion: ti.nombre,
+        unidad: ti.unidad,
+        precioReferencia: ti.precio,
+      }));
+      setCustomItemsMap(prev => ({ ...prev, [cfg.value]: items }));
+    }
+    setCustomLineas(prev => [...prev, cfg]);
+    setCreandoLinea(false);
+    setNewLineaNombre('');
+    setNewLineaDesc('');
+    setTempItems([]);
+    setTempItemNombre('');
+    setTempItemPrecio('');
+    handleSelectLinea(cfg);
+  }, [newLineaNombre, newLineaDesc, newLineaCategoria, newLineaLugar, tempItems, handleSelectLinea]);
+
+  // ── Añadir ítem en Step 3 (cualquier línea) ──
+  const handleAddItemStep3 = useCallback(() => {
+    if (!s3Nombre.trim() || !selectedLinea) return;
+    const item: ItemLinea = {
+      id: `CUSTOM-${selectedLinea.value}-${Date.now()}`,
+      lineaOperativa: selectedLinea.value as LineaOperativa,
+      item: s3Nombre.trim(),
+      descripcion: s3Nombre.trim(),
+      unidad: s3Unidad,
+      precioReferencia: parseFloat(s3Precio) || 0,
+    };
+    setCustomItemsMap(prev => ({
+      ...prev,
+      [selectedLinea.value]: [...(prev[selectedLinea.value] ?? []), item],
+    }));
+    setAvailableItems(prev => [...prev, item]);
+    setSelectedItems(prev => new Set([...prev, item.id]));
+    setAddingItemStep3(false);
+    setS3Nombre('');
+    setS3Precio('');
+  }, [s3Nombre, s3Unidad, s3Precio, selectedLinea]);
+
+  // ── Grupo de líneas por categoría ──
+  const lineasPorCategoria = useMemo(() => {
+    const all = [...LINEAS_PLANEACION, ...customLineas];
+    const map = new Map<string, LineaPlaneacionConfig[]>();
+    for (const cat of CATEGORIAS_ORDEN) map.set(cat, []);
+    for (const l of all) {
+      const arr = map.get(l.categoria);
+      if (arr) arr.push(l);
+    }
+    return map;
+  }, [customLineas]);
+
+  if (!open) return null;
+
+  // ── Render ──
+  return (
+    <Portal>
+      <div className={styles.overlay} onClick={onClose}>
+        <div className={styles.wizard} onClick={e => e.stopPropagation()}>
+          {/* Header */}
+          <div className={styles.wizardHeader}>
+            <div className={styles.headerLeft}>
+              <Title2 style={{ color: '#003057', fontWeight: 700 }}>
+                {selectedLinea ? `Nueva — ${selectedLinea.label}` : 'Nueva Planeación'}
+              </Title2>
+              <Caption1 style={{ color: tokens.colorNeutralForeground3 }}>
+                {STEPS[step].label} — Paso {step + 1} de {STEPS.length}
+              </Caption1>
+            </div>
+            <div className={styles.closeBtn} onClick={onClose}><DismissRegular /></div>
+          </div>
+
+          {/* Steps bar */}
+          <div className={styles.stepsBar}>
+            {STEPS.map((s, i) => (
+              <React.Fragment key={i}>
+                <div className={styles.step}>
+                  <div className={mergeClasses(
+                    styles.stepDot,
+                    i === step && styles.stepDotActive,
+                    i < step && styles.stepDotDone,
+                  )}>
+                    {i < step ? <CheckmarkRegular /> : i + 1}
+                  </div>
+                  <span className={mergeClasses(
+                    styles.stepLabel,
+                    (i === step || i < step) && styles.stepLabelActive,
+                  )}>
+                    {s.label}
+                  </span>
+                </div>
+                {i < STEPS.length - 1 && (
+                  <div className={mergeClasses(styles.stepLine, i < step && styles.stepLineDone)} />
+                )}
+              </React.Fragment>
+            ))}
+          </div>
+
+          {/* Body */}
+          <div className={styles.wizardBody}>
+
+            {/* ═══ Step 0: Línea Operativa ═══ */}
+            {step === 0 && (
+              <div>
+                <Title3 style={{ color: '#003057', display: 'block', marginBottom: '4px' }}>Selecciona la línea operativa</Title3>
+                <Caption1 style={{ color: tokens.colorNeutralForeground3, display: 'block' }}>
+                  Define el tipo de actividad a planear. Cada línea tiene sus propios ítems y flujo.
+                </Caption1>
+
+                {[...lineasPorCategoria.entries()].map(([cat, items]) => items.length > 0 && (
+                  <React.Fragment key={cat}>
+                    <div className={styles.categoriaLabel}>{cat}</div>
+                    <div className={styles.lineaGrid}>
+                      {items.map(cfg => (
+                        <div
+                          key={cfg.value}
+                          className={mergeClasses(styles.lineaCard, selectedLinea?.value === cfg.value && styles.lineaCardActive)}
+                          onClick={() => handleSelectLinea(cfg)}
+                        >
+                          <div className={styles.lineaIcon}>{cfg.icon}</div>
+                          <div className={styles.lineaInfo}>
+                            <Body2 style={{ fontWeight: '600', lineHeight: '1.3' }}>{cfg.label}</Body2>
+                            <Caption1 style={{ color: tokens.colorNeutralForeground3, lineHeight: '1.3' }}>
+                              {cfg.descripcion}
+                            </Caption1>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </React.Fragment>
+                ))}
+
+                {/* Nueva línea inline */}
+                {!creandoLinea ? (
+                  <div className={styles.addLineaCard} onClick={() => setCreandoLinea(true)}>
+                    <AddRegular /> Nueva línea operativa
+                  </div>
+                ) : (
+                  <div className={styles.newLineaOverlay}>
+                    <Body2 style={{ fontWeight: '600', color: '#003057' }}>Crear línea operativa</Body2>
+                    <div className={styles.newLineaRow}>
+                      <div style={{ flex: 1, minWidth: '180px' }}>
+                        <Caption1>Nombre *</Caption1>
+                        <Input
+                          value={newLineaNombre}
+                          onChange={(_, d) => setNewLineaNombre(d.value)}
+                          placeholder="Ej: Residuos Peligrosos"
+                          style={{ width: '100%' }}
+                        />
+                      </div>
+                      <div style={{ flex: 1, minWidth: '180px' }}>
+                        <Caption1>Descripción</Caption1>
+                        <Input
+                          value={newLineaDesc}
+                          onChange={(_, d) => setNewLineaDesc(d.value)}
+                          placeholder="Breve descripción"
+                          style={{ width: '100%' }}
+                        />
+                      </div>
+                    </div>
+                    <div className={styles.newLineaRow}>
+                      <div style={{ minWidth: '180px' }}>
+                        <Caption1>Categoría</Caption1>
+                        <select
+                          value={newLineaCategoria}
+                          onChange={e => setNewLineaCategoria(e.target.value)}
+                          style={{ padding: '6px 10px', borderRadius: '6px', border: '1px solid #ccc', fontSize: '14px' }}
+                        >
+                          {CATEGORIAS_ORDEN.map(c => <option key={c} value={c}>{c}</option>)}
+                        </select>
+                      </div>
+                      <div style={{ minWidth: '160px' }}>
+                        <Caption1>Lugar por defecto</Caption1>
+                        <select
+                          value={newLineaLugar}
+                          onChange={e => setNewLineaLugar(e.target.value as TipoLugar)}
+                          style={{ padding: '6px 10px', borderRadius: '6px', border: '1px solid #ccc', fontSize: '14px' }}
+                        >
+                          {TIPOS_LUGAR.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+                        </select>
+                      </div>
+                    </div>
+                    {/* Ítems del contrato para esta línea */}
+                    <div>
+                      <Caption1 style={{ fontWeight: '700', color: '#003057', display: 'block', marginBottom: '6px' }}>
+                        Ítems del contrato{' '}
+                        <span style={{ fontWeight: '400', color: tokens.colorNeutralForeground3 }}>(opcional)</span>
+                      </Caption1>
+                      {tempItems.length > 0 && (
+                        <div className={styles.tempItemsTableWrap}>
+                          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                            <thead>
+                              <tr>
+                                <th className={styles.paramTh}>Ítem</th>
+                                <th className={styles.paramTh}>Unidad</th>
+                                <th className={styles.paramTh}>Precio ref.</th>
+                                <th className={styles.paramTh} style={{ width: '32px' }} />
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {tempItems.map(it => (
+                                <tr key={it.id} className={styles.paramTr}>
+                                  <td className={styles.paramTd} style={{ fontWeight: '600' }}>{it.nombre}</td>
+                                  <td className={styles.paramTd}>{it.unidad}</td>
+                                  <td className={styles.paramTd}>{fmtCOP(it.precio)}</td>
+                                  <td className={styles.paramTd}>
+                                    <Button appearance="subtle" size="small" onClick={() => handleRemoveTempItem(it.id)}>✕</Button>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                      <div className={styles.tempItemRow}>
+                        <Input
+                          value={tempItemNombre}
+                          onChange={(_, d) => setTempItemNombre(d.value)}
+                          placeholder="Nombre del ítem"
+                          style={{ flex: 2, minWidth: '140px' }}
+                        />
+                        <select
+                          value={tempItemUnidad}
+                          onChange={e => setTempItemUnidad(e.target.value)}
+                          style={{ padding: '6px 10px', borderRadius: '6px', border: '1px solid #ccc', fontSize: '13px', minWidth: '90px' }}
+                        >
+                          {UNIDADES_CONTRATO.map(u => <option key={u} value={u}>{u}</option>)}
+                        </select>
+                        <Input
+                          value={tempItemPrecio}
+                          onChange={(_, d) => setTempItemPrecio(d.value)}
+                          placeholder="Precio COP"
+                          style={{ flex: 1, minWidth: '100px' }}
+                        />
+                        <Button
+                          appearance="primary"
+                          size="small"
+                          disabled={!tempItemNombre.trim()}
+                          onClick={handleAddTempItem}
+                          icon={<AddRegular />}
+                        >
+                          Añadir
+                        </Button>
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
+                      <Button
+                        appearance="primary"
+                        disabled={!newLineaNombre.trim()}
+                        onClick={handleCreateLinea}
+                      >
+                        Crear
+                      </Button>
+                      <Button appearance="subtle" onClick={() => { setCreandoLinea(false); setTempItems([]); setTempItemNombre(''); setTempItemPrecio(''); }}>Cancelar</Button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* ═══ Step 1: Zona ═══ */}
+            {step === 1 && (
+              <div>
+                <Title3 style={{ color: '#003057', display: 'block', marginBottom: '4px' }}>Selecciona la zona</Title3>
+                <Caption1 style={{ color: tokens.colorNeutralForeground3, display: 'block' }}>
+                  Zona geográfica para la planeación de {selectedLinea?.label}
+                </Caption1>
+                <div className={styles.selectionGrid}>
+                  {(isCompensaciones ? ZONAS_COMPENSACIONES : ZONAS).map(z => (
+                    <div
+                      key={z}
+                      className={mergeClasses(styles.selectionCard, selectedZona === z && styles.selectionCardActive)}
+                      onClick={() => handleSelectZona(z)}
+                    >
+                      <div className={mergeClasses(styles.selectionDot, selectedZona === z && styles.selectionDotActive)} />
+                      <Body2 style={{ fontWeight: '600' }}>{z}</Body2>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* ═══ Step 2: Lugar ═══ */}
+            {step === 2 && (
+              <div>
+                <Title3 style={{ color: '#003057', display: 'block', marginBottom: '4px' }}>Ubicación</Title3>
+
+                {isCompensaciones ? (
+                  <>
+                    <Caption1 style={{ color: tokens.colorNeutralForeground3, display: 'block', marginBottom: '16px' }}>
+                      Indica el sistema (oleoducto/poliducto) y el sector/proyecto donde aplica la compensación.
+                    </Caption1>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', maxWidth: '560px' }}>
+                      <div>
+                        <Caption1 style={{ display: 'block', fontWeight: '600', color: '#003057', marginBottom: '4px' }}>Sistema</Caption1>
+                        <select
+                          value={selectedSistema}
+                          onChange={e => setSelectedSistema(e.target.value)}
+                          style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', border: '1px solid #ccc', fontSize: '14px' }}
+                        >
+                          <option value="">Selecciona un sistema...</option>
+                          {SISTEMAS_CENIT.map(s => <option key={s} value={s}>{s}</option>)}
+                        </select>
+                      </div>
+                      <div>
+                        <Caption1 style={{ display: 'block', fontWeight: '600', color: '#003057', marginBottom: '4px' }}>Sector</Caption1>
+                        <Input
+                          placeholder="Ej: PK 70+100 Poliducto Puerto Salgar Cartago Yumbo"
+                          value={selectedSector}
+                          onChange={(_, d) => setSelectedSector(d.value)}
+                          style={{ width: '100%' }}
+                        />
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <Caption1 style={{ color: tokens.colorNeutralForeground3, display: 'block' }}>
+                      ¿La actividad aplica a una estación, una línea (PK) o a toda la zona <strong>{selectedZona}</strong>?
+                    </Caption1>
+
+                    {/* Tipo de lugar */}
+                    <div className={styles.tipoLugarGrid}>
+                      {TIPOS_LUGAR.map(tl => (
+                        <div
+                          key={tl.value}
+                          className={mergeClasses(styles.tipoLugarCard, tipoLugar === tl.value && styles.tipoLugarCardActive)}
+                          onClick={() => { setTipoLugar(tl.value); setSelectedEstacion(null); setPk(''); }}
+                        >
+                          <Body2 style={{ fontWeight: '700' }}>{tl.label}</Body2>
+                          <Caption1 style={{ color: tokens.colorNeutralForeground3 }}>{tl.descripcion}</Caption1>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Sub-selection based on tipo */}
+                    {tipoLugar === 'Estación' && (
+                      <>
+                        <Caption1 style={{ color: '#003057', fontWeight: '600', display: 'block', marginBottom: '4px' }}>
+                          Estaciones en {selectedZona}
+                        </Caption1>
+                        {availableEstaciones.length > 0 ? (
+                          <div className={styles.selectionGrid}>
+                            {availableEstaciones.map(e => (
+                              <div
+                                key={e}
+                                className={mergeClasses(styles.selectionCard, selectedEstacion === e && styles.selectionCardActive)}
+                                onClick={() => handleSelectEstacion(e)}
+                              >
+                                <div className={mergeClasses(styles.selectionDot, selectedEstacion === e && styles.selectionDotActive)} />
+                                <Body2 style={{ fontWeight: '600' }}>{e}</Body2>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className={styles.infoBox}>
+                            No hay estaciones registradas en la zona {selectedZona}.
+                          </div>
+                        )}
+                      </>
+                    )}
+
+                    {tipoLugar === 'Línea' && (
+                      <div className={styles.pkInput}>
+                        <Caption1 style={{ color: '#003057', fontWeight: '600', display: 'block', marginBottom: '6px' }}>
+                          Ingresa el PK de la línea
+                        </Caption1>
+                        <Input
+                          placeholder="Ej: PK 120+500"
+                          value={pk}
+                          onChange={(_, d) => setPk(d.value)}
+                          style={{ width: '100%' }}
+                        />
+                      </div>
+                    )}
+
+                    {tipoLugar === 'Zona' && (
+                      <div className={styles.infoBox}>
+                        La actividad aplica a toda la zona <strong>{selectedZona}</strong>. No es necesario seleccionar una estación.
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            )}
+
+            {/* ═══ Step 3 (Compensaciones only): Descripción ═══ */}
+            {step === 3 && isCompensaciones && (
+              <div style={{ maxWidth: '720px', margin: '0 auto' }}>
+                <Title3 style={{ color: '#003057', display: 'block', marginBottom: '4px' }}>Descripción</Title3>
+                <Caption1 style={{ color: tokens.colorNeutralForeground3, display: 'block', marginBottom: '20px' }}>
+                  Registra los datos del acto administrativo y la compensación ambiental asociada.
+                </Caption1>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px 24px', maxWidth: '720px', margin: '0 auto' }}>
+                  {/* ID obligación */}
+                  <div>
+                    <Caption1 style={{ display: 'block', fontWeight: '700', color: '#003057', marginBottom: '4px' }}>
+                      ID <span style={{ color: '#e00' }}>*</span>
+                    </Caption1>
+                    <Input
+                      placeholder="Ej: COMP_01"
+                      value={obligacionId}
+                      onChange={(_, d) => setObligacionId(d.value)}
+                      style={{ width: '100%' }}
+                    />
+                    <Caption1 style={{ color: tokens.colorNeutralForeground3, fontSize: '11px' }}>
+                      Formato sugerido: COMP_## o INV_##
+                    </Caption1>
+                  </div>
+
+                  {/* Fecha creación */}
+                  <div>
+                    <Caption1 style={{ display: 'block', fontWeight: '700', color: '#003057', marginBottom: '4px' }}>Fecha de creación</Caption1>
+                    <Input
+                      type="date"
+                      value={obligacionFechaCreacion}
+                      onChange={(_, d) => setObligacionFechaCreacion(d.value)}
+                      style={{ width: '100%' }}
+                    />
+                  </div>
+
+                  {/* Acto administrativo — span full width */}
+                  <div style={{ gridColumn: '1 / -1' }}>
+                    <Caption1 style={{ display: 'block', fontWeight: '700', color: '#003057', marginBottom: '8px' }}>Acto administrativo</Caption1>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr 1fr', gap: '12px', alignItems: 'end' }}>
+                      <div>
+                        <Caption1 style={{ display: 'block', fontWeight: '600', marginBottom: '4px' }}>Tipo</Caption1>
+                        <select
+                          value={obligacionActoTipo}
+                          onChange={e => setObligacionActoTipo(e.target.value)}
+                          style={{ padding: '8px 10px', borderRadius: '8px', border: '1px solid #ccc', fontSize: '14px' }}
+                        >
+                          {TIPOS_ACTO.map(t => <option key={t} value={t}>{t}</option>)}
+                        </select>
+                      </div>
+                      <div>
+                        <Caption1 style={{ display: 'block', fontWeight: '600', marginBottom: '4px' }}>Número</Caption1>
+                        <Input
+                          placeholder="Ej: 1234"
+                          value={obligacionActoNumero}
+                          onChange={(_, d) => setObligacionActoNumero(d.value)}
+                          style={{ width: '100%' }}
+                        />
+                      </div>
+                      <div>
+                        <Caption1 style={{ display: 'block', fontWeight: '600', marginBottom: '4px' }}>Fecha de expedición</Caption1>
+                        <Input
+                          type="date"
+                          value={obligacionActoFecha}
+                          onChange={(_, d) => setObligacionActoFecha(d.value)}
+                          style={{ width: '100%' }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Permiso */}
+                  <div>
+                    <Caption1 style={{ display: 'block', fontWeight: '700', color: '#003057', marginBottom: '4px' }}>Permiso que origina la obligación / Tipo de obligación</Caption1>
+                    <select
+                      value={obligacionPermiso}
+                      onChange={e => setObligacionPermiso(e.target.value)}
+                      style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', border: '1px solid #ccc', fontSize: '14px' }}
+                    >
+                      <option value="">Selecciona...</option>
+                      {TIPOS_PERMISO.map(p => <option key={p} value={p}>{p}</option>)}
+                    </select>
+                  </div>
+
+                  {/* Autoridad ambiental */}
+                  <div>
+                    <Caption1 style={{ display: 'block', fontWeight: '700', color: '#003057', marginBottom: '4px' }}>Autoridad ambiental</Caption1>
+                    <select
+                      value={obligacionAutoridad}
+                      onChange={e => setObligacionAutoridad(e.target.value)}
+                      style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', border: '1px solid #ccc', fontSize: '14px' }}
+                    >
+                      <option value="">Selecciona...</option>
+                      {AUTORIDADES_AMBIENTALES.map(a => <option key={a} value={a}>{a}</option>)}
+                    </select>
+                  </div>
+
+                  {/* Jurisdicción — 4 campos separados (donde se ejecuta la compensación) */}
+                  <div style={{ gridColumn: '1 / -1' }}>
+                    <Caption1 style={{ display: 'block', fontWeight: '700', color: '#003057', marginBottom: '8px' }}>
+                      Jurisdicción (donde se ejecuta la compensación)
+                    </Caption1>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                      <div>
+                        <Caption1 style={{ display: 'block', fontWeight: '600', marginBottom: '4px' }}>Corporación</Caption1>
+                        <select
+                          value={obligacionJurisdiccionCorp}
+                          onChange={e => setObligacionJurisdiccionCorp(e.target.value)}
+                          style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', border: '1px solid #ccc', fontSize: '14px' }}
+                        >
+                          <option value="">Selecciona...</option>
+                          {AUTORIDADES_AMBIENTALES.map(a => <option key={a} value={a}>{a}</option>)}
+                        </select>
+                      </div>
+                      <div>
+                        <Caption1 style={{ display: 'block', fontWeight: '600', marginBottom: '4px' }}>Departamento</Caption1>
+                        <select
+                          value={obligacionDepartamento}
+                          onChange={e => {
+                            setObligacionDepartamento(e.target.value);
+                            // Si cambia depto, limpiar municipio y vereda
+                            setObligacionMunicipio('');
+                            setObligacionVeredaPredio('');
+                          }}
+                          style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', border: '1px solid #ccc', fontSize: '14px' }}
+                        >
+                          <option value="">Selecciona...</option>
+                          {DEPARTAMENTOS_LIST.map(d => <option key={d} value={d}>{d}</option>)}
+                        </select>
+                      </div>
+                      <div>
+                        <Caption1 style={{ display: 'block', fontWeight: '600', marginBottom: '4px' }}>
+                          Municipio
+                          {obligacionDepartamento && (
+                            <span style={{ color: tokens.colorNeutralForeground3, fontSize: '10px', marginLeft: '6px', fontWeight: 400 }}>
+                              (sugerencias filtradas por {obligacionDepartamento})
+                            </span>
+                          )}
+                        </Caption1>
+                        <Combobox
+                          freeform
+                          placeholder={obligacionDepartamento ? 'Ej: Villeta — escribe o selecciona' : 'Selecciona un departamento primero'}
+                          value={obligacionMunicipio}
+                          selectedOptions={obligacionMunicipio ? [obligacionMunicipio] : []}
+                          onInput={e => {
+                            const v = (e.target as HTMLInputElement).value;
+                            setObligacionMunicipio(v);
+                            setObligacionVeredaPredio('');
+                          }}
+                          onOptionSelect={(_, d) => {
+                            setObligacionMunicipio(d.optionValue ?? '');
+                            setObligacionVeredaPredio('');
+                          }}
+                          style={{ width: '100%' }}
+                        >
+                          {(DEPARTAMENTOS_MUNICIPIOS[obligacionDepartamento] ?? []).map(m => (
+                            <Option key={m} value={m}>{m}</Option>
+                          ))}
+                        </Combobox>
+                      </div>
+                      <div style={{ gridColumn: '1 / -1' }}>
+                        <Caption1 style={{ display: 'block', fontWeight: '600', marginBottom: '4px' }}>Vereda / Predio</Caption1>
+                        <Input
+                          placeholder="Ej: Vda. La Palma — Predio El Jardín"
+                          value={obligacionVeredaPredio}
+                          onChange={(_, d) => setObligacionVeredaPredio(d.value)}
+                          style={{ width: '100%' }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Expediente */}
+                  <div>
+                    <Caption1 style={{ display: 'block', fontWeight: '700', color: '#003057', marginBottom: '4px' }}>Número de expediente</Caption1>
+                    <Input
+                      placeholder="Ej: EXP-2024-001234"
+                      value={obligacionExpediente}
+                      onChange={(_, d) => setObligacionExpediente(d.value)}
+                      style={{ width: '100%' }}
+                    />
+                  </div>
+
+                  {/* Categoría */}
+                  <div>
+                    <Caption1 style={{ display: 'block', fontWeight: '700', color: '#003057', marginBottom: '4px' }}>Categoría</Caption1>
+                    <select
+                      value={obligacionCategoria}
+                      onChange={e => setObligacionCategoria(e.target.value)}
+                      style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', border: '1px solid #ccc', fontSize: '14px' }}
+                    >
+                      <option value="">Selecciona...</option>
+                      {CATEGORIAS_COMPENSACION.map(c => <option key={c} value={c}>{c}</option>)}
+                    </select>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* ═══ Parámetros / Ítems (step 4 non-comp, step 5 comp) ═══ */}
+            {step === STEP_PARAMETROS && (
+              <div>
+                <Title3 style={{ color: '#003057', display: 'block', marginBottom: '4px' }}>
+                  {isItemsReselect
+                    ? `Selecciona ítems para el Año ${tabAnio} (${anioPlaneacion + (tabAnio - 1)})`
+                    : isMonitoreo ? 'Selecciona parámetros' : 'Selecciona ítems de pago'}
+                </Title3>
+                <Caption1 style={{ color: tokens.colorNeutralForeground3, display: 'block' }}>
+                  {isItemsReselect
+                    ? `Las actividades del Año ${tabAnio} son distintas a las del Año 1. Marca los ítems que aplican para el Año ${tabAnio}.`
+                    : isMonitoreo
+                      ? `Parámetros de la matriz de monitoreo para ${selectedZona}${tipoLugar === 'Zona' ? ' — zona completa' : selectedEstacion ? ` — ${selectedEstacion}` : ''}`
+                      : `Ítems de pago del contrato ${selectedLinea?.label} para ${selectedZona}`}
+                </Caption1>
+                {isItemsReselect && (
+                  <div style={{ marginTop: '8px', marginBottom: '8px', padding: '10px 12px', borderRadius: '8px', background: 'rgba(0,176,80,0.08)', border: '1px solid rgba(0,176,80,0.25)' }}>
+                    <Caption1 style={{ color: '#003057', fontWeight: 600 }}>
+                      🔁 Reselección para Año {tabAnio} — esta selección reemplaza la del año anterior solo para el Año {tabAnio}.
+                    </Caption1>
+                  </div>
+                )}
+
+                {/* Matrix filter (monitoreos only) */}
+                {isMonitoreo && availableMatrices.length > 0 && (
+                  <div className={styles.matrizFilterBar}>
+                    <Caption1 style={{ fontWeight: '700', color: '#003057', alignSelf: 'center', marginRight: '4px' }}>
+                      Filtrar por matriz:
+                    </Caption1>
+                    {availableMatrices.map(m => (
+                      <span
+                        key={m}
+                        className={mergeClasses(styles.matrizChip, selectedMatrices.has(m) && styles.matrizChipActive)}
+                        onClick={() => toggleMatriz(m)}
+                      >
+                        {m}
+                      </span>
+                    ))}
+                    {selectedMatrices.size > 0 && (
+                      <span
+                        className={styles.matrizChip}
+                        style={{ fontStyle: 'italic' }}
+                        onClick={() => setSelectedMatrices(new Set())}
+                      >
+                        Limpiar filtro
+                      </span>
+                    )}
+                  </div>
+                )}
+
+                {/* Search bar */}
+                <div className={styles.searchWrap} style={{ marginTop: isMonitoreo && availableMatrices.length > 0 ? '4px' : '14px' }}>
+                  <Input
+                    placeholder={isMonitoreo ? 'Buscar por parámetro, matriz, norma...' : 'Buscar ítem...'}
+                    contentBefore={<SearchRegular />}
+                    value={paramSearch}
+                    onChange={(_, d) => setParamSearch(d.value)}
+                    style={{ flex: 1, maxWidth: '400px' }}
+                  />
+                  <span className={styles.selectedCount}>
+                    {totalSelectedCount} seleccionados
+                  </span>
+                  {/* IPC global */}
+                  {selectedLinea?.value !== 'Hojas de Ruta Sostenibilidad Ambiental' && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginLeft: 'auto' }}>
+                      <Checkbox
+                        label="¿IPC?"
+                        checked={ipcGlobalActivo}
+                        onChange={(_, d) => setIpcGlobalActivo(!!d.checked)}
+                      />
+                      {ipcGlobalActivo && (
+                        <>
+                          <Input
+                            type="number"
+                            size="small"
+                            value={String(ipcGlobalPorcentaje || '')}
+                            placeholder="%"
+                            onChange={(_, d) => setIpcGlobalPorcentaje(Number(d.value) || 0)}
+                            style={{ width: '70px' }}
+                          />
+                          <Caption1 style={{ color: tokens.colorNeutralForeground3 }}>%</Caption1>
+                        </>
+                      )}
+                    </div>
+                  )}
+                  {/* IVA global por ítem */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <Checkbox
+                      label="¿IVA?"
+                      checked={ivaGlobalActivo}
+                      onChange={(_, d) => setIvaGlobalActivo(!!d.checked)}
+                    />
+                    {ivaGlobalActivo && (
+                      <>
+                        <Input
+                          type="number"
+                          size="small"
+                          value={String(ivaGlobalPorcentaje || '')}
+                          placeholder="%"
+                          onChange={(_, d) => setIvaGlobalPorcentaje(Number(d.value) || 0)}
+                          style={{ width: '70px' }}
+                        />
+                        <Caption1 style={{ color: tokens.colorNeutralForeground3 }}>%</Caption1>
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                {loading ? (
+                  <div className={styles.spinnerWrap}><Spinner label="Cargando..." /></div>
+                ) : isMonitoreo ? (
+                  // ── Monitoreo params table ──
+                  <>
+                    <div className={styles.paramTableWrap}>
+                      <table className={styles.paramTable}>
+                        <thead>
+                          <tr>
+                            <th className={styles.paramTh} style={{ width: '36px' }}>
+                              <Checkbox
+                                checked={selectedParams.size > 0 && selectedParams.size === filteredParams.length ? true : selectedParams.size > 0 ? 'mixed' : false}
+                                onChange={toggleAllParams}
+                              />
+                            </th>
+                            {tipoLugar === 'Zona' && <th className={styles.paramTh}>Estación</th>}
+                            <th className={styles.paramTh}>Parámetro</th>
+                            <th className={styles.paramTh}>Matriz</th>
+                            <th className={styles.paramTh}>Norma</th>
+                            <th className={styles.paramTh}>Permiso</th>
+                            <th className={styles.paramTh}>Requerimiento</th>
+                            <th className={styles.paramTh}>Receptor</th>
+                            <th className={styles.paramTh}>Tipo muestra</th>
+                            <th className={styles.paramTh}>Compuestos</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {filteredParams.map((r, idx) => {
+                            const key = paramKey(r);
+                            const sel = selectedParams.has(key);
+                            return (
+                              <tr
+                                key={key + idx}
+                                className={mergeClasses(styles.paramTr, sel && styles.paramTrSelected)}
+                                onClick={() => toggleParam(r)}
+                              >
+                                <td className={styles.paramTd}><Checkbox checked={sel} onChange={() => toggleParam(r)} /></td>
+                                {tipoLugar === 'Zona' && <td className={styles.paramTd} style={{ fontWeight: '600' }}>{r.estacion}</td>}
+                                <td className={styles.paramTd} style={{ fontWeight: '600', maxWidth: '180px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                  {r.parametro}
+                                </td>
+                                <td className={styles.paramTd}>{r.matriz}</td>
+                                <td className={styles.paramTd} style={{ maxWidth: '160px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                  {r.norma}
+                                </td>
+                                <td className={styles.paramTd}>{r.permiso}</td>
+                                <td className={styles.paramTd} style={{ maxWidth: '140px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                  {r.requerimiento}
+                                </td>
+                                <td className={styles.paramTd}>{r.receptor}</td>
+                                <td className={styles.paramTd} onClick={e => e.stopPropagation()}>
+                                  <select
+                                    value={paramTipoMuestra.get(key) || 'simple'}
+                                    onChange={e => { const m = new Map(paramTipoMuestra); m.set(key, e.target.value as 'simple' | 'compuesto'); setParamTipoMuestra(m); }}
+                                    style={{ padding: '4px 6px', borderRadius: '4px', border: '1px solid #ccc', fontSize: '12px' }}
+                                  >
+                                    <option value="simple">Simple</option>
+                                    <option value="compuesto">Compuesto</option>
+                                  </select>
+                                </td>
+                                <td className={styles.paramTd} onClick={e => e.stopPropagation()}>
+                                  {paramTipoMuestra.get(key) === 'compuesto' && (
+                                    <Input
+                                      type="number"
+                                      size="small"
+                                      value={String(paramCantCompuestos.get(key) || 1)}
+                                      min={1}
+                                      onChange={(_, d) => { const m = new Map(paramCantCompuestos); m.set(key, Number(d.value) || 1); setParamCantCompuestos(m); }}
+                                      style={{ width: '60px' }}
+                                    />
+                                  )}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                          {filteredParams.length === 0 && (
+                            <tr>
+                              <td className={styles.paramTd} colSpan={tipoLugar === 'Zona' ? 10 : 9} style={{ textAlign: 'center', padding: '32px', color: tokens.colorNeutralForeground3 }}>
+                                No se encontraron parámetros{selectedMatrices.size > 0 ? ' para las matrices seleccionadas' : ''}
+                              </td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    {!addingParamStep3 ? (
+                      <div className={styles.addItemCard} onClick={() => { setAddingParamStep3(true); setS3ParamEstacion(selectedEstacion ?? availableEstaciones[0] ?? ''); }}>
+                        <AddRegular /> Añadir parámetro
+                      </div>
+                    ) : (
+                      <div className={styles.newLineaOverlay}>
+                        <Body2 style={{ fontWeight: '600', color: '#003057' }}>Nuevo parámetro de monitoreo</Body2>
+                        <div className={styles.newLineaRow}>
+                          {tipoLugar === 'Zona' && (
+                            <div style={{ minWidth: '180px' }}>
+                              <Caption1>Estación *</Caption1>
+                              <select
+                                value={s3ParamEstacion}
+                                onChange={e => setS3ParamEstacion(e.target.value)}
+                                style={{ padding: '6px 10px', borderRadius: '6px', border: '1px solid #ccc', fontSize: '14px' }}
+                              >
+                                <option value="">Selecciona una estación</option>
+                                {availableEstaciones.map(est => <option key={est} value={est}>{est}</option>)}
+                              </select>
+                            </div>
+                          )}
+                          <div style={{ flex: 1, minWidth: '180px' }}>
+                            <Caption1>Parámetro *</Caption1>
+                            <Input value={s3ParamNombre} onChange={(_, d) => setS3ParamNombre(d.value)} placeholder="Ej: DQO" style={{ width: '100%' }} />
+                          </div>
+                          <div style={{ minWidth: '160px' }}>
+                            <Caption1>Matriz</Caption1>
+                            <select
+                              value={s3ParamMatriz}
+                              onChange={e => setS3ParamMatriz(e.target.value)}
+                              style={{ padding: '6px 10px', borderRadius: '6px', border: '1px solid #ccc', fontSize: '14px' }}
+                            >
+                              {[...new Set([...availableMatrices, ...MATRICES_AMBIENTALES.map(m => m.value)])].map(m => <option key={m} value={m}>{m}</option>)}
+                            </select>
+                          </div>
+                          <div style={{ minWidth: '140px' }}>
+                            <Caption1>Precio ref. (COP)</Caption1>
+                            <Input value={s3ParamPrecio} onChange={(_, d) => setS3ParamPrecio(d.value)} placeholder="0" style={{ width: '100%' }} />
+                          </div>
+                        </div>
+                        <div className={styles.newLineaRow}>
+                          <div style={{ flex: 1, minWidth: '160px' }}>
+                            <Caption1>Norma</Caption1>
+                            <Input value={s3ParamNorma} onChange={(_, d) => setS3ParamNorma(d.value)} placeholder="Norma aplicable" style={{ width: '100%' }} />
+                          </div>
+                          <div style={{ flex: 1, minWidth: '160px' }}>
+                            <Caption1>Permiso</Caption1>
+                            <Input value={s3ParamPermiso} onChange={(_, d) => setS3ParamPermiso(d.value)} placeholder="Permiso" style={{ width: '100%' }} />
+                          </div>
+                          <div style={{ flex: 1, minWidth: '160px' }}>
+                            <Caption1>Requerimiento</Caption1>
+                            <Input value={s3ParamRequerimiento} onChange={(_, d) => setS3ParamRequerimiento(d.value)} placeholder="Requerimiento" style={{ width: '100%' }} />
+                          </div>
+                          <div style={{ flex: 1, minWidth: '160px' }}>
+                            <Caption1>Receptor</Caption1>
+                            <Input value={s3ParamReceptor} onChange={(_, d) => setS3ParamReceptor(d.value)} placeholder="Receptor" style={{ width: '100%' }} />
+                          </div>
+                        </div>
+                        <div style={{ display: 'flex', gap: '8px' }}>
+                          <Button
+                            appearance="primary"
+                            disabled={!s3ParamNombre.trim() || (tipoLugar === 'Zona' && !s3ParamEstacion)}
+                            onClick={handleAddParametroStep3}
+                          >
+                            Agregar
+                          </Button>
+                          <Button
+                            appearance="subtle"
+                            onClick={() => {
+                              setAddingParamStep3(false);
+                              setS3ParamNombre('');
+                              setS3ParamNorma('');
+                              setS3ParamPermiso('');
+                              setS3ParamRequerimiento('');
+                              setS3ParamReceptor('');
+                              setS3ParamPrecio('');
+                              setS3ParamEstacion('');
+                            }}
+                          >
+                            Cancelar
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  // ── Non-monitoreo items table ──
+                  <>
+                  <div className={styles.paramTableWrap}>
+                    <table className={styles.paramTable}>
+                      <thead>
+                        <tr>
+                          <th className={styles.paramTh} style={{ width: '36px' }}>
+                            <Checkbox
+                              checked={itemsSelSet.size > 0 && itemsSelSet.size === filteredItems.length ? true : itemsSelSet.size > 0 ? 'mixed' : false}
+                              onChange={toggleAllItems}
+                            />
+                          </th>
+                          <th className={styles.paramTh}>Ítem</th>
+                          <th className={styles.paramTh}>Descripción</th>
+                          <th className={styles.paramTh}>Unidad</th>
+                          <th className={styles.paramTh}>Precio Ref.</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filteredItems.map(it => {
+                          const sel = itemsSelSet.has(it.id);
+                          return (
+                            <tr
+                              key={it.id}
+                              className={mergeClasses(styles.paramTr, sel && styles.paramTrSelected)}
+                              onClick={() => toggleItem(it)}
+                            >
+                              <td className={styles.paramTd}><Checkbox checked={sel} onChange={() => toggleItem(it)} /></td>
+                              <td className={styles.paramTd} style={{ fontWeight: '600' }}>{it.item}</td>
+                              <td className={styles.paramTd} style={{ maxWidth: '220px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                {it.descripcion}
+                              </td>
+                              <td className={styles.paramTd}>{it.unidad}</td>
+                              <td className={styles.paramTd} style={{ fontWeight: '600' }}>{fmtCOP(it.precioReferencia)}</td>
+                            </tr>
+                          );
+                        })}
+                        {filteredItems.length === 0 && (
+                          <tr>
+                            <td className={styles.paramTd} colSpan={5} style={{ textAlign: 'center', padding: '32px', color: tokens.colorNeutralForeground3 }}>
+                              No se encontraron ítems para {selectedLinea?.label}
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                  {/* Añadir ítem inline */}
+                  {!addingItemStep3 ? (
+                    <div className={styles.addItemCard} onClick={() => setAddingItemStep3(true)}>
+                      <AddRegular /> Añadir ítem
+                    </div>
+                  ) : (
+                    <div className={styles.newLineaOverlay}>
+                      <Body2 style={{ fontWeight: '600', color: '#003057' }}>Nuevo ítem</Body2>
+                      <div className={styles.newLineaRow}>
+                        <div style={{ flex: 2, minWidth: '160px' }}>
+                          <Caption1>Nombre *</Caption1>
+                          <Input value={s3Nombre} onChange={(_, d) => setS3Nombre(d.value)} placeholder="Nombre del ítem" style={{ width: '100%' }} />
+                        </div>
+                        <div style={{ minWidth: '120px' }}>
+                          <Caption1>Unidad</Caption1>
+                          <select value={s3Unidad} onChange={e => setS3Unidad(e.target.value)} style={{ padding: '6px 10px', borderRadius: '6px', border: '1px solid #ccc', fontSize: '14px' }}>
+                            {UNIDADES_CONTRATO.map(u => <option key={u} value={u}>{u}</option>)}
+                          </select>
+                        </div>
+                        <div style={{ minWidth: '140px' }}>
+                          <Caption1>Precio ref. (COP)</Caption1>
+                          <Input value={s3Precio} onChange={(_, d) => setS3Precio(d.value)} placeholder="0" style={{ width: '100%' }} />
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', gap: '8px' }}>
+                        <Button appearance="primary" disabled={!s3Nombre.trim()} onClick={handleAddItemStep3}>Agregar</Button>
+                        <Button appearance="subtle" onClick={() => { setAddingItemStep3(false); setS3Nombre(''); setS3Precio(''); }}>Cancelar</Button>
+                      </div>
+                    </div>
+                  )}
+                  </>
+                )}
+
+                {/* Logística section — solo Monitoreos */}
+                {isMonitoreo && <div className={styles.logisticaSection}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: selectedLogistica.size > 0 ? '10px' : '0' }}>
+                    <Checkbox
+                      checked={selectedLogistica.size === ITEMS_LOGISTICA.length ? true : selectedLogistica.size > 0 ? 'mixed' : false}
+                      onChange={() => {
+                        if (selectedLogistica.size > 0) {
+                          setSelectedLogistica(new Set());
+                        } else {
+                          setSelectedLogistica(new Set(ITEMS_LOGISTICA.map(l => l.id)));
+                        }
+                      }}
+                    />
+                    <Caption1 style={{ fontWeight: '700', color: '#003057' }}>
+                      🚐 Logística
+                    </Caption1>
+                    <Caption1 style={{ color: tokens.colorNeutralForeground3 }}>
+                      {selectedLogistica.size === 0 ? '(no incluida)' : `${selectedLogistica.size} de ${ITEMS_LOGISTICA.length} seleccionados`}
+                    </Caption1>
+                  </div>
+                  {selectedLogistica.size > 0 && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                      {ITEMS_LOGISTICA.map(log => (
+                        <div key={log.id} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <Checkbox
+                            checked={selectedLogistica.has(log.id)}
+                            onChange={() => toggleLogistica(log)}
+                          />
+                          <Body1 style={{ fontWeight: '600', fontSize: '13px' }}>{log.item}</Body1>
+                          <Caption1 style={{ color: tokens.colorNeutralForeground3 }}>
+                            — {log.descripcion} · {fmtCOP(log.precioReferencia)}/{log.unidad}
+                          </Caption1>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>}
+              </div>
+            )}
+
+            {/* ═══ Clasificación (step 3 non-comp, step 4 comp) ═══ */}
+            {step === STEP_CLASIFICACION && (
+              <div>
+                <Title3 style={{ color: '#003057', display: 'block', marginBottom: '4px' }}>Clasificación presupuestal</Title3>
+                <Caption1 style={{ color: tokens.colorNeutralForeground3, display: 'block', marginBottom: '16px' }}>
+                  {isCompensaciones
+                    ? 'Define la fuente de presupuesto y el tipo de planeación.'
+                    : 'Define la fuente de presupuesto, el tipo de planeación y el año a planear.'}
+                </Caption1>
+
+                {/* Fuente presupuesto */}
+                <div className={styles.clasificacionGroup}>
+                  <Body2 style={{ fontWeight: '700', color: '#003057' }}>Fuente de presupuesto</Body2>
+                  <div className={styles.clasificacionCards}>
+                    {FUENTES_PRESUPUESTO.map(fp => (
+                      <div
+                        key={fp.value}
+                        className={mergeClasses(styles.clasificacionCard, fuentePresupuesto === fp.value && styles.clasificacionCardActive)}
+                        onClick={() => setFuentePresupuesto(fp.value)}
+                      >
+                        <Body2 style={{ fontWeight: '700' }}>{fp.label}</Body2>
+                        <Caption1 style={{ color: tokens.colorNeutralForeground3 }}>{fp.descripcion}</Caption1>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Tipo planeación */}
+                <div className={styles.clasificacionGroup}>
+                  <Body2 style={{ fontWeight: '700', color: '#003057' }}>Tipo de planeación</Body2>
+                  <div className={styles.clasificacionCards}>
+                    {TIPOS_PLANEACION.map(tp => (
+                      <div
+                        key={tp.value}
+                        className={mergeClasses(styles.clasificacionCard, tipoPlaneacion === tp.value && styles.clasificacionCardActive)}
+                        onClick={() => setTipoPlaneacion(tp.value)}
+                      >
+                        <Body2 style={{ fontWeight: '700' }}>{tp.label}</Body2>
+                        <Caption1 style={{ color: tokens.colorNeutralForeground3 }}>{tp.descripcion}</Caption1>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Año a planear (solo no-Compensaciones) */}
+                {!isCompensaciones && (
+                  <div className={styles.clasificacionGroup}>
+                    <Body2 style={{ fontWeight: '700', color: '#003057' }}>Año a planear</Body2>
+                    <div style={{ marginTop: '8px', maxWidth: '180px' }}>
+                      <Input
+                        type="number"
+                        value={String(anioPlaneacion)}
+                        onChange={(_, d) => setAnioPlaneacion(Number(d.value) || new Date().getFullYear() + 1)}
+                        min={new Date().getFullYear()}
+                        max={new Date().getFullYear() + 5}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {/* ── Compensaciones: Asignación de recursos / Años / Contrato ── */}
+                {isCompensaciones && (
+                  <>
+                    {/* Asignación de recursos */}
+                    <div className={styles.clasificacionGroup}>
+                      <Body2 style={{ fontWeight: '700', color: '#003057' }}>¿Asignación de recursos?</Body2>
+                      <Caption1 style={{ color: tokens.colorNeutralForeground3, display: 'block', marginBottom: '8px' }}>
+                        Marca Sí si la obligación ya tiene un saldo asignado para no superarlo al planear.
+                      </Caption1>
+                      <div style={{ display: 'flex', gap: '12px', alignItems: 'center', marginTop: '6px' }}>
+                        <div
+                          className={mergeClasses(styles.clasificacionCard, asignacionRecursos && styles.clasificacionCardActive)}
+                          style={{ minWidth: '90px', textAlign: 'center', cursor: 'pointer' }}
+                          onClick={() => setAsignacionRecursos(true)}
+                        >
+                          <Body2 style={{ fontWeight: '700' }}>Sí</Body2>
+                        </div>
+                        <div
+                          className={mergeClasses(styles.clasificacionCard, !asignacionRecursos && styles.clasificacionCardActive)}
+                          style={{ minWidth: '90px', textAlign: 'center', cursor: 'pointer' }}
+                          onClick={() => { setAsignacionRecursos(false); setSaldoDisponible(0); }}
+                        >
+                          <Body2 style={{ fontWeight: '700' }}>No</Body2>
+                        </div>
+                        {asignacionRecursos && (
+                          <div style={{ marginLeft: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <Caption1 style={{ fontWeight: '600' }}>Saldo disponible (COP):</Caption1>
+                            <Input
+                              type="number"
+                              value={String(saldoDisponible || '')}
+                              placeholder="0"
+                              onChange={(_, d) => setSaldoDisponible(Number(d.value) || 0)}
+                              style={{ width: '180px' }}
+                            />
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Años a planear + Año base */}
+                    <div className={styles.clasificacionGroup}>
+                      <Body2 style={{ fontWeight: '700', color: '#003057' }}>Años a planear</Body2>
+                      <Caption1 style={{ color: tokens.colorNeutralForeground3, display: 'block', marginBottom: '8px' }}>
+                        Año 1 se planea mensualizado; Años 2 y 3 anualizados (cantidad × precio).
+                      </Caption1>
+                      <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-end' }}>
+                        <div>
+                          <Caption1 style={{ display: 'block', fontWeight: '600', marginBottom: '4px' }}>Cantidad de años</Caption1>
+                          <select
+                            value={String(aniosAPlanear)}
+                            onChange={e => setAniosAPlanear(Number(e.target.value))}
+                            style={{ padding: '8px 10px', borderRadius: '8px', border: '1px solid #ccc', fontSize: '14px' }}
+                          >
+                            <option value="1">1 año</option>
+                            <option value="2">2 años</option>
+                            <option value="3">3 años</option>
+                          </select>
+                        </div>
+                        <div>
+                          <Caption1 style={{ display: 'block', fontWeight: '600', marginBottom: '4px' }}>Año base (Año 1)</Caption1>
+                          <Input
+                            type="number"
+                            value={String(anioPlaneacion)}
+                            onChange={(_, d) => setAnioPlaneacion(Number(d.value) || new Date().getFullYear() + 1)}
+                            min={new Date().getFullYear()}
+                            max={new Date().getFullYear() + 5}
+                            style={{ maxWidth: '140px' }}
+                          />
+                        </div>
+                      </div>
+                      {/* Checkbox: las actividades cambian por año */}
+                      {aniosAPlanear > 1 && (
+                        <div style={{ marginTop: '12px', padding: '10px 12px', borderRadius: '8px', background: 'rgba(0,51,160,0.04)' }}>
+                          <Checkbox
+                            label="Las actividades cambian entre años (siembra → mantenimiento)"
+                            checked={itemsCambianPorAnio}
+                            onChange={(_, d) => setItemsCambianPorAnio(!!d.checked)}
+                          />
+                          <Caption1 style={{ display: 'block', color: tokens.colorNeutralForeground3, marginTop: '4px', fontSize: '11px' }}>
+                            {itemsCambianPorAnio
+                              ? 'En Programación podrás reseleccionar ítems específicos para cada año (Año 2, Año 3).'
+                              : 'Año 2 y Año 3 usarán los mismos ítems que el Año 1 (recomendado para mantenimientos similares).'}
+                          </Caption1>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Contrato — obligatorio */}
+                    <div className={styles.clasificacionGroup}>
+                      <Body2 style={{ fontWeight: '700', color: '#003057' }}>
+                        Contrato / Contratista <span style={{ color: '#e00' }}>*</span>
+                      </Body2>
+                      <Caption1 style={{ color: tokens.colorNeutralForeground3, display: 'block', marginBottom: '8px' }}>
+                        Filtra los ítems disponibles según el contrato vigente para esta zona.
+                      </Caption1>
+                      <select
+                        value={contratoSeleccionado}
+                        onChange={e => setContratoSeleccionado(e.target.value)}
+                        style={{
+                          padding: '8px 10px', borderRadius: '8px',
+                          border: contratoSeleccionado ? '1px solid #ccc' : '1px solid #e00',
+                          fontSize: '14px', minWidth: '200px',
+                        }}
+                      >
+                        <option value="">Selecciona un contrato...</option>
+                        {CONTRATOS_COMPENSACIONES.map(c => <option key={c} value={c}>{c}</option>)}
+                      </select>
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+
+            {/* ═══ Programación Mensual (step 5 non-comp, step 6 comp) ═══ */}
+            {step === STEP_PROGRAMACION && (
+              <div>
+                <Title3 style={{ color: '#003057', display: 'block', marginBottom: '4px' }}>
+                  {isCompensaciones && aniosAPlanear > 1
+                    ? `Programación Multi-Año — Base ${anioPlaneacion}`
+                    : `Programación Mensual — ${anioPlaneacion}`}
+                </Title3>
+                <Caption1 style={{ color: tokens.colorNeutralForeground3, display: 'block', marginBottom: '14px' }}>
+                  {isMonitoreo
+                    ? 'Ingresa la cantidad de monitoreos por matriz y mes.'
+                    : 'Ingresa la cantidad por ítem y mes.'}
+                  {' '}El total se calcula automáticamente.
+                  {ipcGlobalActivo && ipcGlobalPorcentaje > 0 && (
+                    <span style={{ display: 'block', marginTop: '4px', color: CENIT_COLORS.blueBrand, fontWeight: 600 }}>
+                      💡 Marca los meses a partir de los cuales aplicar el ajuste de IPC (+{ipcGlobalPorcentaje}%). El precio de esos meses se multiplicará por {(1 + ipcGlobalPorcentaje / 100).toFixed(2)}.
+                    </span>
+                  )}
+                </Caption1>
+
+                {/* Indicador de progreso multi-año — solo Compensaciones con aniosAPlanear > 1 */}
+                {isCompensaciones && aniosAPlanear > 1 && (
+                  <div style={{ display: 'flex', gap: '4px', marginBottom: '12px', borderBottom: '2px solid rgba(0,0,0,0.06)' }}>
+                    {[1, 2, 3].slice(0, aniosAPlanear).map(n => {
+                      const totalAnio = n === 1 ? valorTotalY1 : n === 2 ? valorTotalY2 : valorTotalY3;
+                      const active = tabAnio === n;
+                      const done = tabAnio > n;
+                      const pending = tabAnio < n;
+                      return (
+                        <div
+                          key={n}
+                          style={{
+                            padding: '10px 18px',
+                            borderRadius: '10px 10px 0 0',
+                            background: active ? CENIT_COLORS.blueBrand : done ? 'rgba(0,176,80,0.1)' : 'rgba(0,0,0,0.04)',
+                            color: active ? '#fff' : done ? CENIT_COLORS.green : '#94a3b8',
+                            fontWeight: 700,
+                            fontSize: '13px',
+                            opacity: pending ? 0.6 : 1,
+                            display: 'flex', flexDirection: 'column', gap: '2px',
+                            cursor: 'default',
+                            userSelect: 'none',
+                          }}
+                          title={pending ? 'Aún no llegas a este año' : done ? 'Año ya planeado' : 'Año actual'}
+                        >
+                          <span>
+                            {done && '✓ '}Año {n} — {anioPlaneacion + (n - 1)}
+                          </span>
+                          <span style={{ fontSize: '10px', fontWeight: 500, opacity: 0.85 }}>
+                            {n === 1 ? 'mensualizado' : 'anualizado'} · {fmtCOP(totalAnio)}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {/* Aviso de tope excedido (Compensaciones con asignaciónRecursos=Sí) */}
+                {excedeTope && (
+                  <div style={{
+                    padding: '12px 16px', borderRadius: '10px',
+                    background: 'rgba(232, 17, 35, 0.08)',
+                    border: '1px solid rgba(232, 17, 35, 0.3)',
+                    color: '#a4262c', fontSize: '13px', fontWeight: 600,
+                    marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px',
+                  }}>
+                    ⚠️ El total planeado ({fmtCOP(valorTotal)}) excede el saldo disponible ({fmtCOP(saldoDisponible)}). Reduce cantidades para poder completar.
+                  </div>
+                )}
+
+                {/* Año 2 / Año 3 — tabla anualizada (Compensaciones) */}
+                {isCompensaciones && aniosAPlanear > 1 && (tabAnio === 2 || tabAnio === 3) && (
+                  <div className={styles.progMatrixWrap}>
+                    <table className={styles.progMatrixTable} style={{ minWidth: '600px' }}>
+                      <thead>
+                        <tr>
+                          <th className={styles.progMatrixItemTh}>Ítem</th>
+                          <th className={styles.progMatrixMonthTh} style={{ minWidth: '120px' }}>Precio unitario</th>
+                          <th className={styles.progMatrixMonthTh} style={{ minWidth: '120px' }}>Cantidad</th>
+                          <th className={styles.progMatrixTotalTh}>Total anual</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {(tabAnio === 2 ? progY2 : progY3).map(it => (
+                          <tr key={it.key} className={styles.progMatrixRow}>
+                            <td className={styles.progMatrixItemTd}>
+                              <div style={{ fontWeight: '600', color: '#003057', fontSize: '12px' }}>{it.nombre}</div>
+                            </td>
+                            <td className={styles.progMatrixMonthTd}>
+                              <Input
+                                type="number"
+                                size="small"
+                                value={it.precio > 0 ? String(it.precio) : ''}
+                                placeholder="0"
+                                onChange={(_, d) => updateProgYItem(tabAnio as 2 | 3, it.key, 'precio', Number(d.value) || 0)}
+                                style={{ width: '100%' }}
+                              />
+                            </td>
+                            <td className={styles.progMatrixMonthTd}>
+                              <Input
+                                type="number"
+                                size="small"
+                                value={it.cantidad > 0 ? String(it.cantidad) : ''}
+                                placeholder="0"
+                                onChange={(_, d) => updateProgYItem(tabAnio as 2 | 3, it.key, 'cantidad', Number(d.value) || 0)}
+                                style={{ width: '100%' }}
+                              />
+                            </td>
+                            <td className={styles.progMatrixTotalTd}>
+                              {it.total > 0 ? fmtCOP(it.total) : '—'}
+                            </td>
+                          </tr>
+                        ))}
+                        <tr className={styles.progMatrixTotalesRow}>
+                          <td className={styles.progMatrixItemTd} style={{ fontWeight: '700', color: '#003057', fontSize: '12px' }}>Total Año {tabAnio}</td>
+                          <td className={styles.progMatrixMonthTd}></td>
+                          <td className={styles.progMatrixMonthTd}></td>
+                          <td className={styles.progMatrixTotalTd} style={{ fontWeight: '800', fontSize: '13px' }}>
+                            {fmtCOP(tabAnio === 2 ? valorTotalY2 : valorTotalY3)}
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+
+                {/* Año 1 / no-Compensaciones — tabla mensualizada (la existente) */}
+                {(!isCompensaciones || tabAnio === 1) && (
+                <div className={styles.progMatrixWrap}>
+                  <table className={styles.progMatrixTable}>
+                    <thead>
+                      <tr>
+                        <th className={styles.progMatrixItemTh}>Ítem / Parámetro</th>
+                        {MESES_SHORT.map(m => (
+                          <th key={m} className={styles.progMatrixMonthTh}>{m}</th>
+                        ))}
+                        <th className={styles.progMatrixTotalTh}>Total anual</th>
+                      </tr>
+                      {/* IPC per-month toggle row — solo visible si IPC global está activo */}
+                      {ipcGlobalActivo && ipcGlobalPorcentaje > 0 && selectedLinea?.value !== 'Hojas de Ruta Sostenibilidad Ambiental' && (
+                        <tr style={{ background: CENIT_COLORS.blueBrand }}>
+                          <th className={styles.progMatrixItemTh} style={{ fontSize: '11px', fontWeight: '700', color: '#ffffff', textAlign: 'right' }} title={`Marca los meses donde aplicar +${ipcGlobalPorcentaje}% de IPC`}>
+                            Aplicar IPC (+{ipcGlobalPorcentaje}%) →
+                          </th>
+                          {MESES_SHORT.map((_, i) => (
+                            <th key={i} className={styles.progMatrixMonthTh} style={{ textAlign: 'center' }}>
+                              <Checkbox
+                                checked={ipcMeses.has(i)}
+                                onChange={() => { const s = new Set(ipcMeses); s.has(i) ? s.delete(i) : s.add(i); setIpcMeses(s); }}
+                              />
+                            </th>
+                          ))}
+                          <th className={styles.progMatrixTotalTh}></th>
+                        </tr>
+                      )}
+                    </thead>
+                    <tbody>
+                      {(monthlyData[0]?.preciosIndividuales ?? []).map(item => {
+                        const isLog = item.key.startsWith('LOG-');
+                        const rowTotal = monthlyData.reduce((s, m) => {
+                          const e = m.preciosIndividuales.find(p => p.key === item.key);
+                          return s + (e?.total ?? 0);
+                        }, 0);
+                        return (
+                          <tr key={item.key} className={isLog ? styles.progMatrixLogRow : styles.progMatrixRow}>
+                            {/* Item name + editable unit price */}
+                            <td className={styles.progMatrixItemTd}>
+                              <div style={{ fontWeight: '600', color: '#003057', marginBottom: '4px', fontSize: '12px', lineHeight: '1.3' }}>
+                                {isLog && <span style={{ marginRight: '4px', fontSize: '10px' }}>🚐</span>}
+                                {item.nombre}
+                              </div>
+                              {ivaGlobalActivo && (
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '4px' }}>
+                                  <Checkbox
+                                    checked={!ivaItemsExcluidos.has(item.key)}
+                                    onChange={(_, d) => {
+                                      const s = new Set(ivaItemsExcluidos);
+                                      if (d.checked) s.delete(item.key); else s.add(item.key);
+                                      setIvaItemsExcluidos(s);
+                                    }}
+                                  />
+                                  <Caption1 style={{ fontSize: '10px', color: tokens.colorNeutralForeground3 }}>
+                                    Aplica IVA (+{ivaGlobalPorcentaje}%)
+                                  </Caption1>
+                                </div>
+                              )}
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                <Caption1 style={{ color: tokens.colorNeutralForeground3, fontSize: '10px', whiteSpace: 'nowrap' }}>$/u:</Caption1>
+                                <Input
+                                  type="number"
+                                  size="small"
+                                  value={item.precio > 0 ? String(item.precio) : ''}
+                                  placeholder="0"
+                                  onChange={(_, d) => updateItemPrice(item.key, Number(d.value) || 0)}
+                                  style={{ width: '90px' }}
+                                />
+                              </div>
+                            </td>
+                            {/* Month cells */}
+                            {monthlyData.map((month, mi) => {
+                              const entry = month.preciosIndividuales.find(p => p.key === item.key);
+                              if (!entry) return <td key={mi} className={styles.progMatrixMonthTd}>—</td>;
+                              return (
+                                <td key={mi} className={styles.progMatrixMonthTd}>
+                                  <Input
+                                    type="number"
+                                    size="small"
+                                    value={entry.cantidad > 0 ? String(entry.cantidad) : ''}
+                                    placeholder="0"
+                                    onChange={(_, d) => updateItemMonth(mi, item.key, 'cantidad', Number(d.value) || 0)}
+                                    style={{ width: '100%', minWidth: 0 }}
+                                  />
+                                  {isMonitoreo && !item.key.startsWith('MATRIZ|') && (
+                                    <Input
+                                      type="number"
+                                      size="small"
+                                      value={entry.frecuencia > 0 ? String(entry.frecuencia) : ''}
+                                      placeholder="Comp"
+                                      onChange={(_, d) => updateItemMonth(mi, item.key, 'frecuencia', Number(d.value) || 0)}
+                                      style={{ width: '100%', minWidth: 0, marginTop: '2px' }}
+                                    />
+                                  )}
+                                  {entry.total > 0 && (
+                                    <Caption1 style={{ fontSize: '10px', color: CENIT_COLORS.blueBrand, display: 'block', marginTop: '2px', textAlign: 'right', whiteSpace: 'nowrap' }}>
+                                      {fmtCOP(entry.total)}
+                                    </Caption1>
+                                  )}
+                                </td>
+                              );
+                            })}
+                            {/* Row total */}
+                            <td className={styles.progMatrixTotalTd}>
+                              {rowTotal > 0 ? fmtCOP(rowTotal) : '—'}
+                            </td>
+                          </tr>
+                        );
+                      })}
+
+                      {/* Totals row */}
+                      <tr className={styles.progMatrixTotalesRow}>
+                        <td className={styles.progMatrixItemTd} style={{ fontWeight: '700', color: '#003057', fontSize: '12px' }}>
+                          Total mensual
+                        </td>
+                        {monthlyData.map((m, mi) => (
+                          <td key={mi} className={styles.progMatrixMonthTd} style={{ fontWeight: '700', color: '#003057', fontSize: '12px', verticalAlign: 'middle', padding: '8px 4px' }}>
+                            {m.total > 0 ? fmtCOP(m.total) : '—'}
+                          </td>
+                        ))}
+                        <td className={styles.progMatrixTotalTd} style={{ fontWeight: '800', fontSize: '13px' }}>
+                          {fmtCOP(valorTotalY1)}
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Footer */}
+          <div className={styles.wizardFooter}>
+            <div className={styles.footerTotals}>
+              {step === STEP_PROGRAMACION && (
+                <>
+                  <div className={styles.footerTotal}>
+                    <Caption1 style={{ fontWeight: '600', color: tokens.colorNeutralForeground3 }}>VALOR TOTAL</Caption1>
+                    <span style={{ fontSize: '20px', fontWeight: '800', color: '#003057' }}>{fmtCOP(valorTotal)}</span>
+                  </div>
+                  <div className={styles.footerTotal}>
+                    <Caption1 style={{ fontWeight: '600', color: tokens.colorNeutralForeground3 }}>MESES CON DATOS</Caption1>
+                    <span style={{ fontSize: '15px', fontWeight: '700', color: CENIT_COLORS.blueBrand }}>
+                      {monthlyData.filter(m => m.total > 0).length} / 12
+                    </span>
+                  </div>
+                </>
+              )}
+            </div>
+
+            <div style={{ display: 'flex', gap: '8px' }}>
+              {step > 0 && (
+                <Button
+                  appearance="subtle"
+                  icon={<ArrowLeftRegular />}
+                  onClick={handleBack}
+                  style={{ borderRadius: '12px' }}
+                >
+                  Anterior
+                </Button>
+              )}
+              <Button
+                appearance="primary"
+                icon={step === STEP_PROGRAMACION && !hayMasAnios ? <CheckmarkRegular /> : <ArrowRightRegular />}
+                iconPosition="after"
+                onClick={handleNext}
+                disabled={!canNext()}
+                style={{ borderRadius: '12px', paddingLeft: '20px', paddingRight: '20px' }}
+              >
+                {step === STEP_PROGRAMACION
+                  ? (hayMasAnios ? `Siguiente año (Año ${tabAnio + 1})` : 'Completar')
+                  : 'Siguiente'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </Portal>
+  );
+};
