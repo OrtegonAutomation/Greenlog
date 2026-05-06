@@ -205,7 +205,7 @@ const ActivityCard: React.FC<{ actividad: ActividadAmbiental; styles: any; index
                     <Subtitle2 className={styles.cardTitle}>{actividad.tarea}</Subtitle2>
                 }
                 description={
-                    <Caption1 style={{ color: CENIT_COLORS.green, fontWeight: 600 }}>{actividad.tipo.toUpperCase()}</Caption1>
+                    <Caption1 style={{ color: CENIT_COLORS.green, fontWeight: 600 }}>{actividad.lineaOperativa.toUpperCase()}{actividad.contrato ? ` · ${actividad.contrato}` : ''}</Caption1>
                 }
                 action={
                     <Button appearance="transparent" icon={<MoreHorizontalRegular />} className={styles.cardHeaderAction} />
@@ -215,7 +215,7 @@ const ActivityCard: React.FC<{ actividad: ActividadAmbiental; styles: any; index
             <div>
                 <div className={styles.infoRow}>
                     <LocationRegular fontSize={16} style={{ color: '#003057' }} />
-                    <Body1>{actividad.ubicacionZona}</Body1>
+                    <Body1>{actividad.zona}{actividad.estacion ? ` — ${actividad.estacion}` : ''}</Body1>
                 </div>
                 <div className={styles.infoRow}>
                     <CalendarLtrRegular fontSize={16} style={{ color: '#003057' }} />

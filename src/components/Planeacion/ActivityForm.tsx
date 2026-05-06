@@ -1,19 +1,22 @@
 // ============================================================
 // ActivityForm — Drawer lateral para crear/editar actividades
-// Usa OverlayDrawer de Fluent UI v9 (desliza desde la derecha)
+// Modelo CENIT: Línea Operativa, Zona→Estación, Contrato,
+// Presupuesto, Matrices Ambientales
 // ============================================================
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import {
   makeStyles, shorthands, tokens,
   OverlayDrawer, DrawerHeader, DrawerHeaderTitle, DrawerBody,
-  Button, Field, Input, Select, Textarea, Slider,
+  Button, Field, Input, Select, Textarea, Slider, Checkbox,
   Caption1Strong, Divider, MessageBar, MessageBarBody, MessageBarTitle,
-  Spinner,
+  Spinner, Badge,
 } from '@fluentui/react-components';
-import { DismissRegular, CheckmarkRegular, SaveRegular } from '@fluentui/react-icons';
+import { DismissRegular, SaveRegular } from '@fluentui/react-icons';
 import {
   NuevaActividadPayload, FORM_INICIAL, ESTADOS_ACTIVIDAD,
-  PRIORIDADES, TIPOS_ACTIVIDAD, ZONAS,
+  PRIORIDADES, LINEAS_OPERATIVAS, ZONAS, ZONAS_ESTACIONES,
+  CONTRATOS, MESES, TIPOS_CUENTA, RESPONSABLES,
+  MATRICES_AMBIENTALES, MatrizAmbiental, ActividadAmbiental,
 } from '../../types';
 
 // ── Estilos ───────────────────────────────────────────────────
@@ -41,6 +44,11 @@ const useStyles = makeStyles({
     gridTemplateColumns: '1fr 1fr',
     ...shorthands.gap(tokens.spacingVerticalM, tokens.spacingHorizontalM),
   },
+  grid3: {
+    display: 'grid',
+    gridTemplateColumns: '1fr 1fr 1fr',
+    ...shorthands.gap(tokens.spacingVerticalM, tokens.spacingHorizontalM),
+  },
   sliderRow: {
     display: 'flex',
     alignItems: 'center',
@@ -52,6 +60,17 @@ const useStyles = makeStyles({
     fontWeight: '600',
     color: tokens.colorBrandForeground1,
     fontSize: '14px',
+  },
+  matricesGrid: {
+    display: 'grid',
+    gridTemplateColumns: '1fr 1fr',
+    ...shorthands.gap('4px', tokens.spacingHorizontalM),
+  },
+  matricesBadges: {
+    display: 'flex',
+    flexWrap: 'wrap',
+    ...shorthands.gap('6px'),
+    marginTop: '8px',
   },
   footer: {
     display: 'flex',
@@ -77,7 +96,8 @@ function validar(form: NuevaActividadPayload): Errores {
   if (!form.fechaFin)           e.fechaFin    = 'Campo obligatorio.';
   if (form.fechaInicio && form.fechaFin && form.fechaFin < form.fechaInicio)
     e.fechaFin = 'La fecha de fin debe ser posterior al inicio.';
-  if (!form.ubicacionZona)      e.ubicacionZona = 'Selecciona una zona.';
+  if (!form.zona)               e.zona        = 'Selecciona una zona.';
+  if (!form.mes)                e.mes         = 'Selecciona un mes.';
   return e;
 }
 
@@ -88,21 +108,65 @@ interface ActivityFormProps {
   onGuardar: (payload: NuevaActividadPayload) => Promise<void>;
   guardando: boolean;
   errorGuardar: string | null;
+  actividadInicial?: ActividadAmbiental | null;
 }
 
 // ── Componente ────────────────────────────────────────────────
 export const ActivityForm: React.FC<ActivityFormProps> = ({
-  open, onClose, onGuardar, guardando, errorGuardar,
+  open, onClose, onGuardar, guardando, errorGuardar, actividadInicial,
 }) => {
   const styles = useStyles();
-  const [form, setForm]     = useState<NuevaActividadPayload>(FORM_INICIAL);
+  const modoEdicion = !!actividadInicial;
+
+  const formInicial = useMemo<NuevaActividadPayload>(() => {
+    if (!actividadInicial) return FORM_INICIAL;
+    const { id: _id, creadoEn: _c, actualizadoEn: _a, ...rest } = actividadInicial as any;
+    return { ...FORM_INICIAL, ...rest };
+  }, [actividadInicial]);
+
+  const [form, setForm]     = useState<NuevaActividadPayload>(formInicial);
   const [errores, setErrores] = useState<Errores>({});
+
+  // Sincronizar cuando cambia la actividad a editar
+  React.useEffect(() => {
+    if (open) {
+      setForm(formInicial);
+      setErrores({});
+    }
+  }, [open, formInicial]);
 
   const set = useCallback(<K extends keyof NuevaActividadPayload>(
     campo: K, valor: NuevaActividadPayload[K]
   ) => {
     setForm((p) => ({ ...p, [campo]: valor }));
     setErrores((p) => ({ ...p, [campo]: undefined }));
+  }, []);
+
+  // Estaciones filtradas por zona seleccionada
+  const estacionesZona = useMemo(
+    () => form.zona ? (ZONAS_ESTACIONES[form.zona] ?? []) : [],
+    [form.zona],
+  );
+
+  // Responsables filtrados por zona
+  const responsablesZona = useMemo(
+    () => form.zona
+      ? RESPONSABLES.filter((r) => r.zona === form.zona || r.zona === 'Transversal')
+      : RESPONSABLES,
+    [form.zona],
+  );
+
+  // Toggle de matrices
+  const toggleMatriz = useCallback((m: MatrizAmbiental) => {
+    setForm((p) => {
+      const current = p.matricesAplicables ?? [];
+      return {
+        ...p,
+        matricesAplicables: current.includes(m)
+          ? current.filter((x) => x !== m)
+          : [...current, m],
+      };
+    });
   }, []);
 
   const handleCerrar = () => {
@@ -123,7 +187,7 @@ export const ActivityForm: React.FC<ActivityFormProps> = ({
   return (
     <OverlayDrawer
       position="end"
-      size="medium"
+      size="large"
       open={open}
       onOpenChange={(_, s) => { if (!s.open) handleCerrar(); }}
     >
@@ -139,7 +203,7 @@ export const ActivityForm: React.FC<ActivityFormProps> = ({
             />
           }
         >
-          Nueva Actividad Ambiental
+          {modoEdicion ? 'Editar Actividad' : 'Nueva Actividad Ambiental'}
         </DrawerHeaderTitle>
       </DrawerHeader>
 
@@ -170,14 +234,28 @@ export const ActivityForm: React.FC<ActivityFormProps> = ({
             </Field>
 
             <div className={styles.grid2}>
-              <Field label="Tipo de actividad">
-                <Select value={form.tipo} onChange={(_, d) => set('tipo', d.value as typeof form.tipo)} disabled={guardando}>
-                  {TIPOS_ACTIVIDAD.map((t) => <option key={t} value={t}>{t}</option>)}
+              <Field label="Línea Operativa">
+                <Select value={form.lineaOperativa} onChange={(_, d) => set('lineaOperativa', d.value as typeof form.lineaOperativa)} disabled={guardando}>
+                  {LINEAS_OPERATIVAS.map((lo) => <option key={lo.value} value={lo.value}>{lo.label}</option>)}
                 </Select>
               </Field>
+              <Field label="Contrato">
+                <Select value={form.contrato ?? ''} onChange={(_, d) => set('contrato', d.value)} disabled={guardando}>
+                  <option value="">-- Sin contrato --</option>
+                  {CONTRATOS.map((c) => <option key={c} value={c}>{c}</option>)}
+                </Select>
+              </Field>
+            </div>
+
+            <div className={styles.grid2}>
               <Field label="Prioridad">
                 <Select value={form.prioridad} onChange={(_, d) => set('prioridad', d.value as typeof form.prioridad)} disabled={guardando}>
                   {PRIORIDADES.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
+                </Select>
+              </Field>
+              <Field label="Tipo de Cuenta">
+                <Select value={form.cuenta} onChange={(_, d) => set('cuenta', d.value as typeof form.cuenta)} disabled={guardando}>
+                  {TIPOS_CUENTA.map((tc) => <option key={tc.value} value={tc.value}>{tc.label}</option>)}
                 </Select>
               </Field>
             </div>
@@ -194,11 +272,17 @@ export const ActivityForm: React.FC<ActivityFormProps> = ({
             </Field>
           </div>
 
-          {/* ── Sección 2: Fechas ── */}
+          {/* ── Sección 2: Planificación temporal ── */}
           <div className={styles.section}>
             <Caption1Strong className={styles.sectionLabel}>Planificación temporal</Caption1Strong>
             <Divider />
-            <div className={styles.grid2}>
+            <div className={styles.grid3}>
+              <Field label="Mes presupuestal" required validationState={errores.mes ? 'error' : 'none'} validationMessage={errores.mes}>
+                <Select value={form.mes} onChange={(_, d) => set('mes', d.value)} disabled={guardando}>
+                  <option value="">-- Mes --</option>
+                  {MESES.map((m) => <option key={m} value={m}>{m}</option>)}
+                </Select>
+              </Field>
               <Field label="Fecha de inicio" required validationState={errores.fechaInicio ? 'error' : 'none'} validationMessage={errores.fechaInicio}>
                 <Input type="date" value={form.fechaInicio} onChange={(_, d) => set('fechaInicio', d.value)} disabled={guardando} />
               </Field>
@@ -208,24 +292,116 @@ export const ActivityForm: React.FC<ActivityFormProps> = ({
             </div>
           </div>
 
-          {/* ── Sección 3: Responsabilidad y ubicación ── */}
+          {/* ── Sección 3: Ubicación y Responsable ── */}
           <div className={styles.section}>
-            <Caption1Strong className={styles.sectionLabel}>Responsabilidad y ubicación</Caption1Strong>
+            <Caption1Strong className={styles.sectionLabel}>Ubicación y Responsable</Caption1Strong>
             <Divider />
 
-            <Field label="Responsable" required validationState={errores.responsable ? 'error' : 'none'} validationMessage={errores.responsable}>
-              <Input placeholder="Nombre del responsable de la actividad" value={form.responsable} onChange={(_, d) => set('responsable', d.value)} disabled={guardando} />
-            </Field>
+            <div className={styles.grid2}>
+              <Field label="Zona CENIT" required validationState={errores.zona ? 'error' : 'none'} validationMessage={errores.zona}>
+                <Select
+                  value={form.zona}
+                  onChange={(_, d) => {
+                    set('zona', d.value);
+                    setForm((p) => ({ ...p, estacion: '', zona: d.value }));
+                  }}
+                  disabled={guardando}
+                >
+                  <option value="">-- Selecciona una zona --</option>
+                  {ZONAS.map((z) => <option key={z} value={z}>{z}</option>)}
+                </Select>
+              </Field>
+              <Field label="Estación">
+                <Select
+                  value={form.estacion ?? ''}
+                  onChange={(_, d) => set('estacion', d.value)}
+                  disabled={guardando || estacionesZona.length === 0}
+                >
+                  <option value="">-- {estacionesZona.length ? 'Selecciona estación' : 'Selecciona zona primero'} --</option>
+                  {estacionesZona.map((est) => <option key={est} value={est}>{est}</option>)}
+                </Select>
+              </Field>
+            </div>
 
-            <Field label="Ubicación / Zona" required validationState={errores.ubicacionZona ? 'error' : 'none'} validationMessage={errores.ubicacionZona}>
-              <Select value={form.ubicacionZona} onChange={(_, d) => set('ubicacionZona', d.value)} disabled={guardando}>
-                <option value="">-- Selecciona una zona --</option>
-                {ZONAS.map((z) => <option key={z} value={z}>{z}</option>)}
+            <Field label="Responsable" required validationState={errores.responsable ? 'error' : 'none'} validationMessage={errores.responsable}>
+              <Select
+                value={form.responsable}
+                onChange={(_, d) => set('responsable', d.value)}
+                disabled={guardando}
+              >
+                <option value="">-- Selecciona responsable --</option>
+                {responsablesZona.map((r) => (
+                  <option key={r.nombre} value={r.nombre}>
+                    {r.nombre} ({r.zona})
+                  </option>
+                ))}
               </Select>
             </Field>
           </div>
 
-          {/* ── Sección 4: Estado y cumplimiento ── */}
+          {/* ── Sección 4: Presupuesto ── */}
+          <div className={styles.section}>
+            <Caption1Strong className={styles.sectionLabel}>Presupuesto (COP)</Caption1Strong>
+            <Divider />
+            <div className={styles.grid3}>
+              <Field label="Plan">
+                <Input
+                  type="number"
+                  placeholder="0"
+                  value={String(form.presupuestoPlan ?? 0)}
+                  onChange={(_, d) => set('presupuestoPlan', Number(d.value) || 0)}
+                  disabled={guardando}
+                  contentBefore={<span style={{ fontSize: 12, color: '#888' }}>$</span>}
+                />
+              </Field>
+              <Field label="Ejecutado">
+                <Input
+                  type="number"
+                  placeholder="0"
+                  value={String(form.presupuestoEjecutado ?? 0)}
+                  onChange={(_, d) => set('presupuestoEjecutado', Number(d.value) || 0)}
+                  disabled={guardando}
+                  contentBefore={<span style={{ fontSize: 12, color: '#888' }}>$</span>}
+                />
+              </Field>
+              <Field label="Forecast">
+                <Input
+                  type="number"
+                  placeholder="0"
+                  value={String(form.presupuestoForecast ?? 0)}
+                  onChange={(_, d) => set('presupuestoForecast', Number(d.value) || 0)}
+                  disabled={guardando}
+                  contentBefore={<span style={{ fontSize: 12, color: '#888' }}>$</span>}
+                />
+              </Field>
+            </div>
+          </div>
+
+          {/* ── Sección 5: Matrices Ambientales ── */}
+          <div className={styles.section}>
+            <Caption1Strong className={styles.sectionLabel}>Matrices Ambientales Aplicables</Caption1Strong>
+            <Divider />
+            <div className={styles.matricesGrid}>
+              {MATRICES_AMBIENTALES.map((ma) => (
+                <Checkbox
+                  key={ma.value}
+                  label={ma.label}
+                  checked={(form.matricesAplicables ?? []).includes(ma.value)}
+                  onChange={() => toggleMatriz(ma.value)}
+                  disabled={guardando}
+                />
+              ))}
+            </div>
+            {(form.matricesAplicables?.length ?? 0) > 0 && (
+              <div className={styles.matricesBadges}>
+                {form.matricesAplicables!.map((m) => (
+                  <Badge key={m} appearance="tint" color="informative" shape="rounded">{m}</Badge>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* ── Sección 6: Estado y cumplimiento ── */}
           <div className={styles.section}>
             <Caption1Strong className={styles.sectionLabel}>Estado y normatividad</Caption1Strong>
             <Divider />
@@ -278,7 +454,7 @@ export const ActivityForm: React.FC<ActivityFormProps> = ({
             icon={guardando ? <Spinner size="tiny" /> : <SaveRegular />}
             disabled={guardando}
           >
-            {guardando ? 'Guardando...' : 'Guardar actividad'}
+            {guardando ? 'Guardando...' : modoEdicion ? 'Guardar cambios' : 'Guardar actividad'}
           </Button>
         </div>
       </form>

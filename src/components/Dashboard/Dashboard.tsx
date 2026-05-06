@@ -11,7 +11,7 @@ import { useActividades } from '../../hooks/useActividades';
 import { CENIT_COLORS } from '../../theme/cenitTheme';
 import { StatCard } from '../common/StatCard';
 import { FeatureCard } from '../common/FeatureCard';
-import { SeccionApp } from '../../types';
+import { SeccionApp, PRESUPUESTO_RESUMEN, PRESUPUESTO_ZONAS } from '../../types';
 
 // ── Estilos ───────────────────────────────────────────────────
 const useStyles = makeStyles({
@@ -158,7 +158,13 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
     const ejecucion = actividades.filter((a) => a.estado === 'En Ejecución').length;
     const cerradas = actividades.filter((a) => a.estado === 'Cerrada').length;
     const cumplimiento = total > 0 ? Math.round((cerradas / total) * 100) : 0;
-    return { total, ejecucion, cumplimiento };
+
+    // Budget
+    const fmtBillions = (n: number) => `$${(n / 1e9).toFixed(1)}B`;
+    const totalPresupuesto = fmtBillions(PRESUPUESTO_RESUMEN.totalPlan2026);
+    const totalZonas = PRESUPUESTO_ZONAS.reduce((s, z) => s + z.totalEstaciones, 0);
+
+    return { total, ejecucion, cumplimiento, totalPresupuesto, totalZonas };
   }, [actividades]);
 
   return (
@@ -213,6 +219,11 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
           value={`${stats.cumplimiento}%`}
           label="Efectividad"
           sub="Porcentaje de cumplimiento de actividades cerradas"
+        />
+        <StatCard
+          value={stats.totalPresupuesto}
+          label="Presupuesto 2026"
+          sub={`Gestión ambiental - ${stats.totalZonas} estaciones en ${PRESUPUESTO_ZONAS.length} zonas`}
         />
       </div>
 

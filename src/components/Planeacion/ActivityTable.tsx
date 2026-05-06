@@ -4,21 +4,17 @@
 import React, { useMemo, useState } from 'react';
 import {
   makeStyles, shorthands, tokens, mergeClasses,
-  DataGrid, DataGridBody, DataGridCell, DataGridHeader,
-  DataGridHeaderCell, DataGridRow, TableColumnDefinition, createTableColumn,
-  TableCellLayout, Input, Button, Caption1,
+  Input, Button, Caption1,
   Tooltip,
 } from '@fluentui/react-components';
 import {
   SearchRegular, DismissRegular, FilterRegular,
-  CalendarLtrRegular, PersonRegular, LocationRegular,
-  ClipboardTaskListLtrRegular,
+  LocationRegular, ClipboardTaskListLtrRegular, OrganizationRegular,
 } from '@fluentui/react-icons';
 import { ActividadAmbiental, EstadoActividad } from '../../types';
-import { StatusBadge, PrioridadBadge } from '../shared/StatusBadge';
+import { StatusBadge } from '../shared/StatusBadge';
 import { SkeletonTable } from '../shared/SkeletonLoader';
 import { EmptyState } from '../shared/EmptyState';
-import { CENIT_COLORS } from '../../theme/cenitTheme';
 
 // ── Estilos ───────────────────────────────────────────────────
 const useStyles = makeStyles({
@@ -61,7 +57,7 @@ const useStyles = makeStyles({
     },
   },
   chipActive: {
-    background: 'linear-gradient(135deg, #003057 0%, #004b87 100%)', // Blue Cenit Brand
+    background: 'linear-gradient(135deg, #003057 0%, #004b87 100%)',
     color: '#fff',
     border: '1px solid transparent',
     boxShadow: '0 4px 12px rgba(0, 48, 87, 0.25)',
@@ -74,43 +70,12 @@ const useStyles = makeStyles({
   tableWrap: {
     borderRadius: '16px',
     border: '1px solid rgba(255,255,255,0.6)',
-    overflow: 'hidden',
+    overflowX: 'auto',
+    overflowY: 'hidden',
     boxShadow: '0 10px 40px rgba(0,0,0,0.04), 0 2px 10px rgba(0,0,0,0.02)',
-    background: 'rgba(255,255,255,0.4)', // More transparent
+    background: 'rgba(255,255,255,0.4)',
     backdropFilter: 'blur(20px) saturate(180%)',
-  },
-  // Row animation
-  row: {
-    animationName: {
-      from: { opacity: '0', transform: 'translateY(10px)' },
-      to: { opacity: '1', transform: 'translateY(0)' },
-    },
-    animationDuration: '0.4s',
-    animationFillMode: 'both',
-    animationTimingFunction: 'cubic-bezier(0.33, 1, 0.68, 1)',
-    transition: 'background-color 0.2s ease, transform 0.2s ease',
-    ':hover': {
-      backgroundColor: 'rgba(255,255,255,0.5)',
-      transform: 'scale(1.002)',
-      boxShadow: '0 4px 20px rgba(0,0,0,0.04)',
-      zIndex: 1,
-      position: 'relative',
-    },
-  },
-  progressMini: {
-    height: '6px',
-    borderRadius: '3px',
-    backgroundColor: 'rgba(0,0,0,0.06)',
-    overflow: 'hidden',
-    marginTop: '6px',
-    width: '100px',
-  },
-  progressFill: {
-    height: '100%',
-    borderRadius: '3px',
-    // Gradient for progress
-    background: 'linear-gradient(90deg, #16a34a 0%, #4ade80 100%)',
-    transition: 'width 1s cubic-bezier(0.33, 1, 0.68, 1)',
+    position: 'relative',
   },
   count: {
     color: tokens.colorNeutralForeground3,
@@ -131,109 +96,86 @@ const FILTROS: { label: string; value: EstadoActividad | 'Todos' }[] = [
   { label: 'Cerrada', value: 'Cerrada' },
 ];
 
-// ── Columnas ──────────────────────────────────────────────────
-function buildColumns(): TableColumnDefinition<ActividadAmbiental>[] {
-  return [
-    createTableColumn({
-      columnId: 'tarea',
-      compare: (a, b) => a.tarea.localeCompare(b.tarea),
-      renderHeaderCell: () => 'Tarea',
-      renderCell: (item) => (
-        <TableCellLayout media={<ClipboardTaskListLtrRegular style={{ color: '#0078D4' }} />}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-            <span style={{ fontWeight: 500, fontSize: '14px' }}>{item.tarea}</span>
-            <span style={{ fontSize: '11px', color: '#605E5C' }}>{item.tipo}</span>
-          </div>
-        </TableCellLayout>
-      ),
-    }),
-    createTableColumn({
-      columnId: 'responsable',
-      compare: (a, b) => a.responsable.localeCompare(b.responsable),
-      renderHeaderCell: () => 'Responsable',
-      renderCell: (item) => (
-        <TableCellLayout media={<PersonRegular />}>{item.responsable}</TableCellLayout>
-      ),
-    }),
-    createTableColumn({
-      columnId: 'fechas',
-      renderHeaderCell: () => 'Período',
-      renderCell: (item) => (
-        <TableCellLayout media={<CalendarLtrRegular />}>
-          <span style={{ fontSize: '13px' }}>
-            {item.fechaInicio.split('-').reverse().join('/')} – {item.fechaFin.split('-').reverse().join('/')}
-          </span>
-        </TableCellLayout>
-      ),
-    }),
-    createTableColumn({
-      columnId: 'ubicacionZona',
-      renderHeaderCell: () => 'Zona',
-      renderCell: (item) => (
-        <TableCellLayout media={<LocationRegular />}>
-          <span style={{ fontSize: '13px' }}>{item.ubicacionZona}</span>
-        </TableCellLayout>
-      ),
-    }),
-    createTableColumn({
-      columnId: 'avance',
-      compare: (a, b) => a.porcentajeAvance - b.porcentajeAvance,
-      renderHeaderCell: () => 'Avance',
-      renderCell: (item) => {
-        const styles = useStyles(); // eslint-disable-line react-hooks/rules-of-hooks
-        return (
-          <div>
-            <span style={{ fontSize: '13px', fontWeight: 600 }}>{item.porcentajeAvance}%</span>
-            <div className={styles.progressMini}>
-              <div className={styles.progressFill} style={{ width: `${item.porcentajeAvance}%` }} />
-            </div>
-          </div>
-        );
-      },
-    }),
-    createTableColumn({
-      columnId: 'prioridad',
-      compare: (a, b) => a.prioridad.localeCompare(b.prioridad),
-      renderHeaderCell: () => 'Prioridad',
-      renderCell: (item) => <PrioridadBadge prioridad={item.prioridad} />,
-    }),
-    createTableColumn({
-      columnId: 'estado',
-      compare: (a, b) => a.estado.localeCompare(b.estado),
-      renderHeaderCell: () => 'Estado',
-      renderCell: (item) => <StatusBadge estado={item.estado} />,
-    }),
-  ];
-}
+const parseOpex = (raw?: string) => {
+  if (!raw) return null;
+  try { return JSON.parse(raw); } catch { return null; }
+};
 
-const COLUMNS = buildColumns();
+const formatter = new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 });
+
+// Anchos de columna (px) — table-layout: fixed los respeta exactamente
+const COL = { tarea: 280, proveedor: 210, zona: 150, presupuesto: 150, meses: 170, estado: 130 };
+
+// Estilos inline compartidos
+const thStyle: React.CSSProperties = {
+  fontWeight: 600, fontSize: '13px', color: '#323130',
+  padding: '12px 16px', textAlign: 'left',
+  borderBottom: '1px solid rgba(0,0,0,0.07)',
+  background: 'rgba(248,250,252,0.8)',
+  whiteSpace: 'nowrap', overflow: 'hidden',
+};
+const tdStyle: React.CSSProperties = {
+  padding: '14px 16px', verticalAlign: 'middle',
+  borderBottom: '1px solid rgba(0,0,0,0.04)',
+  overflow: 'hidden',
+};
+const cellInner: React.CSSProperties = {
+  display: 'flex', alignItems: 'center', gap: '10px', overflow: 'hidden',
+};
+const textStack: React.CSSProperties = {
+  display: 'flex', flexDirection: 'column', gap: '2px',
+  overflow: 'hidden', minWidth: 0,
+};
+const line1: React.CSSProperties = {
+  fontWeight: 600, fontSize: '13px', lineHeight: 1.3,
+  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+};
+const line2: React.CSSProperties = {
+  fontSize: '11px', color: '#605E5C',
+  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+};
 
 // ── Componente ────────────────────────────────────────────────
 interface ActivityTableProps {
   actividades: ActividadAmbiental[];
   cargando: boolean;
   onNueva: () => void;
+  onItemClick?: (item: ActividadAmbiental) => void;
 }
 
-export const ActivityTable: React.FC<ActivityTableProps> = ({ actividades, cargando, onNueva }) => {
+export const ActivityTable: React.FC<ActivityTableProps> = ({ actividades, cargando, onNueva, onItemClick }) => {
   const styles = useStyles();
   const [search, setSearch] = useState('');
   const [filtroEstado, setFiltroEstado] = useState<EstadoActividad | 'Todos'>('Todos');
+  const [filtroAnio, setFiltroAnio] = useState<number | null>(null);
+
+  // Compute available years from the data
+  const aniosDisponibles = useMemo(() => {
+    const years = new Set<number>();
+    for (const a of actividades) {
+      const anio = (a as any).anioPlaneacion;
+      if (anio && typeof anio === 'number') years.add(anio);
+    }
+    return [...years].sort();
+  }, [actividades]);
 
   const filtradas = useMemo(() => {
     const q = search.toLowerCase().trim();
     return actividades.filter((a) => {
       const matchEstado = filtroEstado === 'Todos' || a.estado === filtroEstado;
       if (!matchEstado) return false;
+      if (filtroAnio !== null && (a as any).anioPlaneacion !== filtroAnio) return false;
       if (!q) return true;
       return (
         a.tarea.toLowerCase().includes(q) ||
         a.responsable.toLowerCase().includes(q) ||
-        a.ubicacionZona.toLowerCase().includes(q) ||
-        a.tipo.toLowerCase().includes(q)
+        a.zona.toLowerCase().includes(q) ||
+        (a.estacion ?? '').toLowerCase().includes(q) ||
+        a.lineaOperativa.toLowerCase().includes(q) ||
+        (a.contrato ?? '').toLowerCase().includes(q)
       );
     });
-  }, [actividades, search, filtroEstado]);
+  }, [actividades, search, filtroEstado, filtroAnio]);
 
   return (
     <div className={styles.root}>
@@ -270,6 +212,34 @@ export const ActivityTable: React.FC<ActivityTableProps> = ({ actividades, carga
           ))}
         </div>
 
+        {aniosDisponibles.length > 0 && (
+          <div className={styles.chips}>
+            <span
+              role="button"
+              tabIndex={0}
+              className={mergeClasses(styles.chip, filtroAnio === null && styles.chipActive)}
+              onClick={() => setFiltroAnio(null)}
+              onKeyDown={(e) => e.key === 'Enter' && setFiltroAnio(null)}
+              style={{ fontSize: '12px' }}
+            >
+              Todos los años
+            </span>
+            {aniosDisponibles.map(y => (
+              <span
+                key={y}
+                role="button"
+                tabIndex={0}
+                className={mergeClasses(styles.chip, filtroAnio === y && styles.chipActive)}
+                onClick={() => setFiltroAnio(y)}
+                onKeyDown={(e) => e.key === 'Enter' && setFiltroAnio(y)}
+                style={{ fontSize: '12px' }}
+              >
+                {y}
+              </span>
+            ))}
+          </div>
+        )}
+
         <Caption1 className={styles.count}>
           {filtradas.length} {filtradas.length === 1 ? 'actividad' : 'actividades'}
         </Caption1>
@@ -287,42 +257,111 @@ export const ActivityTable: React.FC<ActivityTableProps> = ({ actividades, carga
                 ? 'No hay actividades que coincidan con los filtros aplicados.'
                 : 'Aún no hay actividades registradas en el módulo de planeación.'
             }
-            actionLabel={!search && filtroEstado === 'Todos' ? 'Crear primera actividad' : undefined}
+            actionLabel={!search && filtroEstado === 'Todos' ? 'Nueva planeación' : undefined}
             onAction={!search && filtroEstado === 'Todos' ? onNueva : undefined}
           />
         ) : (
-          <DataGrid
-            items={filtradas}
-            columns={COLUMNS}
-            sortable
-            getRowId={(item) => item.id}
-            focusMode="composite"
-            style={{ width: '100%' }}
-          >
-            <DataGridHeader>
-              <DataGridRow>
-                {({ renderHeaderCell }) => (
-                  <DataGridHeaderCell style={{ fontWeight: 600, fontSize: '13px' }}>
-                    {renderHeaderCell()}
-                  </DataGridHeaderCell>
-                )}
-              </DataGridRow>
-            </DataGridHeader>
+          <table style={{ width: '100%', tableLayout: 'fixed', borderCollapse: 'collapse' }}>
+            <colgroup>
+              <col style={{ width: COL.tarea }} />
+              <col style={{ width: COL.proveedor }} />
+              <col style={{ width: COL.zona }} />
+              <col style={{ width: COL.presupuesto }} />
+              <col style={{ width: COL.meses }} />
+              <col style={{ width: COL.estado }} />
+            </colgroup>
+            <thead>
+              <tr>
+                <th style={thStyle}>Objeto / Tarea</th>
+                <th style={thStyle}>Contrato y Proveedor</th>
+                <th style={thStyle}>Ubicación</th>
+                <th style={thStyle}>Total OPEX</th>
+                <th style={thStyle}>Meses Progr.</th>
+                <th style={thStyle}>Estado</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtradas.map((item, idx) => {
+                const opx = parseOpex(item.opexDataRaw);
+                const description = opx?.objeto || item.lineaOperativa || '';
+                const mesesActivos = opx?.meses
+                  ? opx.meses.filter((m: any) => m.total > 0).map((m: any) => m.mes.substring(0, 3))
+                  : [];
+                const mesesTexto = mesesActivos.length === 0 ? '—'
+                  : mesesActivos.length === 12 ? '12 Meses'
+                  : mesesActivos.join(', ');
 
-            <DataGridBody<ActividadAmbiental>>
-              {({ item, rowId }) => (
-                <DataGridRow<ActividadAmbiental>
-                  key={rowId}
-                  className={styles.row}
-                  style={{ animationDelay: `${filtradas.indexOf(item) * 40}ms` }}
-                >
-                  {({ renderCell }) => (
-                    <DataGridCell>{renderCell(item)}</DataGridCell>
-                  )}
-                </DataGridRow>
-              )}
-            </DataGridBody>
-          </DataGrid>
+                return (
+                  <tr
+                    key={item.id}
+                    onClick={() => onItemClick?.(item)}
+                    style={{
+                      cursor: 'pointer',
+                      animationName: 'fadeInUp',
+                      animationDuration: '0.4s',
+                      animationDelay: `${idx * 40}ms`,
+                      animationFillMode: 'both',
+                      transition: 'background 0.15s ease',
+                    }}
+                    onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.55)')}
+                    onMouseLeave={e => (e.currentTarget.style.background = '')}
+                  >
+                    {/* Objeto / Tarea */}
+                    <td style={tdStyle}>
+                      <div style={cellInner}>
+                        <ClipboardTaskListLtrRegular style={{ color: '#0078D4', flexShrink: 0, fontSize: '18px' }} />
+                        <div style={textStack}>
+                          <span style={line1}>{item.tarea}</span>
+                          <span style={line2}>
+                            {description.length > 60 ? description.substring(0, 60) + '...' : description}
+                          </span>
+                        </div>
+                      </div>
+                    </td>
+
+                    {/* Contrato y Proveedor */}
+                    <td style={tdStyle}>
+                      <div style={cellInner}>
+                        <OrganizationRegular style={{ flexShrink: 0, fontSize: '16px', color: '#605E5C' }} />
+                        <div style={textStack}>
+                          <span style={line1}>{opx?.proveedor || 'No asignado'}</span>
+                          <span style={line2}>Contrato: {opx?.contrato || item.contrato || '—'}</span>
+                        </div>
+                      </div>
+                    </td>
+
+                    {/* Ubicación */}
+                    <td style={tdStyle}>
+                      <div style={cellInner}>
+                        <LocationRegular style={{ flexShrink: 0, fontSize: '16px', color: '#605E5C' }} />
+                        <div style={textStack}>
+                          <span style={line1}>{item.zona}</span>
+                          {item.estacion && <span style={line2}>{item.estacion}</span>}
+                        </div>
+                      </div>
+                    </td>
+
+                    {/* Total OPEX */}
+                    <td style={tdStyle}>
+                      <span style={{ fontSize: '13px', fontWeight: 700, color: '#003057', whiteSpace: 'nowrap' }}>
+                        {item.presupuestoPlan ? formatter.format(item.presupuestoPlan) : '—'}
+                      </span>
+                    </td>
+
+                    {/* Meses Progr. */}
+                    <td style={tdStyle}>
+                      <span style={{ fontSize: '12px', color: '#323130' }}>{mesesTexto}</span>
+                    </td>
+
+                    {/* Estado */}
+                    <td style={tdStyle}>
+                      <StatusBadge estado={item.estado} />
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
         )}
       </div>
     </div>

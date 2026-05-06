@@ -187,11 +187,16 @@ export const ReportesModule: React.FC = () => {
         const planned = actividades.filter(a => a.estado === 'Planeada').length;
 
         const byType = actividades.reduce((acc, curr) => {
-            acc[curr.tipo] = (acc[curr.tipo] || 0) + 1;
+            acc[curr.lineaOperativa] = (acc[curr.lineaOperativa] || 0) + 1;
             return acc;
         }, {} as Record<string, number>);
 
-        return { total, closed, pending, execution, planned, byType };
+        const byZona = actividades.reduce((acc, curr) => {
+            acc[curr.zona] = (acc[curr.zona] || 0) + 1;
+            return acc;
+        }, {} as Record<string, number>);
+
+        return { total, closed, pending, execution, planned, byType, byZona };
     }, [actividades]);
 
     const completionRate = stats.total > 0 ? Math.round((stats.closed / stats.total) * 100) : 0;
@@ -270,15 +275,18 @@ export const ReportesModule: React.FC = () => {
 
                 {/* Type Distribution */}
                 <Card className={styles.chartCard}>
-                    <CardHeader header={<Title3 style={{ color: '#003057' }}>Actividades por Tipo</Title3>} />
+                    <CardHeader header={<Title3 style={{ color: '#003057' }}>Actividades por Línea Operativa</Title3>} />
                     <div className={styles.barChart}>
                         {Object.entries(stats.byType).map(([type, count]) => {
-                            const percentage = Math.round((count / stats.total) * 100);
-                            // Color logic
+                            const percentage = stats.total > 0 ? Math.round((count / stats.total) * 100) : 0;
+                            // Color by line
                             let barColor = CENIT_COLORS.green;
-                            if (type === 'Monitoreo') barColor = CENIT_COLORS.blueBrand;
-                            if (type === 'Mantenimiento') barColor = '#f59e0b';
-                            if (type === 'Auditoría') barColor = '#6366f1';
+                            if (type === 'Monitoreos') barColor = CENIT_COLORS.blueBrand;
+                            if (type === 'ICAs') barColor = '#6366f1';
+                            if (type === 'Pagos') barColor = '#f59e0b';
+                            if (type.startsWith('S.')) barColor = '#0ea5e9';
+                            if (type.includes('Compensacion')) barColor = '#10b981';
+                            if (type.includes('Residuos')) barColor = '#ef4444';
 
                             return (
                                 <div key={type} className={styles.barRow}>

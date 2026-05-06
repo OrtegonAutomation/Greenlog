@@ -7,7 +7,7 @@ import { ActividadesService as MockService } from '../generated/services/Activid
 import { SharePointService } from '../services/SharePointService';
 
 // TOGGLE: Change to true to use real SharePoint data (requires Auth context or deployment)
-const USE_REAL_DATA = true;
+const USE_REAL_DATA = false;
 const ActividadesService = USE_REAL_DATA ? SharePointService : MockService;
 
 export interface UseActividadesReturn {

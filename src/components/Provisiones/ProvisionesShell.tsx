@@ -1,7 +1,6 @@
 // ============================================================
-// AppShell — Layout principal CENIT (GREENLOG)
-// Estética: sidebar oscuro con gradiente, header glassmorphism,
-// fondo mesh-gradient, nav pills redondeados
+// ProvisionesShell — Layout principal Provisiones Ambientales
+// Sidebar idéntico en estilo a AppShell, con sus propias secciones
 // ============================================================
 import React, { useRef, useState } from 'react';
 import {
@@ -10,27 +9,22 @@ import {
 } from '@fluentui/react-components';
 import {
   GridRegular,
-  CalendarLtrRegular,
-  PlayCircleRegular,
-  DataBarVerticalRegular,
-  NavigationRegular,
+  DocumentBulletListRegular,
   LeafOneRegular,
+  CalculatorRegular,
+  ChartMultipleRegular,
   AlertRegular,
   QuestionCircleRegular,
   ArrowLeftRegular,
 } from '@fluentui/react-icons';
-import { SeccionApp } from '../../types';
-import { Dashboard } from '../Dashboard/Dashboard';
-import { PlaneacionModule } from '../Planeacion/PlaneacionModule';
-import { EjecucionModule } from '../Ejecucion/EjecucionModule';
-import { ReportesModule } from '../Reportes/ReportesModule';
+import { SeccionProvisiones, BREADCRUMBS_PROVISIONES } from '../../types/provisiones';
 import { CENIT_COLORS } from '../../theme/cenitTheme';
-import { startTour } from '../Tour/TourGuide';
 import GreenLogBlanco from '../../assets/GreenLog Blanco.png';
-
-// ... (existing code)
-
-
+import { ProvisionesDashboard } from './Dashboard/ProvisionesDashboard';
+import { ObligacionesModule } from './Obligaciones/ObligacionesModule';
+import { CompensacionesModule } from './Compensaciones/CompensacionesModule';
+import { PxQModule } from './PxQ/PxQModule';
+import { SeguimientoModule } from './Seguimiento/SeguimientoModule';
 
 // ── Layout ────────────────────────────────────────────────────
 const SIDEBAR_EXPANDED = 256;
@@ -82,7 +76,6 @@ const useStyles = makeStyles({
   logoIcon: {
     width: '60px',
     height: '60px',
-    // Removed white background, borderRadius and shadow as requested
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
@@ -114,16 +107,6 @@ const useStyles = makeStyles({
     overflowY: 'auto',
     overflowX: 'hidden',
   },
-  navSection: {
-    fontSize: '10px',
-    fontWeight: '700',
-    letterSpacing: '0.10em',
-    textTransform: 'uppercase',
-    color: 'rgba(255,255,255,0.28)',
-    ...shorthands.padding('14px', '10px', '5px'),
-    whiteSpace: 'nowrap',
-    overflow: 'hidden',
-  },
   navItem: {
     display: 'flex',
     alignItems: 'center',
@@ -153,21 +136,13 @@ const useStyles = makeStyles({
       transform: 'translateX(0)',
     },
   },
-  navItemAccent: {
-    position: 'relative',
-    '::before': {
-      content: '""',
-      position: 'absolute',
-      left: '-10px',
-      top: '20%',
-      bottom: '20%',
-      width: '3px',
-      borderRadius: '0 4px 4px 0',
-      background: CENIT_COLORS.green,
-    },
-  },
   navIcon: { flexShrink: 0, fontSize: '19px', color: 'inherit' },
-  navText: { flex: 1, overflow: 'hidden', textOverflow: 'ellipsis' },
+  navLabel: {
+    ...shorthands.flex(1),
+    fontSize: '14px',
+    fontWeight: '500',
+    letterSpacing: '0.3px',
+  },
   navBadge: {
     flexShrink: 0,
     fontSize: '9px',
@@ -179,32 +154,22 @@ const useStyles = makeStyles({
     color: 'rgba(255,255,255,0.45)',
     ...shorthands.border('1px', 'solid', 'rgba(255,255,255,0.13)'),
   },
-
-  userSection: {
-    display: 'flex',
-    alignItems: 'center',
-    ...shorthands.gap('10px'),
-    ...shorthands.padding('14px', '14px'),
-    ...shorthands.borderTop('1px', 'solid', 'rgba(255,255,255,0.07)'),
-    overflow: 'hidden',
-    flexShrink: 0,
+  activeIndicator: {
+    width: '4px',
+    height: '16px',
+    borderRadius: '4px',
+    backgroundColor: '#4ade80',
+    marginLeft: 'auto',
   },
-  userInfo: {
+
+  sidebarFooter: {
+    marginTop: 'auto',
     display: 'flex',
     flexDirection: 'column',
-    overflow: 'hidden',
-    flex: 1,
-    whiteSpace: 'nowrap',
-  },
-  userName: { fontSize: '13px', fontWeight: '600', color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis' },
-  userEmail: { fontSize: '11px', color: 'rgba(255,255,255,0.4)', marginTop: '1px', overflow: 'hidden', textOverflow: 'ellipsis' },
-  onlineDot: {
-    width: '8px',
-    height: '8px',
-    borderRadius: '50%',
-    background: '#22c55e',
-    flexShrink: 0,
-    boxShadow: '0 0 0 2px rgba(34,197,94,0.3)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...shorthands.padding('24px'),
+    ...shorthands.borderTop('1px', 'solid', 'rgba(255,255,255,0.1)'),
   },
 
   // ── Main ─────────────────────────────────────────────────────
@@ -243,15 +208,6 @@ const useStyles = makeStyles({
     alignItems: 'center',
     ...shorthands.gap('10px'),
   },
-  breadcrumb: {
-    display: 'flex',
-    alignItems: 'center',
-    ...shorthands.gap('6px'),
-    fontSize: '14px',
-  },
-  breadcrumbRoot: { color: tokens.colorNeutralForeground4 },
-  breadcrumbSep: { color: tokens.colorNeutralForeground4, opacity: '0.4', fontSize: '16px' },
-  breadcrumbCurrent: { fontWeight: '700', color: tokens.colorNeutralForeground1 },
   headerRight: {
     display: 'flex',
     alignItems: 'center',
@@ -280,92 +236,32 @@ const useStyles = makeStyles({
     overflowY: 'auto',
     ...shorthands.padding('28px'),
   },
-
-  // ── Branding & Footer ──
-  sidebarFooter: {
-    marginTop: 'auto',
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    justifyContent: 'center',
-    ...shorthands.padding('24px'),
-    ...shorthands.borderTop('1px', 'solid', 'rgba(255,255,255,0.1)'),
-  },
-
-  // ── Nav Styles ──
-  navLabel: {
-    ...shorthands.flex(1),
-    fontSize: '14px',
-    fontWeight: '500',
-    letterSpacing: '0.3px',
-  },
-  activeIndicator: {
-    width: '4px',
-    height: '16px',
-    borderRadius: '4px',
-    backgroundColor: '#4ade80', // Green accent
-    marginLeft: 'auto',
-  },
-
-  // Coming soon
-  comingSoon: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    flex: 1,
-    minHeight: '400px',
-    animationName: {
-      from: { opacity: '0', transform: 'translateY(16px)' },
-      to: { opacity: '1', transform: 'translateY(0)' },
-    },
-    animationDuration: '0.4s',
-    animationFillMode: 'both',
-  },
-  comingSoonCard: {
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    ...shorthands.gap('12px'),
-    ...shorthands.padding('52px', '64px'),
-    background: 'rgba(255,255,255,0.72)',
-    backdropFilter: 'blur(16px)',
-    borderRadius: '24px',
-    ...shorthands.border('1px', 'solid', 'rgba(255,255,255,0.9)'),
-    boxShadow: '0 8px 40px rgba(0,0,0,0.06)',
-    textAlign: 'center' as const,
-  },
-  comingSoonIcon: {
-    fontSize: '52px',
-    color: CENIT_COLORS.green,
-    opacity: '0.35',
-  },
 });
 
 // ── Items de navegación ───────────────────────────────────────
-interface NavItemDef { id: SeccionApp; label: string; icon: React.ReactNode; badge?: string; }
+interface NavItemDef {
+  id: SeccionProvisiones;
+  label: string;
+  icon: React.ReactNode;
+  badge?: string;
+}
 
 const NAV_ITEMS: NavItemDef[] = [
-  { id: 'dashboard', label: 'Dashboard', icon: <GridRegular /> },
-  { id: 'planeacion', label: 'Planeación', icon: <CalendarLtrRegular /> },
-  { id: 'ejecucion', label: 'Ejecución', icon: <PlayCircleRegular /> },
-  { id: 'reportes', label: 'Reportes', icon: <DataBarVerticalRegular /> },
+  { id: 'dashboard',       label: 'Dashboard',       icon: <GridRegular /> },
+  { id: 'obligaciones',    label: 'Obligaciones',    icon: <DocumentBulletListRegular /> },
+  { id: 'compensaciones',  label: 'Compensaciones',  icon: <LeafOneRegular /> },
+  { id: 'pxq',             label: 'PxQ / Estimaciones', icon: <CalculatorRegular /> },
+  { id: 'seguimiento',     label: 'Seguimiento',     icon: <ChartMultipleRegular /> },
 ];
 
-const BREADCRUMBS: Record<SeccionApp, string> = {
-  dashboard: 'Dashboard',
-  planeacion: 'Planeación Ambiental',
-  ejecucion: 'Seguimiento a Ejecución',
-  reportes: 'Reportes e Indicadores',
-};
-
 // ── Componente ────────────────────────────────────────────────
-interface AppShellProps {
+interface ProvisionesShellProps {
   onBack?: () => void;
 }
 
-export const AppShell: React.FC<AppShellProps> = ({ onBack }) => {
+export const ProvisionesShell: React.FC<ProvisionesShellProps> = ({ onBack }) => {
   const styles = useStyles();
-  const [seccion, setSeccion] = useState<SeccionApp>('dashboard');
+  const [seccion, setSeccion] = useState<SeccionProvisiones>('dashboard');
   const [collapsed, setCollapsed] = useState(true);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -374,21 +270,12 @@ export const AppShell: React.FC<AppShellProps> = ({ onBack }) => {
 
   const renderContent = () => {
     switch (seccion) {
-      case 'dashboard': return <Dashboard onNavigate={setSeccion} />;
-      case 'planeacion': return <PlaneacionModule />;
-      case 'ejecucion': return <EjecucionModule />;
-      case 'reportes': return <ReportesModule />;
-      default: return (
-        <div className={styles.comingSoon}>
-          <div className={styles.comingSoonCard}>
-            <DataBarVerticalRegular className={styles.comingSoonIcon} />
-            <Body1Strong style={{ fontSize: '18px' }}>{BREADCRUMBS[seccion]}</Body1Strong>
-            <Caption1 style={{ color: tokens.colorNeutralForeground3, maxWidth: '280px' }}>
-              Este módulo estará disponible en la siguiente fase del proyecto CENIT.
-            </Caption1>
-          </div>
-        </div>
-      );
+      case 'dashboard':      return <ProvisionesDashboard onNavigate={setSeccion} />;
+      case 'obligaciones':   return <ObligacionesModule />;
+      case 'compensaciones': return <CompensacionesModule />;
+      case 'pxq':            return <PxQModule />;
+      case 'seguimiento':    return <SeguimientoModule />;
+      default:               return null;
     }
   };
 
@@ -396,12 +283,12 @@ export const AppShell: React.FC<AppShellProps> = ({ onBack }) => {
     <div className={styles.shell}>
       <aside
         className={mergeClasses(styles.sidebar, collapsed ? styles.sidebarCollapsed : styles.sidebarExpanded)}
-        id="app-sidebar"
+        id="provisiones-sidebar"
         onMouseEnter={onEnter}
         onMouseLeave={onLeave}
       >
         {/* Logo Area */}
-        <div className={styles.logoArea} id="sidebar-logo">
+        <div className={styles.logoArea}>
           <div
             className={styles.logoIcon}
             style={{
@@ -427,7 +314,7 @@ export const AppShell: React.FC<AppShellProps> = ({ onBack }) => {
                     Cambiar módulo
                   </span>
                 ) : (
-                  'Control Ambiental'
+                  'Provisiones Ambientales'
                 )}
               </span>
             </div>
@@ -441,7 +328,7 @@ export const AppShell: React.FC<AppShellProps> = ({ onBack }) => {
             return (
               <div
                 key={item.id}
-                id={`nav-${item.id}`}
+                id={`prov-nav-${item.id}`}
                 className={mergeClasses(styles.navItem, active && styles.navItemActive)}
                 onClick={() => setSeccion(item.id)}
                 role="button"
@@ -488,24 +375,11 @@ export const AppShell: React.FC<AppShellProps> = ({ onBack }) => {
           <div className={styles.headerLeft}>
             {seccion !== 'dashboard' && (
               <span style={{ fontSize: '18px', fontWeight: '700', color: tokens.colorNeutralForeground1 }}>
-                {BREADCRUMBS[seccion]}
+                {BREADCRUMBS_PROVISIONES[seccion]}
               </span>
             )}
           </div>
           <div className={styles.headerRight}>
-            <Tooltip content="Ayuda / Tour" relationship="label">
-              <div
-                className={styles.iconBtn}
-                id="tour-trigger"
-                role="button"
-                tabIndex={0}
-                aria-label="Iniciar Tour"
-                onClick={() => startTour(setSeccion)}
-                style={{ backgroundColor: seccion === 'dashboard' ? 'rgba(255,255,255,0.5)' : undefined }}
-              >
-                <QuestionCircleRegular />
-              </div>
-            </Tooltip>
             <Tooltip content="Notificaciones" relationship="label">
               <div
                 className={styles.iconBtn}
@@ -517,12 +391,11 @@ export const AppShell: React.FC<AppShellProps> = ({ onBack }) => {
                 <AlertRegular />
               </div>
             </Tooltip>
-            {/* Avatar sin label para ser más minimalista */}
             <Avatar name="Camilo Ortegón" color="colorful" size={32} />
           </div>
         </header>
         <div className={styles.content}>{renderContent()}</div>
       </main>
-    </div >
+    </div>
   );
 };
