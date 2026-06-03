@@ -1,7 +1,7 @@
 // ============================================================
 // PlaneacionWizard — Unified multi-step wizard for creating
 // environmental planning activities across all líneas operativas.
-// Steps: Línea → Zona → Lugar → Ítems/Parámetros → Clasificación → Programación
+// Steps: Línea → Zona → Lugar → Clasificación → Datos auxiliares → Ítems/Parámetros → Programación
 // Replaces the old MonitoreosWizard + ServicioOpexWizard split.
 // ============================================================
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
@@ -25,6 +25,11 @@ import { MonitoreosMatrizService, MonitoreoRow } from '../../services/Monitoreos
 import { ItemsLineaService, ItemLinea, ITEMS_LOGISTICA } from '../../services/ItemsLineaService';
 import { DEPARTAMENTOS_MUNICIPIOS, DEPARTAMENTOS_LIST } from '../../data/jurisdiccionesCompensaciones';
 import { CENIT_COLORS } from '../../theme/cenitTheme';
+import {
+  DatosAuxiliaresPresupuestales,
+  DatosAuxiliaresPresupuestalesForm,
+  DEFAULT_DATOS_AUXILIARES,
+} from './DatosAuxiliaresPresupuestalesForm';
 import {
   LineaOperativa, LineaPlaneacionConfig, TipoLugar, TipoPlaneacion, FuentePresupuesto,
   LINEAS_PLANEACION, TIPOS_LUGAR, TIPOS_PLANEACION, FUENTES_PRESUPUESTO,
@@ -61,6 +66,7 @@ export interface PlaneacionWizardResult {
   fuentePresupuesto: FuentePresupuesto;
   tipoPlaneacion: TipoPlaneacion;
   anioPlaneacion: number;
+  datosAuxiliaresPresupuestales: DatosAuxiliaresPresupuestales;
   parametrosSeleccionados: MonitoreoRow[];
   itemsSeleccionados: ItemLinea[];
   logisticaSeleccionada: ItemLinea[];
@@ -127,6 +133,7 @@ export interface PlaneacionInitialData {
   fuentePresupuesto?: FuentePresupuesto;
   tipoPlaneacion?: TipoPlaneacion;
   anioPlaneacion?: number;
+  datosAuxiliaresPresupuestales?: Partial<DatosAuxiliaresPresupuestales>;
   programacion?: PlaneacionMensual[];
 }
 
@@ -264,6 +271,7 @@ const getStepLabels = (isMonitoreo: boolean, isCompensaciones: boolean) => {
     base.push({ label: 'Descripción',   icon: '📄' });
   }
   base.push({ label: 'Clasificación', icon: '⚙️' });
+  base.push({ label: 'Datos auxiliares', icon: '🗂️' });
   base.push({ label: isMonitoreo ? 'Parámetros' : 'Ítems', icon: '🧪' });
   base.push({ label: 'Programación',  icon: '📅' });
   return base;
@@ -973,7 +981,11 @@ export const PlaneacionWizard: React.FC<Props> = ({ open, onClose, onComplete, i
   const [tipoPlaneacion, setTipoPlaneacion] = useState<TipoPlaneacion>('Plan');
   const [anioPlaneacion, setAnioPlaneacion] = useState(new Date().getFullYear() + 1);
 
-  // Step 5: Programación
+  // Datos auxiliares presupuestales (aplican para OPEX y CAPEX)
+  const [datosAuxiliaresPresupuestales, setDatosAuxiliaresPresupuestales] =
+    useState<DatosAuxiliaresPresupuestales>({ ...DEFAULT_DATOS_AUXILIARES });
+
+  // Programación
   const [monthlyData, setMonthlyData] = useState<PlaneacionMensual[]>([]);
   // IPC per month toggle (which months apply IPC adjustment)
   const [ipcMeses, setIpcMeses] = useState<Set<number>>(new Set());
@@ -1021,9 +1033,10 @@ export const PlaneacionWizard: React.FC<Props> = ({ open, onClose, onComplete, i
 
   // Step index offsets for Compensaciones (new Obligación step inserted at index 3)
   const STEP_CLASIFICACION = isCompensaciones ? 4 : 3;
-  const STEP_PARAMETROS    = isCompensaciones ? 5 : 4;
-  const STEP_PROGRAMACION  = isCompensaciones ? 6 : 5;
-  const TOTAL_STEPS        = isCompensaciones ? 7 : 6;
+  const STEP_DATOS_AUXILIARES = STEP_CLASIFICACION + 1;
+  const STEP_PARAMETROS    = isCompensaciones ? 6 : 5;
+  const STEP_PROGRAMACION  = isCompensaciones ? 7 : 6;
+  const TOTAL_STEPS        = isCompensaciones ? 8 : 7;
 
   const STEPS = useMemo(() => getStepLabels(isMonitoreo, isCompensaciones), [isMonitoreo, isCompensaciones]);
 
@@ -1042,6 +1055,10 @@ export const PlaneacionWizard: React.FC<Props> = ({ open, onClose, onComplete, i
       setFuentePresupuesto(initialData.fuentePresupuesto ?? 'OPEX');
       setTipoPlaneacion(initialData.tipoPlaneacion ?? 'Plan');
       setAnioPlaneacion(initialData.anioPlaneacion ?? new Date().getFullYear() + 1);
+      setDatosAuxiliaresPresupuestales({
+        ...DEFAULT_DATOS_AUXILIARES,
+        ...initialData.datosAuxiliaresPresupuestales,
+      });
       setSelectedParams(new Set());
       setSelectedItems(new Set());
       setSelectedLogistica(new Set(ITEMS_LOGISTICA.map(it => it.id)));
@@ -1065,6 +1082,7 @@ export const PlaneacionWizard: React.FC<Props> = ({ open, onClose, onComplete, i
       setFuentePresupuesto('OPEX');
       setTipoPlaneacion('Plan');
       setAnioPlaneacion(new Date().getFullYear() + 1);
+      setDatosAuxiliaresPresupuestales({ ...DEFAULT_DATOS_AUXILIARES });
       setMonthlyData([]);
       setSelectedSistema('');
       setSelectedSector('');
@@ -1534,6 +1552,10 @@ export const PlaneacionWizard: React.FC<Props> = ({ open, onClose, onComplete, i
           if (isCompensaciones && !contratoSeleccionado) return false;
           return true;
         }
+        if (step === STEP_DATOS_AUXILIARES) {
+          return datosAuxiliaresPresupuestales.contrato.trim().length > 0
+            && datosAuxiliaresPresupuestales.proveedor.trim().length > 0;
+        }
         if (step === STEP_PARAMETROS) {
           // Si estamos planeando Año 2/3 con itemsCambian, validar contra Y2/Y3
           if (isCompensaciones && itemsCambianPorAnio && tabAnio === 2) return selectedItemsY2.size > 0;
@@ -1600,6 +1622,7 @@ export const PlaneacionWizard: React.FC<Props> = ({ open, onClose, onComplete, i
         fuentePresupuesto,
         tipoPlaneacion,
         anioPlaneacion,
+        datosAuxiliaresPresupuestales,
         parametrosSeleccionados: selRows,
         itemsSeleccionados: selItems,
         logisticaSeleccionada: selLog,
@@ -2889,7 +2912,24 @@ export const PlaneacionWizard: React.FC<Props> = ({ open, onClose, onComplete, i
               </div>
             )}
 
-            {/* ═══ Programación Mensual (step 5 non-comp, step 6 comp) ═══ */}
+            {/* ═══ Datos auxiliares presupuestales (OPEX y CAPEX) ═══ */}
+            {step === STEP_DATOS_AUXILIARES && (
+              <div style={{ maxWidth: '760px', margin: '0 auto' }}>
+                <Title3 style={{ color: '#003057', display: 'block', marginBottom: '4px' }}>
+                  Datos auxiliares presupuestales
+                </Title3>
+                <Caption1 style={{ color: tokens.colorNeutralForeground3, display: 'block', marginBottom: '20px' }}>
+                  Completa la información contractual asociada a la planeación {fuentePresupuesto}.
+                  Los campos marcados con * son obligatorios para continuar.
+                </Caption1>
+                <DatosAuxiliaresPresupuestalesForm
+                  value={datosAuxiliaresPresupuestales}
+                  onChange={setDatosAuxiliaresPresupuestales}
+                />
+              </div>
+            )}
+
+            {/* ═══ Programación Mensual ═══ */}
             {step === STEP_PROGRAMACION && (
               <div>
                 <Title3 style={{ color: '#003057', display: 'block', marginBottom: '4px' }}>

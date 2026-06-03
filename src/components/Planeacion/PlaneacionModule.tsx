@@ -12,7 +12,6 @@ import { ActivityForm } from './ActivityForm';
 import { ActivityDetailPanel } from './ActivityDetailPanel';
 import { BulkUploadPanel, BulkUploadResult } from './BulkUploadPanel';
 import { PlaneacionWizard, PlaneacionWizardResult, PlaneacionInitialData } from './PlaneacionWizard';
-import { OpexWizard, OpexFormData } from './OpexWizard';
 import { exportOpexToExcel, exportDetalleInternoToExcel } from '../../utils/exportOpex';
 
 const useStyles = makeStyles({
@@ -68,12 +67,9 @@ export const PlaneacionModule: React.FC = () => {
   const [bulkAbierto, setBulkAbierto]            = useState(false);
 
   const [wizardAbierto, setWizardAbierto]        = useState(false);
-  const [opexAbierto, setOpexAbierto]            = useState(false);
-  const [tempWizardPayload, setTempWizardPayload] = useState<PlaneacionWizardResult | null>(null);
 
-  // Initial data para edición de wizards
+  // Initial data para edición del wizard
   const [planeacionInitial, setPlaneacionInitial] = useState<PlaneacionInitialData | null>(null);
-  const [opexInitial, setOpexInitial]           = useState<Partial<OpexFormData> | null>(null);
 
   // Notifications
   const [errorGuardar, setErrorGuardar] = useState<string | null>(null);
@@ -124,24 +120,6 @@ export const PlaneacionModule: React.FC = () => {
     let opx: any = null;
     try { opx = actividad.opexDataRaw ? JSON.parse(actividad.opexDataRaw) : null; } catch { /* noop */ }
 
-    // Pre-llenar datos del contrato OpexWizard
-    if (opx) {
-      setOpexInitial({
-        contrato:              opx.contrato     ?? actividad.contrato ?? '',
-        proveedor:             opx.proveedor    ?? '',
-        objeto:                opx.objeto       ?? '',
-        administrador:         opx.administrador ?? actividad.responsable ?? '',
-        supervisor:            opx.supervisor   ?? '',
-        fechaInicio:           opx.fechaInicio  ?? actividad.fechaInicio ?? '',
-        fechaFin:              opx.fechaFin     ?? actividad.fechaFin    ?? '',
-        estadoContrato:        opx.estadoContrato        ?? 'VIGENTE',
-        procesoAbastecimiento: opx.procesoAbastecimiento ?? 'Ejecución contractual',
-        descripcionNecesidad:  opx.descripcionNecesidad  ?? '',
-      });
-    } else {
-      setOpexInitial(null);
-    }
-
     if (opx?.meses) {
       // Reconstruir initial para PlaneacionWizard
       setPlaneacionInitial({
@@ -153,6 +131,18 @@ export const PlaneacionModule: React.FC = () => {
         fuentePresupuesto: (actividad as any).fuentePresupuesto ?? 'OPEX',
         tipoPlaneacion:    (actividad as any).tipoPlaneacion ?? 'Plan',
         anioPlaneacion:    (actividad as any).anioPlaneacion ?? new Date().getFullYear() + 1,
+        datosAuxiliaresPresupuestales: {
+          contrato:              opx.contrato     ?? actividad.contrato ?? '',
+          proveedor:             opx.proveedor    ?? '',
+          objeto:                opx.objeto       ?? '',
+          administrador:         opx.administrador ?? actividad.responsable ?? '',
+          supervisor:            opx.supervisor   ?? '',
+          fechaInicio:           opx.fechaInicio  ?? actividad.fechaInicio ?? '',
+          fechaFin:              opx.fechaFin     ?? actividad.fechaFin    ?? '',
+          estadoContrato:        opx.estadoContrato        ?? 'VIGENTE',
+          procesoAbastecimiento: opx.procesoAbastecimiento ?? 'Ejecución contractual',
+          descripcionNecesidad:  opx.descripcionNecesidad  ?? '',
+        },
         programacion:   opx.meses.map((m: any, i: number) => ({
           mes:               m.mes,
           mesIndex:          i,
@@ -212,17 +202,9 @@ export const PlaneacionModule: React.FC = () => {
     return { createdCount, failedCount, errors };
   }, [crear]);
 
-  const handleWizardComplete = useCallback((result: PlaneacionWizardResult) => {
+  const handleWizardComplete = useCallback(async (result: PlaneacionWizardResult) => {
     setWizardAbierto(false);
-    setTempWizardPayload(result);
-    setOpexAbierto(true);
-  }, []);
-
-  const handleOpexComplete = useCallback(async (opexData: OpexFormData) => {
-    if (!tempWizardPayload) return;
-    setOpexAbierto(false);
-
-    const result = tempWizardPayload;
+    const datosAuxiliares = result.datosAuxiliaresPresupuestales;
     const mesesProg = result.programacion.filter(m => m.total > 0).map(m => m.mes);
     const isMonitoreo = result.parametrosSeleccionados.length > 0;
 
@@ -231,7 +213,7 @@ export const PlaneacionModule: React.FC = () => {
     if (result.itemsSeleccionados.length > 0) descParts.push(`Ítems: ${result.itemsSeleccionados.map(it => it.item).join(', ')}`);
 
     const opexPayload = {
-      ...opexData,
+      ...datosAuxiliares,
       zona: result.zona,
       tipoLugar: result.tipoLugar,
       pk: result.pk,
@@ -285,20 +267,20 @@ export const PlaneacionModule: React.FC = () => {
       fuentePresupuesto: result.fuentePresupuesto,
       tipoPlaneacion: result.tipoPlaneacion,
       anioPlaneacion: result.anioPlaneacion,
-      fechaInicio: opexData.fechaInicio || `${result.anioPlaneacion}-01-01`,
-      fechaFin: opexData.fechaFin || `${result.anioPlaneacion}-12-31`,
+      fechaInicio: datosAuxiliares.fechaInicio || `${result.anioPlaneacion}-01-01`,
+      fechaFin: datosAuxiliares.fechaFin || `${result.anioPlaneacion}-12-31`,
       mes: mesesProg[0] || '',
       estado: 'Planeada',
       prioridad: 'Media',
       cuenta: result.fuentePresupuesto === 'CAPEX' ? 'CAPEX' : 'OPEX',
-      responsable: opexData.administrador || '',
-      contrato: opexData.contrato,
+      responsable: datosAuxiliares.administrador || '',
+      contrato: datosAuxiliares.contrato,
       porcentajeAvance: 0,
       estadoAprobacion: 'Pendiente',
       presupuestoPlan: result.valorTotal,
       presupuestoEjecutado: 0,
       presupuestoForecast: result.valorTotal,
-      novedades: `Proveedor: ${opexData.proveedor} | Obj: ${opexData.objeto}`,
+      novedades: `Proveedor: ${datosAuxiliares.proveedor} | Obj: ${datosAuxiliares.objeto}`,
       opexDataRaw: JSON.stringify(opexPayload)
     };
 
@@ -318,17 +300,15 @@ export const PlaneacionModule: React.FC = () => {
         setToastMsg('La actividad fue actualizada exitosamente.');
         setActividadEditar(null);
         setPlaneacionInitial(null);
-        setOpexInitial(null);
       } else {
         await crear(payload);
-        setToastMsg('Línea OPEX preparada y enviada correctamente.');
+        setToastMsg('La planeación fue preparada y enviada correctamente.');
       }
       setToastOk(true);
-      setTempWizardPayload(null);
     } catch (err) {
-      setErrorGuardar(err instanceof Error ? err.message : 'Error al guardar OPEX.');
+      setErrorGuardar(err instanceof Error ? err.message : 'Error al guardar la planeación.');
     }
-  }, [crear, actualizar, actividadEditar, tempWizardPayload]);
+  }, [crear, actualizar, actividadEditar]);
 
   return (
     <div className={styles.root}>
@@ -478,14 +458,6 @@ export const PlaneacionModule: React.FC = () => {
         onClose={() => { setWizardAbierto(false); setPlaneacionInitial(null); setActividadEditar(null); }}
         onComplete={handleWizardComplete}
         initialData={planeacionInitial}
-      />
-
-      <OpexWizard
-        open={opexAbierto}
-        onClose={() => { setOpexAbierto(false); setOpexInitial(null); }}
-        monitoreoPayload={tempWizardPayload as any}
-        onComplete={handleOpexComplete}
-        initialOpexData={opexInitial}
       />
     </div>
   );
