@@ -6,6 +6,7 @@
 
 import { LineaOperativa } from '../types';
 import { ITEMS_COMPENSACIONES_BQS, EstacionBQS, ESTACIONES_BQS } from '../data/itemsCompensacionesBQS';
+import { getItemsIcasPorZona, ITEMS_ICAS } from '../data/itemsIcas';
 
 export interface ItemLinea {
   id: string;
@@ -15,6 +16,11 @@ export interface ItemLinea {
   unidad: string;          // ej: "Global", "Kg", "Visita", "Und"
   precioReferencia: number; // Precio base de referencia
   preciosMensuales?: Record<number, number>; // Override por mes
+  tipoIca?: 'consolidacion' | 'elaboracion';
+  zonaIca?: string;
+  baseServicio?: string;
+  ordenInterna?: string;
+  cuentaContable?: string;
 }
 
 /** Ítems de logística — aplican a todas las líneas (especialmente monitoreos) */
@@ -26,11 +32,6 @@ export const ITEMS_LOGISTICA: ItemLinea[] = [
 
 /** Base de ítems por línea operativa (mock data — pendiente actualización del equipo) */
 const ITEMS_DB: ItemLinea[] = [
-  // ── ICAs ──────────────────────────────────────────────────
-  { id: 'ICAS-001', lineaOperativa: 'ICAs', item: 'Reporte ICA trimestral',         descripcion: 'Preparación y envío de reporte ICA trimestral',    unidad: 'Reporte', precioReferencia: 2_500_000 },
-  { id: 'ICAS-002', lineaOperativa: 'ICAs', item: 'Auditoría ICA anual',            descripcion: 'Auditoría anual de cumplimiento ICA',              unidad: 'Global',  precioReferencia: 8_000_000 },
-  { id: 'ICAS-003', lineaOperativa: 'ICAs', item: 'Soporte técnico ICA',            descripcion: 'Soporte técnico para gestión de ICAs',             unidad: 'Mes',     precioReferencia: 3_200_000 },
-
   // ── RESPEL ────────────────────────────────────────────────
   { id: 'RESP-001', lineaOperativa: 'Residuos peligrosos', item: 'Recolección RESPEL',            descripcion: 'Recolección de residuos peligrosos en estación',        unidad: 'Kg',      precioReferencia: 4_500 },
   { id: 'RESP-002', lineaOperativa: 'Residuos peligrosos', item: 'Transporte RESPEL',             descripcion: 'Transporte de RESPEL a sitio de disposición',           unidad: 'Viaje',   precioReferencia: 1_800_000 },
@@ -95,7 +96,11 @@ export const ItemsLineaService = {
    * Para Compensaciones, si se pasa `estacion`, el `precioReferencia` se toma
    * de la columna correspondiente del consolidado BQS.
    */
-  getItems(linea: LineaOperativa, estacion?: string): ItemLinea[] {
+  getItems(linea: LineaOperativa, estacion?: string, zona?: string): ItemLinea[] {
+    if (linea === 'ICAs') {
+      return getItemsIcasPorZona(zona);
+    }
+
     if (LINEAS_BQS.includes(linea)) {
       const est = isEstacionBQS(estacion) ? estacion : undefined;
       return ITEMS_COMPENSACIONES_BQS.map(it => ({
@@ -118,12 +123,13 @@ export const ItemsLineaService = {
   /** Get all available líneas that have items configured */
   getLineasConItems(): LineaOperativa[] {
     const lineas = new Set(ITEMS_DB.map(it => it.lineaOperativa));
+    if (ITEMS_ICAS.length > 0) lineas.add('ICAs');
     return [...lineas];
   },
 
   /** Get a specific item by ID */
   getItemById(id: string): ItemLinea | undefined {
-    const hit = ITEMS_DB.find(it => it.id === id) ?? ITEMS_LOGISTICA.find(it => it.id === id);
+    const hit = ITEMS_DB.find(it => it.id === id) ?? ITEMS_LOGISTICA.find(it => it.id === id) ?? ITEMS_ICAS.find(it => it.id === id);
     if (hit) return hit;
     const bqs = ITEMS_COMPENSACIONES_BQS.find(it => it.id === id);
     if (bqs) {

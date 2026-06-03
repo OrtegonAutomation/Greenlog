@@ -1162,7 +1162,7 @@ export const PlaneacionWizard: React.FC<Props> = ({ open, onClose, onComplete, i
     if (step !== STEP_PARAMETROS || isMonitoreo || !selectedLinea) return;
     // Para Compensaciones la zona ES la estación (columnas del consolidado BQS)
     const estacionParaTarifa = isCompensaciones ? (selectedZona ?? undefined) : undefined;
-    const serviceItems = ItemsLineaService.getItems(selectedLinea.value, estacionParaTarifa);
+    const serviceItems = ItemsLineaService.getItems(selectedLinea.value, estacionParaTarifa, selectedZona ?? undefined);
     const custom = customItemsMap[selectedLinea.value] ?? [];
     let merged = [...serviceItems, ...custom];
     // Compensaciones: filtrar adicionalmente por contrato seleccionado si los ítems traen campo `contrato`
