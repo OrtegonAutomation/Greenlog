@@ -131,6 +131,7 @@ export const PlaneacionModule: React.FC = () => {
         fuentePresupuesto: (actividad as any).fuentePresupuesto ?? 'OPEX',
         tipoPlaneacion:    (actividad as any).tipoPlaneacion ?? 'Plan',
         anioPlaneacion:    (actividad as any).anioPlaneacion ?? new Date().getFullYear() + 1,
+        servicioEComplejidad: opx.servicioEComplejidad,
         datosAuxiliaresPresupuestales: {
           contrato:              opx.contrato     ?? actividad.contrato ?? '',
           proveedor:             opx.proveedor    ?? '',
@@ -236,6 +237,7 @@ export const PlaneacionModule: React.FC = () => {
       ivaGlobalActivo: result.ivaGlobalActivo,
       ivaGlobalPorcentaje: result.ivaGlobalPorcentaje,
       ivaItemsExcluidos: result.ivaItemsExcluidos,
+      servicioEComplejidad: result.servicioEComplejidad,
       // Compensaciones fields
       sistema: result.sistema,
       sector: result.sector,

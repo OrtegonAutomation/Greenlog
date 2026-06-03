@@ -24,6 +24,7 @@ import {
 import { MonitoreosMatrizService, MonitoreoRow } from '../../services/MonitoreosMatrizService';
 import { ItemsLineaService, ItemLinea, ITEMS_LOGISTICA } from '../../services/ItemsLineaService';
 import { DEPARTAMENTOS_MUNICIPIOS, DEPARTAMENTOS_LIST } from '../../data/jurisdiccionesCompensaciones';
+import { SERVICIO_E_COMPLEJIDADES, type ServicioEComplejidad } from '../../data/itemsServiciosE';
 import { CENIT_COLORS } from '../../theme/cenitTheme';
 import {
   DatosAuxiliaresPresupuestales,
@@ -113,6 +114,7 @@ export interface PlaneacionWizardResult {
   itemsCambianPorAnio?: boolean;
   selectedItemsY2?: string[];
   selectedItemsY3?: string[];
+  servicioEComplejidad?: ServicioEComplejidad;
 }
 
 // Compensaciones: ítem anual simplificado (Año 2 y Año 3)
@@ -135,6 +137,7 @@ export interface PlaneacionInitialData {
   anioPlaneacion?: number;
   datosAuxiliaresPresupuestales?: Partial<DatosAuxiliaresPresupuestales>;
   programacion?: PlaneacionMensual[];
+  servicioEComplejidad?: ServicioEComplejidad;
 }
 
 // ── Constants ──
@@ -943,6 +946,7 @@ export const PlaneacionWizard: React.FC<Props> = ({ open, onClose, onComplete, i
   const [availableEstaciones, setAvailableEstaciones] = useState<string[]>([]);
   const [selectedEstacion, setSelectedEstacion] = useState<string | null>(null);
   const [pk, setPk] = useState('');
+  const [servicioEComplejidad, setServicioEComplejidad] = useState<ServicioEComplejidad>('Muy Alta');
 
   // Step 4: Parámetros / Ítems
   const [availableMatrices, setAvailableMatrices] = useState<string[]>([]);
@@ -1030,6 +1034,11 @@ export const PlaneacionWizard: React.FC<Props> = ({ open, onClose, onComplete, i
   // Derived
   const isMonitoreo = selectedLinea?.usaMatriz === true;
   const isCompensaciones = selectedLinea?.value === 'Compensaciones estaciones' || selectedLinea?.value === 'Compensaciones e Inv';
+  const isServiciosE = selectedLinea?.value === 'Servicios E';
+  const tiposLugarDisponibles = useMemo(
+    () => isServiciosE ? TIPOS_LUGAR.filter(t => t.value !== 'Estación') : TIPOS_LUGAR,
+    [isServiciosE],
+  );
 
   // Step index offsets for Compensaciones (new Obligación step inserted at index 3)
   const STEP_CLASIFICACION = isCompensaciones ? 4 : 3;
@@ -1046,12 +1055,17 @@ export const PlaneacionWizard: React.FC<Props> = ({ open, onClose, onComplete, i
     setParamSearch('');
     if (initialData) {
       const cfg = LINEAS_PLANEACION.find(l => l.value === initialData.lineaOperativa) ?? null;
+      const initialTipoLugar = initialData.tipoLugar ?? cfg?.lugarPorDefecto ?? 'Estación';
+      const safeTipoLugar = cfg?.value === 'Servicios E' && initialTipoLugar === 'Estación'
+        ? 'Zona'
+        : initialTipoLugar;
       setSelectedLinea(cfg);
       setStep(0);
       setSelectedZona(initialData.zona ?? null);
-      setTipoLugar(initialData.tipoLugar ?? cfg?.lugarPorDefecto ?? 'Estación');
-      setSelectedEstacion(initialData.estacion ?? null);
+      setTipoLugar(safeTipoLugar);
+      setSelectedEstacion(safeTipoLugar === 'Estación' ? initialData.estacion ?? null : null);
       setPk(initialData.pk ?? '');
+      setServicioEComplejidad(initialData.servicioEComplejidad ?? 'Muy Alta');
       setFuentePresupuesto(initialData.fuentePresupuesto ?? 'OPEX');
       setTipoPlaneacion(initialData.tipoPlaneacion ?? 'Plan');
       setAnioPlaneacion(initialData.anioPlaneacion ?? new Date().getFullYear() + 1);
@@ -1071,6 +1085,7 @@ export const PlaneacionWizard: React.FC<Props> = ({ open, onClose, onComplete, i
       setTipoLugar('Estación');
       setSelectedEstacion(null);
       setPk('');
+      setServicioEComplejidad('Muy Alta');
       setAvailableEstaciones([]);
       setAvailableMatrices([]);
       setAvailableParams([]);
@@ -1114,6 +1129,12 @@ export const PlaneacionWizard: React.FC<Props> = ({ open, onClose, onComplete, i
       setIvaItemsExcluidos(new Set());
     }
   }, [open, initialData]);
+
+  useEffect(() => {
+    if (!isServiciosE || tipoLugar !== 'Estación') return;
+    setTipoLugar('Zona');
+    setSelectedEstacion(null);
+  }, [isServiciosE, tipoLugar]);
 
   // ── Load estaciones when zona + tipoLugar change ──
   useEffect(() => {
@@ -1162,7 +1183,12 @@ export const PlaneacionWizard: React.FC<Props> = ({ open, onClose, onComplete, i
     if (step !== STEP_PARAMETROS || isMonitoreo || !selectedLinea) return;
     // Para Compensaciones la zona ES la estación (columnas del consolidado BQS)
     const estacionParaTarifa = isCompensaciones ? (selectedZona ?? undefined) : undefined;
-    const serviceItems = ItemsLineaService.getItems(selectedLinea.value, estacionParaTarifa, selectedZona ?? undefined);
+    const serviceItems = ItemsLineaService.getItems(
+      selectedLinea.value,
+      estacionParaTarifa,
+      selectedZona ?? undefined,
+      isServiciosE ? servicioEComplejidad : undefined,
+    );
     const custom = customItemsMap[selectedLinea.value] ?? [];
     let merged = [...serviceItems, ...custom];
     // Compensaciones: filtrar adicionalmente por contrato seleccionado si los ítems traen campo `contrato`
@@ -1173,7 +1199,7 @@ export const PlaneacionWizard: React.FC<Props> = ({ open, onClose, onComplete, i
       });
     }
     setAvailableItems(merged);
-  }, [step, isMonitoreo, selectedLinea, customItemsMap, isCompensaciones, selectedZona, contratoSeleccionado]);
+  }, [step, isMonitoreo, selectedLinea, customItemsMap, isCompensaciones, selectedZona, contratoSeleccionado, isServiciosE, servicioEComplejidad]);
 
   // ── Build monthly data when entering Programación step ──
   useEffect(() => {
@@ -1636,6 +1662,7 @@ export const PlaneacionWizard: React.FC<Props> = ({ open, onClose, onComplete, i
         ivaGlobalActivo,
         ivaGlobalPorcentaje,
         ivaItemsExcluidos: [...ivaItemsExcluidos],
+        ...(isServiciosE && { servicioEComplejidad }),
         ...(isCompensaciones && {
           sistema: selectedSistema || undefined,
           sector: selectedSector || undefined,
@@ -1695,10 +1722,11 @@ export const PlaneacionWizard: React.FC<Props> = ({ open, onClose, onComplete, i
   // ── Selection handlers with reset cascade ──
   const handleSelectLinea = useCallback((cfg: LineaPlaneacionConfig) => {
     setSelectedLinea(cfg);
-    setTipoLugar(cfg.lugarPorDefecto);
+    setTipoLugar(cfg.value === 'Servicios E' && cfg.lugarPorDefecto === 'Estación' ? 'Zona' : cfg.lugarPorDefecto);
     // Reset downstream
     setSelectedEstacion(null);
     setPk('');
+    if (cfg.value === 'Servicios E') setServicioEComplejidad('Muy Alta');
     setSelectedParams(new Set());
     setSelectedItems(new Set());
     setSelectedMatrices(new Set());
@@ -2077,7 +2105,7 @@ export const PlaneacionWizard: React.FC<Props> = ({ open, onClose, onComplete, i
 
                     {/* Tipo de lugar */}
                     <div className={styles.tipoLugarGrid}>
-                      {TIPOS_LUGAR.map(tl => (
+                      {tiposLugarDisponibles.map(tl => (
                         <div
                           key={tl.value}
                           className={mergeClasses(styles.tipoLugarCard, tipoLugar === tl.value && styles.tipoLugarCardActive)}
@@ -2648,8 +2676,30 @@ export const PlaneacionWizard: React.FC<Props> = ({ open, onClose, onComplete, i
                             >
                               <td className={styles.paramTd}><Checkbox checked={sel} onChange={() => toggleItem(it)} /></td>
                               <td className={styles.paramTd} style={{ fontWeight: '600' }}>{it.item}</td>
-                              <td className={styles.paramTd} style={{ maxWidth: '220px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                {it.descripcion}
+                              <td className={styles.paramTd} style={{ maxWidth: '260px' }}>
+                                <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                  {it.descripcion}
+                                </div>
+                                {it.requiereComplejidad && (
+                                  <div
+                                    style={{ marginTop: '6px', display: 'flex', alignItems: 'center', gap: '6px' }}
+                                    onClick={e => e.stopPropagation()}
+                                  >
+                                    <Caption1 style={{ color: tokens.colorNeutralForeground3 }}>Complejidad</Caption1>
+                                    <select
+                                      value={servicioEComplejidad}
+                                      onChange={e => {
+                                        setServicioEComplejidad(e.target.value as ServicioEComplejidad);
+                                        setMonthlyData([]);
+                                      }}
+                                      style={{ padding: '4px 8px', borderRadius: '6px', border: '1px solid #ccc', fontSize: '12px' }}
+                                    >
+                                      {SERVICIO_E_COMPLEJIDADES.map(complejidad => (
+                                        <option key={complejidad} value={complejidad}>{complejidad}</option>
+                                      ))}
+                                    </select>
+                                  </div>
+                                )}
                               </td>
                               <td className={styles.paramTd}>{it.unidad}</td>
                               <td className={styles.paramTd} style={{ fontWeight: '600' }}>{fmtCOP(it.precioReferencia)}</td>

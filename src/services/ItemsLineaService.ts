@@ -7,6 +7,7 @@
 import { LineaOperativa } from '../types';
 import { ITEMS_COMPENSACIONES_BQS, EstacionBQS, ESTACIONES_BQS } from '../data/itemsCompensacionesBQS';
 import { getItemsIcasPorZona, ITEMS_ICAS } from '../data/itemsIcas';
+import { getItemsServiciosEPorZona, ITEMS_SERVICIOS_E, type ServicioEComplejidad } from '../data/itemsServiciosE';
 
 export interface ItemLinea {
   id: string;
@@ -21,6 +22,10 @@ export interface ItemLinea {
   baseServicio?: string;
   ordenInterna?: string;
   cuentaContable?: string;
+  servicioEZona?: string;
+  servicioEBase?: string;
+  servicioEComplejidad?: ServicioEComplejidad;
+  requiereComplejidad?: boolean;
 }
 
 /** Ítems de logística — aplican a todas las líneas (especialmente monitoreos) */
@@ -43,12 +48,6 @@ const ITEMS_DB: ItemLinea[] = [
   { id: 'RESP-008', lineaOperativa: 'Residuos peligrosos', item: 'Plan de contingencia RESPEL',   descripcion: 'Actualización plan de contingencia',                   unidad: 'Und',     precioReferencia: 2_000_000 },
   { id: 'RESP-009', lineaOperativa: 'Residuos peligrosos', item: 'Registro IDEAM',                descripcion: 'Registro ante IDEAM como generador',                   unidad: 'Und',     precioReferencia: 500_000 },
   { id: 'RESP-010', lineaOperativa: 'Residuos peligrosos', item: 'Auditoría gestor RESPEL',       descripcion: 'Auditoría al gestor autorizado',                       unidad: 'Visita',  precioReferencia: 1_500_000 },
-
-  // ── Servicios E / Compensación ─────────────────────────────
-  { id: 'SECOMP-001', lineaOperativa: 'Servicios E', item: 'Siembra especies nativas',      descripcion: 'Siembra de especies nativas compensación',        unidad: 'Árbol',   precioReferencia: 45_000 },
-  { id: 'SECOMP-002', lineaOperativa: 'Servicios E', item: 'Mantenimiento compensación',    descripcion: 'Mantenimiento de áreas de compensación',          unidad: 'Ha',      precioReferencia: 3_500_000 },
-  { id: 'SECOMP-003', lineaOperativa: 'Servicios E', item: 'Aislamiento con cerca',         descripcion: 'Aislamiento perimetral con cerca',                unidad: 'ml',      precioReferencia: 18_000 },
-  { id: 'SECOMP-004', lineaOperativa: 'Servicios E', item: 'Control fitosanitario',         descripcion: 'Control fitosanitario y de plagas',               unidad: 'Ha',      precioReferencia: 800_000 },
 
   // ── Compensaciones estaciones ────────────────────────────
   { id: 'COMPEST-001', lineaOperativa: 'Compensaciones estaciones', item: 'Compensación forestal',        descripcion: 'Compensación forestal por estación',               unidad: 'Ha',      precioReferencia: 12_000_000 },
@@ -96,9 +95,18 @@ export const ItemsLineaService = {
    * Para Compensaciones, si se pasa `estacion`, el `precioReferencia` se toma
    * de la columna correspondiente del consolidado BQS.
    */
-  getItems(linea: LineaOperativa, estacion?: string, zona?: string): ItemLinea[] {
+  getItems(
+    linea: LineaOperativa,
+    estacion?: string,
+    zona?: string,
+    servicioEComplejidad?: ServicioEComplejidad,
+  ): ItemLinea[] {
     if (linea === 'ICAs') {
       return getItemsIcasPorZona(zona);
+    }
+
+    if (linea === 'Servicios E') {
+      return getItemsServiciosEPorZona(zona, servicioEComplejidad);
     }
 
     if (LINEAS_BQS.includes(linea)) {
@@ -124,12 +132,16 @@ export const ItemsLineaService = {
   getLineasConItems(): LineaOperativa[] {
     const lineas = new Set(ITEMS_DB.map(it => it.lineaOperativa));
     if (ITEMS_ICAS.length > 0) lineas.add('ICAs');
+    if (ITEMS_SERVICIOS_E.length > 0) lineas.add('Servicios E');
     return [...lineas];
   },
 
   /** Get a specific item by ID */
   getItemById(id: string): ItemLinea | undefined {
-    const hit = ITEMS_DB.find(it => it.id === id) ?? ITEMS_LOGISTICA.find(it => it.id === id) ?? ITEMS_ICAS.find(it => it.id === id);
+    const hit = ITEMS_DB.find(it => it.id === id)
+      ?? ITEMS_LOGISTICA.find(it => it.id === id)
+      ?? ITEMS_ICAS.find(it => it.id === id)
+      ?? ITEMS_SERVICIOS_E.find(it => it.id === id);
     if (hit) return hit;
     const bqs = ITEMS_COMPENSACIONES_BQS.find(it => it.id === id);
     if (bqs) {
