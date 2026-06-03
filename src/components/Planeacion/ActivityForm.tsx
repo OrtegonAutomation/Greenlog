@@ -364,16 +364,6 @@ export const ActivityForm: React.FC<ActivityFormProps> = ({
                   contentBefore={<span style={{ fontSize: 12, color: '#888' }}>$</span>}
                 />
               </Field>
-              <Field label="Forecast">
-                <Input
-                  type="number"
-                  placeholder="0"
-                  value={String(form.presupuestoForecast ?? 0)}
-                  onChange={(_, d) => set('presupuestoForecast', Number(d.value) || 0)}
-                  disabled={guardando}
-                  contentBefore={<span style={{ fontSize: 12, color: '#888' }}>$</span>}
-                />
-              </Field>
             </div>
           </div>
 

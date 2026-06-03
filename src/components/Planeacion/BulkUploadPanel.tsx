@@ -415,7 +415,6 @@ function validateRow(raw: Record<string, unknown>, rowIdx: number, detailRows: R
   }
 
   payload.presupuestoPlan = totalAnio;
-  payload.presupuestoForecast = totalAnio;
   payload.mes = primerMesActivo ?? '';
 
   // Build opexDataRaw with the new metadata model
@@ -648,7 +647,6 @@ function validateCompensacionesRow(
   payload.cuenta = payload.fuentePresupuesto === 'CAPEX' ? 'CAPEX' : 'OPEX';
   payload.contrato = contrato;
   payload.presupuestoPlan = totalCombinado;
-  payload.presupuestoForecast = totalCombinado;
   payload.novedades = `Obligación ${idObligacion} — ${aniosAPlanear} año(s)`;
 
   payload.opexDataRaw = JSON.stringify({

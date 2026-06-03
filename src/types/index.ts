@@ -198,7 +198,6 @@ export const FORM_INICIAL: NuevaActividadPayload = {
   estadoAprobacion: 'Pendiente',
   presupuestoPlan: 0,
   presupuestoEjecutado: 0,
-  presupuestoForecast: 0,
   matricesAplicables: [],
 };
 

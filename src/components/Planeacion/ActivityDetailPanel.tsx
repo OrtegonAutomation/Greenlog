@@ -425,12 +425,6 @@ export const ActivityDetailPanel: React.FC<ActivityDetailPanelProps> = ({
                 </div>
                 <div className={styles.budgetLabel}>Ejecutado</div>
               </div>
-              <div className={styles.budgetCard}>
-                <div className={styles.budgetValue} style={{ color: CENIT_COLORS.orange }}>
-                  {fmtCOP(actividad.presupuestoForecast)}
-                </div>
-                <div className={styles.budgetLabel}>Forecast</div>
-              </div>
             </div>
           </div>
 

@@ -279,7 +279,6 @@ export const PlaneacionModule: React.FC = () => {
       estadoAprobacion: 'Pendiente',
       presupuestoPlan: result.valorTotal,
       presupuestoEjecutado: 0,
-      presupuestoForecast: result.valorTotal,
       novedades: `Proveedor: ${datosAuxiliares.proveedor} | Obj: ${datosAuxiliares.objeto}`,
       opexDataRaw: JSON.stringify(opexPayload)
     };
