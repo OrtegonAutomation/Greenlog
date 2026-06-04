@@ -5,45 +5,29 @@ import { AuthProvider } from './auth/AuthContext';
 import { useAuth } from './auth/AuthContext';
 import { LoginGate } from './components/Auth/LoginGate';
 import { AppShell } from './components/Shell/AppShell';
-
-const getBasePath = () => {
-  if (typeof window === 'undefined') return '';
-  return window.location.pathname.toLowerCase().startsWith('/greenlog') ? '/Greenlog' : '';
-};
-
-const getRoutePaths = () => {
-  const basePath = getBasePath();
-  return {
-    basePath,
-    homePath: basePath ? `${basePath}/` : '/',
-    loginPath: `${basePath}/login`,
-  };
-};
-
-const normalizePath = (path: string) => path.replace(/\/+$/, '').toLowerCase() || '/';
+import { getLoginPath, getSectionPath, isLoginPath } from './utils/appRoutes';
 
 const AppContent: React.FC = () => {
   const { currentUser } = useAuth();
-  const paths = useMemo(() => getRoutePaths(), []);
-  const currentPath = typeof window === 'undefined' ? '/' : normalizePath(window.location.pathname);
-  const loginPath = normalizePath(paths.loginPath);
-  const isLoginRoute = currentPath === loginPath;
+  const loginPath = useMemo(() => getLoginPath(), []);
+  const homePath = useMemo(() => getSectionPath('dashboard'), []);
+  const loginRoute = typeof window === 'undefined' ? false : isLoginPath();
 
   const goHome = () => {
-    window.history.replaceState(null, '', paths.homePath);
+    window.history.replaceState(null, '', homePath);
   };
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
-    if (!currentUser && !isLoginRoute) {
-      window.history.replaceState(null, '', paths.loginPath);
+    if (!currentUser && !loginRoute) {
+      window.history.replaceState(null, '', loginPath);
     }
 
-    if (currentUser && isLoginRoute) {
+    if (currentUser && loginRoute) {
       goHome();
     }
-  }, [currentUser, isLoginRoute, paths.loginPath]);
+  }, [currentUser, loginPath, loginRoute]);
 
   if (!currentUser) {
     return <LoginGate onLoginSuccess={goHome} />;

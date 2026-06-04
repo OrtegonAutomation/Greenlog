@@ -11,7 +11,7 @@ export default defineConfig({
     port: 4200,
     strictPort: false, // Deja que Vite suba al siguiente si 4200 está ocupado
   },
-  base: './', // CRITICAL: Permite que la app funcione en subcarpetas (SharePoint/GitHub Pages)
+  base: process.env.GREENLOG_GITHUB_PAGES === 'true' ? '/Greenlog/' : './',
   build: {
     outDir: 'dist',
   },

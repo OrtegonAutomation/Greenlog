@@ -3,7 +3,7 @@
 // Estética: sidebar oscuro con gradiente, header glassmorphism,
 // fondo mesh-gradient, nav pills redondeados
 // ============================================================
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   makeStyles, shorthands, tokens, mergeClasses,
   Body1Strong, Caption1, Tooltip, Avatar, Button,
@@ -28,6 +28,7 @@ import { CENIT_COLORS } from '../../theme/cenitTheme';
 import { startTour, maybeAutoStartTour } from '../Tour/TourGuide';
 import GreenLogBlanco from '../../assets/GreenLog Blanco.png';
 import { useAuth } from '../../auth/AuthContext';
+import { getSectionFromPath, getSectionPath, normalizePath } from '../../utils/appRoutes';
 
 // ... (existing code)
 
@@ -367,21 +368,41 @@ interface AppShellProps {
 export const AppShell: React.FC<AppShellProps> = ({ onBack }) => {
   const styles = useStyles();
   const { currentUser, isAdmin, logout } = useAuth();
-  const [seccion, setSeccion] = useState<SeccionApp>('dashboard');
+  const [seccion, setSeccion] = useState<SeccionApp>(() => getSectionFromPath() ?? 'dashboard');
   const [collapsed, setCollapsed] = useState(true);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const onEnter = () => { if (timer.current) clearTimeout(timer.current); setCollapsed(false); };
   const onLeave = () => { timer.current = setTimeout(() => setCollapsed(true), COLLAPSE_DELAY); };
 
+  const navigateSection = useCallback((next: SeccionApp, replace = false) => {
+    setSeccion(next);
+    if (typeof window === 'undefined') return;
+
+    const nextPath = getSectionPath(next);
+    if (normalizePath(window.location.pathname) === normalizePath(nextPath)) return;
+    window.history[replace ? 'replaceState' : 'pushState'](null, '', nextPath);
+  }, []);
+
   // Disparar tour automático la PRIMERA vez que el usuario abre la app
   useEffect(() => {
-    maybeAutoStartTour(setSeccion);
-  }, []);
+    const sectionFromPath = getSectionFromPath();
+    if (!sectionFromPath) {
+      navigateSection('dashboard', true);
+    }
+
+    const onPopState = () => {
+      setSeccion(getSectionFromPath() ?? 'dashboard');
+    };
+
+    window.addEventListener('popstate', onPopState);
+    maybeAutoStartTour(navigateSection);
+    return () => window.removeEventListener('popstate', onPopState);
+  }, [navigateSection]);
 
   const renderContent = () => {
     switch (seccion) {
-      case 'dashboard': return <Dashboard onNavigate={setSeccion} />;
+      case 'dashboard': return <Dashboard onNavigate={navigateSection} />;
       case 'planeacion': return <PlaneacionModule />;
       case 'ejecucion': return <EjecucionModule />;
       case 'reportes': return <ReportesModule />;
@@ -450,7 +471,7 @@ export const AppShell: React.FC<AppShellProps> = ({ onBack }) => {
                 key={item.id}
                 id={`nav-${item.id}`}
                 className={mergeClasses(styles.navItem, active && styles.navItemActive)}
-                onClick={() => setSeccion(item.id)}
+                onClick={() => navigateSection(item.id)}
                 role="button"
                 tabIndex={0}
               >
@@ -507,7 +528,7 @@ export const AppShell: React.FC<AppShellProps> = ({ onBack }) => {
                 role="button"
                 tabIndex={0}
                 aria-label="Iniciar Tour"
-                onClick={() => startTour(setSeccion)}
+                onClick={() => startTour(navigateSection)}
                 style={{ backgroundColor: seccion === 'dashboard' ? 'rgba(255,255,255,0.5)' : undefined }}
               >
                 <QuestionCircleRegular />
