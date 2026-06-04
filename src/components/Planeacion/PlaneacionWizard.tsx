@@ -923,9 +923,20 @@ interface Props {
   onClose: () => void;
   onComplete: (result: PlaneacionWizardResult) => void;
   initialData?: PlaneacionInitialData | null;
+  canSelectLinea?: (linea: LineaOperativa) => boolean;
+  canSelectZona?: (linea: LineaOperativa, zona: string) => boolean;
+  allowCustomLineas?: boolean;
 }
 
-export const PlaneacionWizard: React.FC<Props> = ({ open, onClose, onComplete, initialData }) => {
+export const PlaneacionWizard: React.FC<Props> = ({
+  open,
+  onClose,
+  onComplete,
+  initialData,
+  canSelectLinea,
+  canSelectZona,
+  allowCustomLineas = true,
+}) => {
   const styles = useStyles();
 
   // ── State ──
@@ -1066,6 +1077,17 @@ export const PlaneacionWizard: React.FC<Props> = ({ open, onClose, onComplete, i
   const TOTAL_STEPS        = isCompensaciones ? 8 : 7;
 
   const STEPS = useMemo(() => getStepLabels(isMonitoreo, isCompensaciones), [isMonitoreo, isCompensaciones]);
+
+  const lineasPlaneacionVisibles = useMemo(
+    () => LINEAS_PLANEACION.filter(linea => !canSelectLinea || canSelectLinea(linea.value)),
+    [canSelectLinea],
+  );
+
+  const zonasDisponiblesPaso = useMemo(() => {
+    const zonasBase = isCompensaciones ? ZONAS_COMPENSACIONES : ZONAS;
+    if (!selectedLinea || !canSelectZona) return zonasBase;
+    return zonasBase.filter(zona => canSelectZona(selectedLinea.value, zona));
+  }, [canSelectZona, isCompensaciones, selectedLinea]);
 
   // ── Reset on open ──
   useEffect(() => {
@@ -1790,6 +1812,7 @@ export const PlaneacionWizard: React.FC<Props> = ({ open, onClose, onComplete, i
 
   // ── Crear línea custom ──
   const handleCreateLinea = useCallback(() => {
+    if (!allowCustomLineas) return;
     if (!newLineaNombre.trim()) return;
     const cfg: LineaPlaneacionConfig = {
       value: newLineaNombre.trim().toLowerCase().replace(/\s+/g, '_') as LineaOperativa,
@@ -1819,7 +1842,7 @@ export const PlaneacionWizard: React.FC<Props> = ({ open, onClose, onComplete, i
     setTempItemNombre('');
     setTempItemPrecio('');
     handleSelectLinea(cfg);
-  }, [newLineaNombre, newLineaDesc, newLineaCategoria, newLineaLugar, tempItems, handleSelectLinea]);
+  }, [allowCustomLineas, newLineaNombre, newLineaDesc, newLineaCategoria, newLineaLugar, tempItems, handleSelectLinea]);
 
   // ── Añadir ítem en Step 3 (cualquier línea) ──
   const handleAddItemStep3 = useCallback(() => {
@@ -1845,7 +1868,7 @@ export const PlaneacionWizard: React.FC<Props> = ({ open, onClose, onComplete, i
 
   // ── Grupo de líneas por categoría ──
   const lineasPorCategoria = useMemo(() => {
-    const all = [...LINEAS_PLANEACION, ...customLineas];
+    const all = [...lineasPlaneacionVisibles, ...(allowCustomLineas ? customLineas : [])];
     const map = new Map<string, LineaPlaneacionConfig[]>();
     for (const cat of CATEGORIAS_ORDEN) map.set(cat, []);
     for (const l of all) {
@@ -1853,7 +1876,7 @@ export const PlaneacionWizard: React.FC<Props> = ({ open, onClose, onComplete, i
       if (arr) arr.push(l);
     }
     return map;
-  }, [customLineas]);
+  }, [allowCustomLineas, customLineas, lineasPlaneacionVisibles]);
 
   if (!open) return null;
 
@@ -1936,7 +1959,7 @@ export const PlaneacionWizard: React.FC<Props> = ({ open, onClose, onComplete, i
                 ))}
 
                 {/* Nueva línea inline */}
-                {!creandoLinea ? (
+                {allowCustomLineas && (!creandoLinea ? (
                   <div className={styles.addLineaCard} onClick={() => setCreandoLinea(true)}>
                     <AddRegular /> Nueva línea operativa
                   </div>
@@ -2059,7 +2082,7 @@ export const PlaneacionWizard: React.FC<Props> = ({ open, onClose, onComplete, i
                       <Button appearance="subtle" onClick={() => { setCreandoLinea(false); setTempItems([]); setTempItemNombre(''); setTempItemPrecio(''); }}>Cancelar</Button>
                     </div>
                   </div>
-                )}
+                ))}
               </div>
             )}
 
@@ -2071,7 +2094,7 @@ export const PlaneacionWizard: React.FC<Props> = ({ open, onClose, onComplete, i
                   Zona geográfica para la planeación de {selectedLinea?.label}
                 </Caption1>
                 <div className={styles.selectionGrid}>
-                  {(isCompensaciones ? ZONAS_COMPENSACIONES : ZONAS).map(z => (
+                  {zonasDisponiblesPaso.map(z => (
                     <div
                       key={z}
                       className={mergeClasses(styles.selectionCard, selectedZona === z && styles.selectionCardActive)}

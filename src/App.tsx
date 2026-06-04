@@ -1,6 +1,8 @@
 import React from 'react';
 import { FluentProvider } from '@fluentui/react-components';
 import { cenitTheme } from './theme/cenitTheme';
+import { AuthProvider } from './auth/AuthContext';
+import { LoginGate } from './components/Auth/LoginGate';
 import { AppShell } from './components/Shell/AppShell';
 
 // App raíz - CENIT (GREENLOG) - Sistema de Control Ambiental
@@ -10,7 +12,11 @@ import { AppShell } from './components/Shell/AppShell';
 const App: React.FC = () => {
   return (
     <FluentProvider theme={cenitTheme}>
-      <AppShell />
+      <AuthProvider>
+        <LoginGate>
+          <AppShell />
+        </LoginGate>
+      </AuthProvider>
     </FluentProvider>
   );
 };

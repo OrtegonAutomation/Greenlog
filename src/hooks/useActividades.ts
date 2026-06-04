@@ -1,10 +1,11 @@
 // ============================================================
 // useActividades — Custom hook para gestión de estado de datos
 // ============================================================
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActividadAmbiental, NuevaActividadPayload } from '../types';
 import { ActividadesService as MockService } from '../generated/services/ActividadesService';
 import { SharePointService } from '../services/SharePointService';
+import { useAuth } from '../auth/AuthContext';
 
 // TOGGLE: Change to true to use real SharePoint data (requires Auth context or deployment)
 const USE_REAL_DATA = false;
@@ -27,6 +28,7 @@ export function useActividades(): UseActividadesReturn {
   const [errorCarga, setErrorCarga] = useState<string | null>(null);
   const [guardando, setGuardando] = useState(false);
   const [version, setVersion] = useState(0); // trigger de recarga
+  const { canViewActividad } = useAuth();
 
   const recargar = useCallback(() => setVersion((v) => v + 1), []);
 
@@ -97,5 +99,10 @@ export function useActividades(): UseActividadesReturn {
     }
   }, [recargar]);
 
-  return { actividades, cargando, errorCarga, guardando, recargar, crear, actualizar, eliminar };
+  const actividadesVisibles = useMemo(
+    () => actividades.filter(canViewActividad),
+    [actividades, canViewActividad],
+  );
+
+  return { actividades: actividadesVisibles, cargando, errorCarga, guardando, recargar, crear, actualizar, eliminar };
 }

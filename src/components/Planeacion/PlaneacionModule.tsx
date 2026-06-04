@@ -13,6 +13,7 @@ import { ActivityDetailPanel } from './ActivityDetailPanel';
 import { BulkUploadPanel, BulkUploadResult } from './BulkUploadPanel';
 import { PlaneacionWizard, PlaneacionWizardResult, PlaneacionInitialData } from './PlaneacionWizard';
 import { exportOpexToExcel, exportDetalleInternoToExcel } from '../../utils/exportOpex';
+import { useAuth } from '../../auth/AuthContext';
 
 const useStyles = makeStyles({
   root: {
@@ -58,6 +59,8 @@ export const PlaneacionModule: React.FC = () => {
   const styles = useStyles();
 
   const { actividades, cargando, errorCarga, guardando, recargar, crear, actualizar, eliminar } = useActividades();
+  const { currentUser, isAdmin, canPlan, canReview, canEditActividad } = useAuth();
+  const canPlanAny = canPlan();
 
   // Panel states
   const [drawerAbierto, setDrawerAbierto]       = useState(false);
@@ -86,6 +89,14 @@ export const PlaneacionModule: React.FC = () => {
   // ── Handlers ──────────────────────────────────────────────
   const handleGuardar = useCallback(async (payload: NuevaActividadPayload) => {
     setErrorGuardar(null);
+    if (actividadEditar && !canEditActividad(actividadEditar)) {
+      setErrorGuardar('No tienes permisos para editar esta actividad.');
+      return;
+    }
+    if (!actividadEditar && !canPlan(payload.lineaOperativa, payload.zona)) {
+      setErrorGuardar('No tienes permisos para crear planeaciones en esta línea y zona.');
+      return;
+    }
     try {
       if (actividadEditar) {
         await actualizar(actividadEditar.id, payload);
@@ -100,7 +111,7 @@ export const PlaneacionModule: React.FC = () => {
     } catch (err) {
       setErrorGuardar(err instanceof Error ? err.message : 'Error inesperado al guardar.');
     }
-  }, [crear, actualizar, actividadEditar]);
+  }, [crear, actualizar, actividadEditar, canEditActividad, canPlan]);
 
   const handleItemClick = useCallback((item: ActividadAmbiental) => {
     setDetalleItem(item);
@@ -112,6 +123,10 @@ export const PlaneacionModule: React.FC = () => {
   }, []);
 
   const handleDetailEdit = useCallback((actividad: ActividadAmbiental) => {
+    if (!canEditActividad(actividad)) {
+      setErrorGuardar('No tienes permisos para editar esta actividad.');
+      return;
+    }
     setDetalleAbierto(false);
     setActividadEditar(actividad);
     setErrorGuardar(null);
@@ -163,9 +178,13 @@ export const PlaneacionModule: React.FC = () => {
       setPlaneacionInitial(null);
       setDrawerAbierto(true);
     }
-  }, []);
+  }, [canEditActividad]);
 
   const handleDetailDelete = useCallback(async (id: string) => {
+    if (!isAdmin) {
+      setErrorGuardar('Solo un administrador puede eliminar actividades.');
+      return;
+    }
     try {
       if(eliminar) await eliminar(id);
       setDetalleAbierto(false);
@@ -174,9 +193,34 @@ export const PlaneacionModule: React.FC = () => {
     } catch (err) {
       setErrorGuardar(err instanceof Error ? err.message : 'Error al eliminar.');
     }
-  }, [eliminar]);
+  }, [eliminar, isAdmin]);
+
+  const handleReview = useCallback(async (actividad: ActividadAmbiental, estadoAprobacion: 'Aprobado' | 'Rechazado') => {
+    if (!currentUser || !canReview(actividad.lineaOperativa, actividad.zona)) {
+      setErrorGuardar('No tienes permisos para revisar esta actividad.');
+      return;
+    }
+
+    const cambios: Partial<NuevaActividadPayload> = {
+      estadoAprobacion,
+      aprobadoPor: currentUser.nombre,
+      fechaAprobacion: new Date().toISOString(),
+    };
+
+    try {
+      const actualizada = await actualizar(actividad.id, cambios);
+      setDetalleItem(actualizada);
+      setToastMsg(estadoAprobacion === 'Aprobado' ? 'Actividad aprobada.' : 'Actividad rechazada.');
+      setToastOk(true);
+    } catch (err) {
+      setErrorGuardar(err instanceof Error ? err.message : 'Error al actualizar la revisión.');
+    }
+  }, [actualizar, canReview, currentUser]);
 
   const handleBulkUpload = useCallback(async (payloads: NuevaActividadPayload[]): Promise<BulkUploadResult> => {
+    if (!isAdmin) {
+      throw new Error('Solo un administrador puede ejecutar cargas masivas.');
+    }
     setErrorGuardar(null);
     let createdCount = 0;
     const errors: string[] = [];
@@ -204,10 +248,18 @@ export const PlaneacionModule: React.FC = () => {
     );
     setToastOk(true);
     return { createdCount, failedCount, errors };
-  }, [crear]);
+  }, [crear, isAdmin]);
 
   const handleWizardComplete = useCallback(async (result: PlaneacionWizardResult) => {
     setWizardAbierto(false);
+    if (actividadEditar && !canEditActividad(actividadEditar)) {
+      setErrorGuardar('No tienes permisos para editar esta actividad.');
+      return;
+    }
+    if (!actividadEditar && !canPlan(result.lineaOperativa, result.zona)) {
+      setErrorGuardar('No tienes permisos para crear planeaciones en esta línea y zona.');
+      return;
+    }
     const datosAuxiliares = result.datosAuxiliaresPresupuestales;
     const mesesProg = result.programacion.filter(m => m.total > 0).map(m => m.mes);
     const isMonitoreo = result.parametrosSeleccionados.length > 0;
@@ -312,7 +364,7 @@ export const PlaneacionModule: React.FC = () => {
     } catch (err) {
       setErrorGuardar(err instanceof Error ? err.message : 'Error al guardar la planeación.');
     }
-  }, [crear, actualizar, actividadEditar]);
+  }, [crear, actualizar, actividadEditar, canEditActividad, canPlan]);
 
   return (
     <div className={styles.root}>
@@ -337,6 +389,7 @@ export const PlaneacionModule: React.FC = () => {
                 fontWeight: 600,
               }}
               id="planeacion-export-financiera"
+              disabled={actividades.length === 0}
               onClick={() => exportOpexToExcel(actividades)}
             >
               Exportar Matriz Financiera
@@ -353,43 +406,48 @@ export const PlaneacionModule: React.FC = () => {
                 border: '1px solid rgba(0,0,0,0.1)',
               }}
               id="planeacion-export-detalle"
+              disabled={actividades.length === 0}
               onClick={() => exportDetalleInternoToExcel(actividades)}
             >
               Detalle Interno
             </Button>
           </Tooltip>
 
-          <Tooltip content="Cargar actividades desde un archivo Excel" relationship="label">
+          {isAdmin && (
+            <Tooltip content="Cargar actividades desde un archivo Excel" relationship="label">
+              <Button
+                appearance="secondary"
+                icon={<ArrowUploadRegular />}
+                size="large"
+                style={{
+                  borderRadius: '12px',
+                  border: '1px solid rgba(0,0,0,0.1)',
+                }}
+                id="planeacion-bulk-btn"
+                onClick={() => setBulkAbierto(true)}
+              >
+                Carga Masiva
+              </Button>
+            </Tooltip>
+          )}
+
+          {canPlanAny && (
             <Button
-              appearance="secondary"
-              icon={<ArrowUploadRegular />}
+              appearance="primary"
+              icon={<AddRegular />}
               size="large"
               style={{
+                background: '#00B050',
                 borderRadius: '12px',
-                border: '1px solid rgba(0,0,0,0.1)',
+                fontWeight: 600,
+                boxShadow: '0 4px 10px rgba(0, 176, 80, 0.4)'
               }}
-              id="planeacion-bulk-btn"
-              onClick={() => setBulkAbierto(true)}
+              id="planeacion-new-btn"
+              onClick={() => setWizardAbierto(true)}
             >
-              Carga Masiva
+              Nueva planeación
             </Button>
-          </Tooltip>
-
-          <Button
-            appearance="primary"
-            icon={<AddRegular />}
-            size="large"
-            style={{
-              background: '#00B050',
-              borderRadius: '12px',
-              fontWeight: 600,
-              boxShadow: '0 4px 10px rgba(0, 176, 80, 0.4)'
-            }}
-            id="planeacion-new-btn"
-            onClick={() => setWizardAbierto(true)}
-          >
-            Nueva planeación
-          </Button>
+          )}
 
 
         </div>
@@ -419,12 +477,21 @@ export const PlaneacionModule: React.FC = () => {
         </MessageBar>
       )}
 
+      {errorGuardar && (
+        <MessageBar intent="error">
+          <MessageBarBody>
+            <MessageBarTitle>Acción no disponible</MessageBarTitle>
+            {errorGuardar}
+          </MessageBarBody>
+        </MessageBar>
+      )}
+
       {/* Tabla */}
       <div id="planeacion-table">
         <ActivityTable
           actividades={actividades}
           cargando={cargando}
-          onNueva={() => setWizardAbierto(true)}
+          onNueva={canPlanAny ? () => setWizardAbierto(true) : undefined}
           onItemClick={handleItemClick}
         />
       </div>
@@ -445,7 +512,12 @@ export const PlaneacionModule: React.FC = () => {
         open={detalleAbierto}
         onClose={handleDetailClose}
         onEdit={handleDetailEdit}
-        onDelete={handleDetailDelete}
+        onDelete={isAdmin ? handleDetailDelete : undefined}
+        canEdit={!!detalleItem && canEditActividad(detalleItem)}
+        canDelete={isAdmin}
+        canReview={!!detalleItem && detalleItem.estadoAprobacion === 'Pendiente' && canReview(detalleItem.lineaOperativa, detalleItem.zona)}
+        onApprove={(actividad) => handleReview(actividad, 'Aprobado')}
+        onReject={(actividad) => handleReview(actividad, 'Rechazado')}
       />
 
       {/* Dialog de carga masiva */}
@@ -462,6 +534,9 @@ export const PlaneacionModule: React.FC = () => {
         onClose={() => { setWizardAbierto(false); setPlaneacionInitial(null); setActividadEditar(null); }}
         onComplete={handleWizardComplete}
         initialData={planeacionInitial}
+        canSelectLinea={(linea) => canPlan(linea)}
+        canSelectZona={(linea, zona) => canPlan(linea, zona)}
+        allowCustomLineas={isAdmin}
       />
     </div>
   );

@@ -1,0 +1,227 @@
+import React, { useState } from 'react';
+import {
+  makeStyles,
+  shorthands,
+  tokens,
+  Button,
+  Input,
+  MessageBar,
+  MessageBarBody,
+  MessageBarTitle,
+  Title1,
+  Body1,
+  Caption1,
+} from '@fluentui/react-components';
+import { MailRegular, LockClosedRegular } from '@fluentui/react-icons';
+import { useAuth } from '../../auth/AuthContext';
+import { CENIT_COLORS } from '../../theme/cenitTheme';
+import GreenLogBlanco from '../../assets/GreenLog Blanco.png';
+
+const useStyles = makeStyles({
+  root: {
+    minHeight: '100vh',
+    display: 'grid',
+    placeItems: 'center',
+    ...shorthands.padding('32px'),
+    background: `
+      radial-gradient(circle at 18% 18%, rgba(140,198,63,0.22) 0, transparent 28%),
+      radial-gradient(circle at 78% 18%, rgba(0,86,210,0.25) 0, transparent 30%),
+      linear-gradient(135deg, #001a5c 0%, #003057 52%, #0b3b2f 100%)
+    `,
+    color: '#fff',
+  },
+  card: {
+    width: 'min(960px, 100%)',
+    display: 'grid',
+    gridTemplateColumns: '1.1fr 0.9fr',
+    overflow: 'hidden',
+    borderRadius: '28px',
+    background: 'rgba(255,255,255,0.12)',
+    backdropFilter: 'blur(24px)',
+    ...shorthands.border('1px', 'solid', 'rgba(255,255,255,0.22)'),
+    boxShadow: '0 24px 80px rgba(0,0,0,0.32)',
+    '@media (max-width: 820px)': {
+      gridTemplateColumns: '1fr',
+    },
+  },
+  brandPanel: {
+    position: 'relative',
+    minHeight: '460px',
+    display: 'flex',
+    flexDirection: 'column',
+    justifyContent: 'space-between',
+    ...shorthands.padding('42px'),
+    background: `linear-gradient(145deg, rgba(0,48,87,0.95) 0%, rgba(0,51,160,0.74) 100%),
+      url('https://cenit-transporte.com/wp-content/uploads/2025/10/geodesicos1.jpg') center/cover`,
+  },
+  logoRow: {
+    display: 'flex',
+    alignItems: 'center',
+    ...shorthands.gap('18px'),
+    flexWrap: 'wrap',
+  },
+  cenitLogo: {
+    height: '46px',
+    objectFit: 'contain',
+  },
+  greenlogLogo: {
+    width: '66px',
+    height: '66px',
+    objectFit: 'contain',
+    filter: 'drop-shadow(0 10px 24px rgba(0,0,0,0.24))',
+  },
+  brandCopy: {
+    maxWidth: '520px',
+    display: 'flex',
+    flexDirection: 'column',
+    ...shorthands.gap('16px'),
+  },
+  eyebrow: {
+    width: 'fit-content',
+    ...shorthands.padding('6px', '12px'),
+    borderRadius: '999px',
+    background: 'rgba(140,198,63,0.2)',
+    ...shorthands.border('1px', 'solid', 'rgba(140,198,63,0.42)'),
+    color: '#d9f99d',
+    fontSize: '12px',
+    fontWeight: 800,
+    letterSpacing: '0.08em',
+    textTransform: 'uppercase',
+  },
+  title: {
+    fontSize: '44px',
+    lineHeight: 1,
+    fontWeight: 900,
+    letterSpacing: '-0.04em',
+    color: '#fff',
+  },
+  subtitle: {
+    maxWidth: '460px',
+    color: 'rgba(255,255,255,0.84)',
+    fontSize: '16px',
+    lineHeight: 1.6,
+  },
+  formPanel: {
+    display: 'flex',
+    flexDirection: 'column',
+    justifyContent: 'center',
+    ...shorthands.gap('18px'),
+    ...shorthands.padding('42px'),
+    background: 'rgba(255,255,255,0.94)',
+    color: tokens.colorNeutralForeground1,
+  },
+  formHeader: {
+    display: 'flex',
+    flexDirection: 'column',
+    ...shorthands.gap('8px'),
+    marginBottom: '10px',
+  },
+  lockBadge: {
+    width: '44px',
+    height: '44px',
+    display: 'grid',
+    placeItems: 'center',
+    borderRadius: '14px',
+    background: 'rgba(0,48,87,0.08)',
+    color: CENIT_COLORS.blueBrand,
+  },
+  form: {
+    display: 'flex',
+    flexDirection: 'column',
+    ...shorthands.gap('12px'),
+  },
+  helper: {
+    color: tokens.colorNeutralForeground3,
+    lineHeight: 1.5,
+  },
+});
+
+interface LoginGateProps {
+  children: React.ReactNode;
+}
+
+export const LoginGate: React.FC<LoginGateProps> = ({ children }) => {
+  const styles = useStyles();
+  const { currentUser, login } = useAuth();
+  const [email, setEmail] = useState('');
+  const [error, setError] = useState('');
+
+  if (currentUser) return <>{children}</>;
+
+  const handleSubmit = (event: React.FormEvent) => {
+    event.preventDefault();
+    const result = login(email);
+    if (!result.ok) setError(result.message ?? 'No fue posible iniciar sesión.');
+  };
+
+  return (
+    <div className={styles.root}>
+      <div className={styles.card}>
+        <section className={styles.brandPanel}>
+          <div className={styles.logoRow}>
+            <img
+              src="https://cenit-transporte.com/wp-content/uploads/2025/10/cobranding-en-blanco.png"
+              alt="CENIT Grupo Ecopetrol"
+              className={styles.cenitLogo}
+            />
+            <img src={GreenLogBlanco} alt="GreenLog" className={styles.greenlogLogo} />
+          </div>
+          <div className={styles.brandCopy}>
+            <span className={styles.eyebrow}>Acceso temporal</span>
+            <Title1 className={styles.title}>GreenLog Ambiental</Title1>
+            <Body1 className={styles.subtitle}>
+              Ingresa con el correo registrado en la matriz del equipo ambiental CENIT. Esta barrera temporal se reemplazará por Entra ID.
+            </Body1>
+          </div>
+        </section>
+
+        <section className={styles.formPanel}>
+          <div className={styles.lockBadge}>
+            <LockClosedRegular fontSize={24} />
+          </div>
+          <div className={styles.formHeader}>
+            <Title1 style={{ color: CENIT_COLORS.blueBrand, fontSize: '30px', lineHeight: 1.1 }}>
+              Validar acceso
+            </Title1>
+            <Caption1 className={styles.helper}>
+              Solo los correos autorizados pueden consultar, planear o revisar actividades ambientales.
+            </Caption1>
+          </div>
+
+          {error && (
+            <MessageBar intent="error">
+              <MessageBarBody>
+                <MessageBarTitle>Acceso no habilitado</MessageBarTitle>
+                {error}
+              </MessageBarBody>
+            </MessageBar>
+          )}
+
+          <form className={styles.form} onSubmit={handleSubmit}>
+            <Input
+              type="email"
+              required
+              size="large"
+              value={email}
+              onChange={(_, data) => {
+                setEmail(data.value);
+                setError('');
+              }}
+              contentBefore={<MailRegular />}
+              placeholder="correo@cenit-transporte.com"
+            />
+            <Button
+              appearance="primary"
+              size="large"
+              type="submit"
+              disabled={!email.trim()}
+              style={{ background: CENIT_COLORS.green, color: '#003057', fontWeight: 800 }}
+            >
+              Entrar a GreenLog
+            </Button>
+          </form>
+        </section>
+      </div>
+    </div>
+  );
+};

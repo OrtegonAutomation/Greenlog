@@ -6,7 +6,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
   makeStyles, shorthands, tokens, mergeClasses,
-  Body1Strong, Caption1, Tooltip, Avatar,
+  Body1Strong, Caption1, Tooltip, Avatar, Button,
 } from '@fluentui/react-components';
 import {
   GridRegular,
@@ -27,6 +27,7 @@ import { ReportesModule } from '../Reportes/ReportesModule';
 import { CENIT_COLORS } from '../../theme/cenitTheme';
 import { startTour, maybeAutoStartTour } from '../Tour/TourGuide';
 import GreenLogBlanco from '../../assets/GreenLog Blanco.png';
+import { useAuth } from '../../auth/AuthContext';
 
 // ... (existing code)
 
@@ -365,6 +366,7 @@ interface AppShellProps {
 
 export const AppShell: React.FC<AppShellProps> = ({ onBack }) => {
   const styles = useStyles();
+  const { currentUser, isAdmin, logout } = useAuth();
   const [seccion, setSeccion] = useState<SeccionApp>('dashboard');
   const [collapsed, setCollapsed] = useState(true);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -522,8 +524,20 @@ export const AppShell: React.FC<AppShellProps> = ({ onBack }) => {
                 <AlertRegular />
               </div>
             </Tooltip>
-            {/* Avatar sin label para ser más minimalista */}
-            <Avatar name="Camilo Ortegón" color="colorful" size={32} />
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <Avatar name={currentUser?.nombre ?? 'Usuario GreenLog'} color="colorful" size={32} />
+              <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.15 }}>
+                <span style={{ fontSize: '12px', fontWeight: 700, color: tokens.colorNeutralForeground1 }}>
+                  {currentUser?.nombre ?? 'Usuario'}
+                </span>
+                <span style={{ fontSize: '10px', color: tokens.colorNeutralForeground3 }}>
+                  {isAdmin ? 'Admin' : currentUser?.zonaBase ?? 'Ambiental'}
+                </span>
+              </div>
+              <Button appearance="subtle" size="small" onClick={logout}>
+                Salir
+              </Button>
+            </div>
           </div>
         </header>
         <div className={styles.content}>{renderContent()}</div>

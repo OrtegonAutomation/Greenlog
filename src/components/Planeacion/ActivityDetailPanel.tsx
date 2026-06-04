@@ -260,11 +260,25 @@ interface ActivityDetailPanelProps {
   onClose: () => void;
   onEdit?: (actividad: ActividadAmbiental) => void;
   onDelete?: (id: string) => void;
+  canEdit?: boolean;
+  canDelete?: boolean;
+  canReview?: boolean;
+  onApprove?: (actividad: ActividadAmbiental) => void;
+  onReject?: (actividad: ActividadAmbiental) => void;
 }
 
 // ── Componente ────────────────────────────────────────────────
 export const ActivityDetailPanel: React.FC<ActivityDetailPanelProps> = ({
-  actividad, open, onClose, onEdit, onDelete,
+  actividad,
+  open,
+  onClose,
+  onEdit,
+  onDelete,
+  canEdit = true,
+  canDelete = !!onDelete,
+  canReview = false,
+  onApprove,
+  onReject,
 }) => {
   const styles = useStyles();
 
@@ -587,29 +601,47 @@ export const ActivityDetailPanel: React.FC<ActivityDetailPanelProps> = ({
 
         {/* ══ FOOTER ═══════════════════════════════════════════ */}
         <div className={styles.footer}>
-          <Button
-            appearance="subtle"
-            icon={<DeleteRegular />}
-            style={{ color: CENIT_COLORS.red }}
-            onClick={() => onDelete?.(actividad.id)}
-          >
-            Eliminar
-          </Button>
+          {canDelete ? (
+            <Button
+              appearance="subtle"
+              icon={<DeleteRegular />}
+              style={{ color: CENIT_COLORS.red }}
+              onClick={() => onDelete?.(actividad.id)}
+            >
+              Eliminar
+            </Button>
+          ) : <span />}
           <div style={{ display: 'flex', gap: '8px' }}>
             <Button appearance="secondary" onClick={onClose}>Cerrar</Button>
-            <Button
-              appearance="primary"
-              icon={<EditRegular />}
-              style={{
-                background: 'linear-gradient(135deg, #0033A0 0%, #0056D2 100%)',
-                border: 'none',
-                boxShadow: '0 4px 12px rgba(0,51,160,0.3)',
-                borderRadius: '10px',
-              }}
-              onClick={() => onEdit?.(actividad)}
-            >
-              Editar
-            </Button>
+            {canReview && (
+              <>
+                <Button appearance="secondary" onClick={() => onReject?.(actividad)}>
+                  Rechazar
+                </Button>
+                <Button
+                  appearance="primary"
+                  style={{ background: CENIT_COLORS.green, color: '#003057', borderRadius: '10px', fontWeight: 700 }}
+                  onClick={() => onApprove?.(actividad)}
+                >
+                  Aprobar
+                </Button>
+              </>
+            )}
+            {canEdit && (
+              <Button
+                appearance="primary"
+                icon={<EditRegular />}
+                style={{
+                  background: 'linear-gradient(135deg, #0033A0 0%, #0056D2 100%)',
+                  border: 'none',
+                  boxShadow: '0 4px 12px rgba(0,51,160,0.3)',
+                  borderRadius: '10px',
+                }}
+                onClick={() => onEdit?.(actividad)}
+              >
+                Editar
+              </Button>
+            )}
           </div>
         </div>
 

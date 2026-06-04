@@ -139,7 +139,7 @@ const line2: React.CSSProperties = {
 interface ActivityTableProps {
   actividades: ActividadAmbiental[];
   cargando: boolean;
-  onNueva: () => void;
+  onNueva?: () => void;
   onItemClick?: (item: ActividadAmbiental) => void;
 }
 
@@ -257,8 +257,8 @@ export const ActivityTable: React.FC<ActivityTableProps> = ({ actividades, carga
                 ? 'No hay actividades que coincidan con los filtros aplicados.'
                 : 'Aún no hay actividades registradas en el módulo de planeación.'
             }
-            actionLabel={!search && filtroEstado === 'Todos' ? 'Nueva planeación' : undefined}
-            onAction={!search && filtroEstado === 'Todos' ? onNueva : undefined}
+            actionLabel={!search && filtroEstado === 'Todos' && onNueva ? 'Nueva planeación' : undefined}
+            onAction={!search && filtroEstado === 'Todos' && onNueva ? onNueva : undefined}
           />
         ) : (
           <table style={{ width: '100%', tableLayout: 'fixed', borderCollapse: 'collapse' }}>

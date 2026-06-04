@@ -182,7 +182,7 @@ export const ReportesModule: React.FC = () => {
     const stats = useMemo(() => {
         const total = actividades.length;
         const closed = actividades.filter(a => a.estado === 'Cerrada').length;
-        const pending = actividades.filter(a => a.estado === 'Pendiente Aprobación').length;
+        const pending = actividades.filter(a => a.estadoAprobacion === 'Pendiente').length;
         const execution = actividades.filter(a => a.estado === 'En Ejecución').length;
         const planned = actividades.filter(a => a.estado === 'Planeada').length;
 
