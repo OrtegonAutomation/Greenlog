@@ -14,6 +14,7 @@ import { BulkUploadPanel, BulkUploadResult } from './BulkUploadPanel';
 import { PlaneacionWizard, PlaneacionWizardResult, PlaneacionInitialData } from './PlaneacionWizard';
 import { exportOpexToExcel, exportDetalleInternoToExcel } from '../../utils/exportOpex';
 import { useAuth } from '../../auth/AuthContext';
+import { RevisionNotificationService } from '../../services/RevisionNotificationService';
 
 const useStyles = makeStyles({
   root: {
@@ -76,6 +77,7 @@ export const PlaneacionModule: React.FC = () => {
 
   // Notifications
   const [errorGuardar, setErrorGuardar] = useState<string | null>(null);
+  const [notificationWarning, setNotificationWarning] = useState<string | null>(null);
   const [toastOk, setToastOk]           = useState(false);
   const [toastMsg, setToastMsg]         = useState('La nueva actividad fue guardada exitosamente.');
 
@@ -86,9 +88,62 @@ export const PlaneacionModule: React.FC = () => {
     return () => clearTimeout(t);
   }, [toastOk]);
 
+  const withSolicitante = useCallback((payload: NuevaActividadPayload, base?: ActividadAmbiental | null): NuevaActividadPayload => {
+    const solicitanteNombre = base?.solicitanteNombre || payload.solicitanteNombre || currentUser?.nombre || '';
+    const solicitanteEmail = base?.solicitanteEmail || payload.solicitanteEmail || currentUser?.email || '';
+    let opexDataRaw = payload.opexDataRaw;
+
+    if (opexDataRaw) {
+      try {
+        opexDataRaw = JSON.stringify({
+          ...JSON.parse(opexDataRaw),
+          solicitanteNombre,
+          solicitanteEmail,
+        });
+      } catch {
+        // Mantener el raw original si viene corrupto; el guardado principal no debe fallar por metadata auxiliar.
+      }
+    }
+
+    return {
+      ...payload,
+      solicitanteNombre,
+      solicitanteEmail,
+      opexDataRaw,
+    };
+  }, [currentUser]);
+
+  const handleNotificationResult = useCallback((result: { ok: boolean; message?: string }, fallback: string) => {
+    if (result.ok) return;
+    setNotificationWarning(result.message ? `${fallback}: ${result.message}` : fallback);
+  }, []);
+
+  const sendRevisionRequested = useCallback((actividad: ActividadAmbiental, action: 'created' | 'updated' | 'resent') => {
+    if (!currentUser || actividad.estadoAprobacion !== 'Pendiente') return;
+    void RevisionNotificationService
+      .notifyRevisionRequested(actividad, currentUser, action)
+      .then(result => handleNotificationResult(result, 'La actividad se guardó, pero no se pudo enviar la solicitud de revisión'))
+      .catch(error => {
+        const message = error instanceof Error ? error.message : 'Error inesperado.';
+        setNotificationWarning(`La actividad se guardó, pero no se pudo enviar la solicitud de revisión: ${message}`);
+      });
+  }, [currentUser, handleNotificationResult]);
+
+  const sendRevisionResolved = useCallback((actividad: ActividadAmbiental, estadoAprobacion: 'Aprobado' | 'Rechazado') => {
+    if (!currentUser) return;
+    void RevisionNotificationService
+      .notifyRevisionResolved(actividad, currentUser, estadoAprobacion)
+      .then(result => handleNotificationResult(result, 'La revisión se registró, pero no se pudo enviar la notificación al solicitante'))
+      .catch(error => {
+        const message = error instanceof Error ? error.message : 'Error inesperado.';
+        setNotificationWarning(`La revisión se registró, pero no se pudo enviar la notificación al solicitante: ${message}`);
+      });
+  }, [currentUser, handleNotificationResult]);
+
   // ── Handlers ──────────────────────────────────────────────
   const handleGuardar = useCallback(async (payload: NuevaActividadPayload) => {
     setErrorGuardar(null);
+    setNotificationWarning(null);
     if (actividadEditar && !canEditActividad(actividadEditar)) {
       setErrorGuardar('No tienes permisos para editar esta actividad.');
       return;
@@ -98,12 +153,15 @@ export const PlaneacionModule: React.FC = () => {
       return;
     }
     try {
+      const payloadConSolicitante = withSolicitante(payload, actividadEditar);
       if (actividadEditar) {
-        await actualizar(actividadEditar.id, payload);
+        const actualizada = await actualizar(actividadEditar.id, payloadConSolicitante);
         setToastMsg('La actividad fue actualizada exitosamente.');
+        sendRevisionRequested(actualizada, 'updated');
       } else {
-        await crear(payload);
+        const nueva = await crear(payloadConSolicitante);
         setToastMsg('La nueva actividad fue guardada exitosamente.');
+        sendRevisionRequested(nueva, 'created');
       }
       setDrawerAbierto(false);
       setActividadEditar(null);
@@ -111,7 +169,7 @@ export const PlaneacionModule: React.FC = () => {
     } catch (err) {
       setErrorGuardar(err instanceof Error ? err.message : 'Error inesperado al guardar.');
     }
-  }, [crear, actualizar, actividadEditar, canEditActividad, canPlan]);
+  }, [crear, actualizar, actividadEditar, canEditActividad, canPlan, sendRevisionRequested, withSolicitante]);
 
   const handleItemClick = useCallback((item: ActividadAmbiental) => {
     setDetalleItem(item);
@@ -212,10 +270,23 @@ export const PlaneacionModule: React.FC = () => {
       setDetalleItem(actualizada);
       setToastMsg(estadoAprobacion === 'Aprobado' ? 'Actividad aprobada.' : 'Actividad rechazada.');
       setToastOk(true);
+      sendRevisionResolved(actualizada, estadoAprobacion);
     } catch (err) {
       setErrorGuardar(err instanceof Error ? err.message : 'Error al actualizar la revisión.');
     }
-  }, [actualizar, canReview, currentUser]);
+  }, [actualizar, canReview, currentUser, sendRevisionResolved]);
+
+  const handleResendReviewRequest = useCallback((actividad: ActividadAmbiental) => {
+    if (!currentUser || actividad.estadoAprobacion !== 'Pendiente' || !canEditActividad(actividad)) {
+      setErrorGuardar('No tienes permisos para reenviar esta solicitud de revisión.');
+      return;
+    }
+
+    setNotificationWarning(null);
+    sendRevisionRequested(actividad, 'resent');
+    setToastMsg('Solicitud de revisión reenviada.');
+    setToastOk(true);
+  }, [canEditActividad, currentUser, sendRevisionRequested]);
 
   const handleBulkUpload = useCallback(async (payloads: NuevaActividadPayload[]): Promise<BulkUploadResult> => {
     if (!isAdmin) {
@@ -252,6 +323,7 @@ export const PlaneacionModule: React.FC = () => {
 
   const handleWizardComplete = useCallback(async (result: PlaneacionWizardResult) => {
     setWizardAbierto(false);
+    setNotificationWarning(null);
     if (actividadEditar && !canEditActividad(actividadEditar)) {
       setErrorGuardar('No tienes permisos para editar esta actividad.');
       return;
@@ -261,6 +333,8 @@ export const PlaneacionModule: React.FC = () => {
       return;
     }
     const datosAuxiliares = result.datosAuxiliaresPresupuestales;
+    const solicitanteNombre = actividadEditar?.solicitanteNombre || currentUser?.nombre || '';
+    const solicitanteEmail = actividadEditar?.solicitanteEmail || currentUser?.email || '';
     const mesesProg = result.programacion.filter(m => m.total > 0).map(m => m.mes);
     const isMonitoreo = result.parametrosSeleccionados.length > 0;
 
@@ -293,6 +367,8 @@ export const PlaneacionModule: React.FC = () => {
       ivaGlobalPorcentaje: result.ivaGlobalPorcentaje,
       ivaMeses: result.ivaMeses,
       servicioEComplejidad: result.servicioEComplejidad,
+      solicitanteNombre,
+      solicitanteEmail,
       // Compensaciones fields
       sistema: result.sistema,
       sector: result.sector,
@@ -334,6 +410,8 @@ export const PlaneacionModule: React.FC = () => {
       contrato: datosAuxiliares.contrato,
       porcentajeAvance: 0,
       estadoAprobacion: 'Pendiente',
+      solicitanteNombre,
+      solicitanteEmail,
       presupuestoPlan: result.valorTotal,
       presupuestoEjecutado: 0,
       novedades: `Proveedor: ${datosAuxiliares.proveedor} | Obj: ${datosAuxiliares.objeto}`,
@@ -341,10 +419,11 @@ export const PlaneacionModule: React.FC = () => {
     };
 
     try {
+      const payloadConSolicitante = withSolicitante(payload, actividadEditar);
       if (actividadEditar) {
         // Modo edición: conservar campos que el wizard no toca
         const cambios: Partial<NuevaActividadPayload> = {
-          ...payload,
+          ...payloadConSolicitante,
           estado:            actividadEditar.estado,
           porcentajeAvance:  actividadEditar.porcentajeAvance,
           estadoAprobacion:  actividadEditar.estadoAprobacion,
@@ -352,19 +431,21 @@ export const PlaneacionModule: React.FC = () => {
           matricesAplicables:   actividadEditar.matricesAplicables,
           cumplimientoNormativo: actividadEditar.cumplimientoNormativo,
         };
-        await actualizar(actividadEditar.id, cambios);
+        const actualizada = await actualizar(actividadEditar.id, cambios);
         setToastMsg('La actividad fue actualizada exitosamente.');
         setActividadEditar(null);
         setPlaneacionInitial(null);
+        sendRevisionRequested(actualizada, 'updated');
       } else {
-        await crear(payload);
+        const nueva = await crear(payloadConSolicitante);
         setToastMsg('La planeación fue preparada y enviada correctamente.');
+        sendRevisionRequested(nueva, 'created');
       }
       setToastOk(true);
     } catch (err) {
       setErrorGuardar(err instanceof Error ? err.message : 'Error al guardar la planeación.');
     }
-  }, [crear, actualizar, actividadEditar, canEditActividad, canPlan]);
+  }, [crear, actualizar, actividadEditar, canEditActividad, canPlan, currentUser, sendRevisionRequested, withSolicitante]);
 
   return (
     <div className={styles.root}>
@@ -486,6 +567,15 @@ export const PlaneacionModule: React.FC = () => {
         </MessageBar>
       )}
 
+      {notificationWarning && (
+        <MessageBar intent="warning">
+          <MessageBarBody>
+            <MessageBarTitle>Notificación pendiente</MessageBarTitle>
+            {notificationWarning}
+          </MessageBarBody>
+        </MessageBar>
+      )}
+
       {/* Tabla */}
       <div id="planeacion-table">
         <ActivityTable
@@ -518,6 +608,8 @@ export const PlaneacionModule: React.FC = () => {
         canReview={!!detalleItem && detalleItem.estadoAprobacion === 'Pendiente' && canReview(detalleItem.lineaOperativa, detalleItem.zona)}
         onApprove={(actividad) => handleReview(actividad, 'Aprobado')}
         onReject={(actividad) => handleReview(actividad, 'Rechazado')}
+        canResendReviewRequest={!!detalleItem && detalleItem.estadoAprobacion === 'Pendiente' && canEditActividad(detalleItem)}
+        onResendReviewRequest={handleResendReviewRequest}
       />
 
       {/* Dialog de carga masiva */}

@@ -83,6 +83,8 @@ export interface ActividadAmbiental {
   estadoAprobacion: EstadoAprobacion;
   aprobadoPor?: string;
   fechaAprobacion?: string;
+  solicitanteNombre?: string;
+  solicitanteEmail?: string;
   // Presupuesto
   presupuestoPlan?: number;
   presupuestoEjecutado?: number;

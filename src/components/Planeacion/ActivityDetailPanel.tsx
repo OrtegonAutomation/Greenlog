@@ -265,6 +265,8 @@ interface ActivityDetailPanelProps {
   canReview?: boolean;
   onApprove?: (actividad: ActividadAmbiental) => void;
   onReject?: (actividad: ActividadAmbiental) => void;
+  canResendReviewRequest?: boolean;
+  onResendReviewRequest?: (actividad: ActividadAmbiental) => void;
 }
 
 // ── Componente ────────────────────────────────────────────────
@@ -279,6 +281,8 @@ export const ActivityDetailPanel: React.FC<ActivityDetailPanelProps> = ({
   canReview = false,
   onApprove,
   onReject,
+  canResendReviewRequest = false,
+  onResendReviewRequest,
 }) => {
   const styles = useStyles();
 
@@ -561,6 +565,20 @@ export const ActivityDetailPanel: React.FC<ActivityDetailPanelProps> = ({
               <Field label="Estado aprobación" value={actividad.estadoAprobacion} />
               <Field label="Aprobado por" value={actividad.aprobadoPor} />
             </div>
+            {(actividad.solicitanteNombre || actividad.solicitanteEmail || opx?.solicitanteNombre || opx?.solicitanteEmail) && (
+              <div style={{ marginTop: '10px' }}>
+                <Field
+                  label="Solicitante"
+                  value={
+                    `${actividad.solicitanteNombre || opx?.solicitanteNombre || ''}${
+                      actividad.solicitanteEmail || opx?.solicitanteEmail
+                        ? ` <${actividad.solicitanteEmail || opx?.solicitanteEmail}>`
+                        : ''
+                    }`
+                  }
+                />
+              </div>
+            )}
             {actividad.cumplimientoNormativo && (
               <div style={{ marginTop: '10px' }}>
                 <Field label="Cumplimiento normativo" value={actividad.cumplimientoNormativo} />
@@ -613,6 +631,11 @@ export const ActivityDetailPanel: React.FC<ActivityDetailPanelProps> = ({
           ) : <span />}
           <div style={{ display: 'flex', gap: '8px' }}>
             <Button appearance="secondary" onClick={onClose}>Cerrar</Button>
+            {canResendReviewRequest && (
+              <Button appearance="secondary" onClick={() => onResendReviewRequest?.(actividad)}>
+                Reenviar solicitud
+              </Button>
+            )}
             {canReview && (
               <>
                 <Button appearance="secondary" onClick={() => onReject?.(actividad)}>

@@ -187,5 +187,59 @@ export const EQUIPO_AMBIENTAL: EquipoAmbientalUser[] = [
 
 export const normalizeEmail = (email: string) => email.trim().toLowerCase();
 
+export const normalizeText = (value: string) =>
+  value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+
+const zonaTokens = (zona?: string) => {
+  if (!zona) return [];
+  const normalized = normalizeText(zona);
+  if (!normalized) return [];
+  if (normalized === '*' || normalized === 'transversal') return ['*'];
+  if (normalized.includes('norte covenas')) return ['norte', 'covenas'];
+  if (normalized.includes('occidente')) return ['occidente'];
+  if (normalized === 'clc' || normalized.includes('cano limon')) return ['clc'];
+  if (normalized.includes('covenas')) return ['covenas'];
+  return [normalized];
+};
+
+export const zonasMatch = (scopeZona: string, targetZona?: string) => {
+  const scopeTokens = zonaTokens(scopeZona);
+  if (scopeTokens.includes('*')) return true;
+  const targetTokens = zonaTokens(targetZona);
+  if (targetTokens.length === 0) return false;
+  return scopeTokens.some(token => targetTokens.includes(token));
+};
+
+export const ambitoMatches = (scopes: AmbitoAmbiental[], linea?: LineaOperativa, zona?: string) =>
+  scopes.some(scope => {
+    const matchLinea = !linea || scope.lineas.includes(linea);
+    const matchZona = !zona || scope.global || scope.zonas.some(scopeZona => zonasMatch(scopeZona, zona));
+    return matchLinea && matchZona;
+  });
+
+export const getRevisoresAmbientales = (linea: LineaOperativa, zona?: string) => {
+  const vistos = new Set<string>();
+
+  return EQUIPO_AMBIENTAL
+    .filter(user => user.email && ambitoMatches(user.revisor, linea, zona))
+    .map(user => ({
+      nombre: user.nombre,
+      email: normalizeEmail(user.email),
+      alcance: user.alcance,
+      zonaBase: user.zonaBase,
+      admin: !!user.admin,
+    }))
+    .filter(user => {
+      if (vistos.has(user.email)) return false;
+      vistos.add(user.email);
+      return true;
+    });
+};
+
 export const findEquipoAmbientalUser = (email: string) =>
   EQUIPO_AMBIENTAL.find(user => normalizeEmail(user.email) === normalizeEmail(email)) ?? null;
