@@ -5,11 +5,17 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActividadAmbiental, NuevaActividadPayload } from '../types';
 import { ActividadesService as MockService } from '../generated/services/ActividadesService';
 import { SharePointService } from '../services/SharePointService';
+import { SupabaseService } from '../services/SupabaseService';
+import { DATA_SOURCE } from '../services/supabaseClient';
 import { useAuth } from '../auth/AuthContext';
 
-// TOGGLE: Change to true to use real SharePoint data (requires Auth context or deployment)
-const USE_REAL_DATA = false;
-const ActividadesService = USE_REAL_DATA ? SharePointService : MockService;
+const SERVICES = {
+  mock: MockService,
+  sharepoint: SharePointService,
+  supabase: SupabaseService,
+};
+
+const ActividadesService = SERVICES[DATA_SOURCE as keyof typeof SERVICES] ?? MockService;
 
 export interface UseActividadesReturn {
   actividades: ActividadAmbiental[];
@@ -42,13 +48,13 @@ export function useActividades(): UseActividadesReturn {
         const data = await ActividadesService.getAll();
         if (!cancelled) setActividades(data);
       } catch (err) {
-        if (!USE_REAL_DATA) {
+        if (DATA_SOURCE === 'mock') {
           if (!cancelled) setErrorCarga('No se pudieron cargar los datos de prueba.');
           console.error('Error cargando datos mock.', err);
           return;
         }
 
-        console.warn('Fallo conexión SharePoint. Usando datos mock.', err);
+        console.warn(`Fallo conexión ${DATA_SOURCE}. Usando datos mock.`, err);
         try {
           const mockData = await MockService.getAll();
           if (!cancelled) setActividades(mockData);

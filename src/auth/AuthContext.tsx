@@ -1,4 +1,4 @@
-import React, { createContext, useCallback, useContext, useMemo, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { ActividadAmbiental, LineaOperativa } from '../types';
 import {
   AmbitoAmbiental,
@@ -7,19 +7,23 @@ import {
   findEquipoAmbientalUser,
   normalizeEmail,
 } from '../data/equipoAmbiental';
+import { getSectionPath } from '../utils/appRoutes';
+import { getSupabaseClient, isSupabaseEnabled } from '../services/supabaseClient';
 
 const STORAGE_KEY = 'greenlog-auth-email';
 
 interface LoginResult {
   ok: boolean;
   message?: string;
+  pendingEmail?: boolean;
 }
 
 interface AuthContextValue {
   currentUser: EquipoAmbientalUser | null;
   isAdmin: boolean;
-  login: (email: string) => LoginResult;
-  logout: () => void;
+  authLoading: boolean;
+  login: (email: string) => Promise<LoginResult>;
+  logout: () => Promise<void>;
   canPlan: (linea?: LineaOperativa, zona?: string) => boolean;
   canReview: (linea?: LineaOperativa, zona?: string) => boolean;
   canViewActividad: (actividad: ActividadAmbiental) => boolean;
@@ -49,8 +53,9 @@ const getInitialUser = () => {
 const AuthContext = createContext<AuthContextValue>({
   currentUser: null,
   isAdmin: false,
-  login: () => ({ ok: false, message: 'AuthProvider no inicializado.' }),
-  logout: () => undefined,
+  authLoading: false,
+  login: async () => ({ ok: false, message: 'AuthProvider no inicializado.' }),
+  logout: async () => undefined,
   canPlan: () => false,
   canReview: () => false,
   canViewActividad: () => false,
@@ -59,11 +64,57 @@ const AuthContext = createContext<AuthContextValue>({
 });
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [currentUser, setCurrentUser] = useState<EquipoAmbientalUser | null>(() => getInitialUser());
+  const supabaseEnabled = isSupabaseEnabled();
+  const [currentUser, setCurrentUser] = useState<EquipoAmbientalUser | null>(() => (
+    supabaseEnabled ? null : getInitialUser()
+  ));
+  const [authLoading, setAuthLoading] = useState(supabaseEnabled);
 
   const isAdmin = !!currentUser?.admin;
 
-  const login = useCallback((email: string): LoginResult => {
+  const setUserFromEmail = useCallback(async (email?: string | null) => {
+    const normalized = normalizeEmail(email ?? '');
+    const user = normalized ? findEquipoAmbientalUser(normalized) : null;
+    setCurrentUser(user);
+
+    if (supabaseEnabled && normalized && !user) {
+      try {
+        await getSupabaseClient().auth.signOut();
+      } catch {
+        // No bloquear render si el cierre falla.
+      }
+    }
+
+    return user;
+  }, [supabaseEnabled]);
+
+  useEffect(() => {
+    if (!supabaseEnabled) return;
+
+    const supabase = getSupabaseClient();
+    let active = true;
+
+    setAuthLoading(true);
+    supabase.auth.getSession()
+      .then(async ({ data }) => {
+        if (!active) return;
+        await setUserFromEmail(data.session?.user.email);
+      })
+      .finally(() => {
+        if (active) setAuthLoading(false);
+      });
+
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+      void setUserFromEmail(session?.user.email);
+    });
+
+    return () => {
+      active = false;
+      listener.subscription.unsubscribe();
+    };
+  }, [setUserFromEmail, supabaseEnabled]);
+
+  const login = useCallback(async (email: string): Promise<LoginResult> => {
     const normalized = normalizeEmail(email);
     const user = findEquipoAmbientalUser(normalized);
     if (!user) {
@@ -72,15 +123,42 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         message: 'Este correo no está habilitado para GreenLog. Verifica el correo o solicita actualización de la matriz de accesos.',
       };
     }
+
+    if (supabaseEnabled) {
+      const redirectTo = typeof window === 'undefined'
+        ? undefined
+        : `${window.location.origin}${getSectionPath('dashboard')}`;
+      const { error } = await getSupabaseClient().auth.signInWithOtp({
+        email: normalized,
+        options: {
+          emailRedirectTo: redirectTo,
+          shouldCreateUser: true,
+        },
+      });
+
+      if (error) {
+        return { ok: false, message: error.message };
+      }
+
+      return {
+        ok: true,
+        pendingEmail: true,
+        message: 'Te enviamos un enlace de acceso. Abre el correo para entrar a GreenLog.',
+      };
+    }
+
     window.localStorage.setItem(STORAGE_KEY, normalized);
     setCurrentUser(user);
     return { ok: true };
-  }, []);
+  }, [supabaseEnabled]);
 
-  const logout = useCallback(() => {
+  const logout = useCallback(async () => {
+    if (supabaseEnabled) {
+      await getSupabaseClient().auth.signOut();
+    }
     window.localStorage.removeItem(STORAGE_KEY);
     setCurrentUser(null);
-  }, []);
+  }, [supabaseEnabled]);
 
   const canPlan = useCallback((linea?: LineaOperativa, zona?: string) => {
     if (!currentUser) return false;
@@ -115,6 +193,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const value = useMemo<AuthContextValue>(() => ({
     currentUser,
     isAdmin,
+    authLoading,
     login,
     logout,
     canPlan,
@@ -122,7 +201,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     canViewActividad,
     canEditActividad,
     getPlaneacionZonas,
-  }), [currentUser, isAdmin, login, logout, canPlan, canReview, canViewActividad, canEditActividad, getPlaneacionZonas]);
+  }), [currentUser, isAdmin, authLoading, login, logout, canPlan, canReview, canViewActividad, canEditActividad, getPlaneacionZonas]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };

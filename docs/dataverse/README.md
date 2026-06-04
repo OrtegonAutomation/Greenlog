@@ -13,6 +13,7 @@ Esta carpeta define una configuracion temporal de Dataverse para mover GreenLog 
 
 - [01-esquema-temporal.md](./01-esquema-temporal.md): tablas, columnas y decisiones de modelado.
 - [02-configuracion-y-carga.md](./02-configuracion-y-carga.md): pasos para crear ambiente, solucion, tablas, seguridad y carga inicial.
+- [03-github-pages-dataverse.md](./03-github-pages-dataverse.md): requisitos y pasos para conectar GitHub Pages con Dataverse usando Entra ID.
 
 ## Decision temporal
 

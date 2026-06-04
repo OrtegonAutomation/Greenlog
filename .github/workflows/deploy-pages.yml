@@ -36,6 +36,9 @@ jobs:
         run: npm run build
         env:
           GREENLOG_GITHUB_PAGES: 'true'
+          VITE_GREENLOG_DATA_SOURCE: ${{ vars.VITE_GREENLOG_DATA_SOURCE }}
+          VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ vars.VITE_SUPABASE_ANON_KEY }}
 
       - name: SPA fallback (404.html = index.html)
         run: |

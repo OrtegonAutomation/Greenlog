@@ -165,19 +165,29 @@ const useStyles = makeStyles({
 
 interface LoginGateProps {
   onLoginSuccess?: () => void;
+  loadingOnly?: boolean;
 }
 
-export const LoginGate: React.FC<LoginGateProps> = ({ onLoginSuccess }) => {
+export const LoginGate: React.FC<LoginGateProps> = ({ onLoginSuccess, loadingOnly = false }) => {
   const styles = useStyles();
   const { login } = useAuth();
   const [email, setEmail] = useState('');
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+  const [submitting, setSubmitting] = useState(false);
 
-  const handleSubmit = (event: React.FormEvent) => {
+  const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
-    const result = login(email);
+    setSubmitting(true);
+    setSuccess('');
+    const result = await login(email);
+    setSubmitting(false);
     if (!result.ok) {
       setError(result.message ?? 'No fue posible iniciar sesión.');
+      return;
+    }
+    if (result.pendingEmail) {
+      setSuccess(result.message ?? 'Revisa tu correo para entrar a GreenLog.');
       return;
     }
     onLoginSuccess?.();
@@ -210,10 +220,12 @@ export const LoginGate: React.FC<LoginGateProps> = ({ onLoginSuccess }) => {
           </div>
           <div className={styles.formHeader}>
             <Title1 style={{ color: CENIT_COLORS.blueBrand, fontSize: '30px', lineHeight: 1.1 }}>
-              Validar acceso
+              {loadingOnly ? 'Validando sesión' : 'Validar acceso'}
             </Title1>
             <Caption1 className={styles.helper}>
-              Solo los correos autorizados pueden consultar, planear o revisar actividades ambientales.
+              {loadingOnly
+                ? 'Estamos restaurando tu acceso a GreenLog.'
+                : 'Solo los correos autorizados pueden consultar, planear o revisar actividades ambientales.'}
             </Caption1>
           </div>
 
@@ -226,29 +238,41 @@ export const LoginGate: React.FC<LoginGateProps> = ({ onLoginSuccess }) => {
             </MessageBar>
           )}
 
-          <form className={styles.form} onSubmit={handleSubmit}>
-            <Input
-              type="email"
-              required
-              size="large"
-              value={email}
-              onChange={(_, data) => {
-                setEmail(data.value);
-                setError('');
-              }}
-              contentBefore={<MailRegular />}
-              placeholder="correo@cenit-transporte.com"
-            />
-            <Button
-              appearance="primary"
-              size="large"
-              type="submit"
-              disabled={!email.trim()}
-              style={{ background: CENIT_COLORS.green, color: '#003057', fontWeight: 800 }}
-            >
-              Entrar a GreenLog
-            </Button>
-          </form>
+          {success && (
+            <MessageBar intent="success" className={styles.errorBar}>
+              <MessageBarBody className={styles.errorBody}>
+                <MessageBarTitle>Revisa tu correo</MessageBarTitle>
+                {success}
+              </MessageBarBody>
+            </MessageBar>
+          )}
+
+          {!loadingOnly && (
+            <form className={styles.form} onSubmit={handleSubmit}>
+              <Input
+                type="email"
+                required
+                size="large"
+                value={email}
+                onChange={(_, data) => {
+                  setEmail(data.value);
+                  setError('');
+                  setSuccess('');
+                }}
+                contentBefore={<MailRegular />}
+                placeholder="correo@cenit-transporte.com"
+              />
+              <Button
+                appearance="primary"
+                size="large"
+                type="submit"
+                disabled={!email.trim() || submitting}
+                style={{ background: CENIT_COLORS.green, color: '#003057', fontWeight: 800 }}
+              >
+                {submitting ? 'Validando...' : 'Entrar a GreenLog'}
+              </Button>
+            </form>
+          )}
         </section>
       </div>
     </div>

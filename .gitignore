@@ -38,6 +38,7 @@ pnpm-debug.log
 connections.txt
 current_org.txt
 CENIT_extracted.txt
+supabase/.temp/
 
 # OS specific
 Thumbs.db

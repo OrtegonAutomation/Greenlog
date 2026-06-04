@@ -8,7 +8,7 @@ import { AppShell } from './components/Shell/AppShell';
 import { getLoginPath, getSectionPath, isLoginPath } from './utils/appRoutes';
 
 const AppContent: React.FC = () => {
-  const { currentUser } = useAuth();
+  const { currentUser, authLoading } = useAuth();
   const loginPath = useMemo(() => getLoginPath(), []);
   const homePath = useMemo(() => getSectionPath('dashboard'), []);
   const loginRoute = typeof window === 'undefined' ? false : isLoginPath();
@@ -28,6 +28,10 @@ const AppContent: React.FC = () => {
       goHome();
     }
   }, [currentUser, loginPath, loginRoute]);
+
+  if (authLoading) {
+    return <LoginGate loadingOnly />;
+  }
 
   if (!currentUser) {
     return <LoginGate onLoginSuccess={goHome} />;
