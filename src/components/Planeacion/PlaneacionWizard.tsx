@@ -71,6 +71,12 @@ export interface PlaneacionWizardResult {
   parametrosSeleccionados: MonitoreoRow[];
   itemsSeleccionados: ItemLinea[];
   logisticaSeleccionada: ItemLinea[];
+  selectedParamKeys?: string[];
+  selectedItemIds?: string[];
+  selectedLogisticaIds?: string[];
+  selectedMatrices?: string[];
+  customItems?: ItemLinea[];
+  customMonitoreoRows?: MonitoreoRow[];
   programacion: PlaneacionMensual[];
   valorTotal: number;
   // Cambio 5: tipo muestra por param
@@ -139,10 +145,34 @@ export interface PlaneacionInitialData {
   anioPlaneacion?: number;
   datosAuxiliaresPresupuestales?: Partial<DatosAuxiliaresPresupuestales>;
   programacion?: PlaneacionMensual[];
+  selectedParamKeys?: string[];
+  selectedItemIds?: string[];
+  selectedLogisticaIds?: string[];
+  selectedMatrices?: string[];
+  customItems?: ItemLinea[];
+  customMonitoreoRows?: MonitoreoRow[];
+  paramTipoMuestra?: Record<string, 'simple' | 'compuesto'>;
+  paramCantCompuestos?: Record<string, number>;
+  ipcGlobalActivo?: boolean;
+  ipcGlobalPorcentaje?: number;
+  ipcMeses?: number[];
   servicioEComplejidad?: ServicioEComplejidad;
   ivaGlobalActivo?: boolean;
   ivaGlobalPorcentaje?: number;
   ivaMeses?: number[];
+  sistema?: string;
+  sector?: string;
+  obligacion?: PlaneacionWizardResult['obligacion'];
+  asignacionRecursos?: boolean;
+  saldoDisponible?: number;
+  aniosAPlanear?: number;
+  contratoSeleccionado?: string;
+  programacionY2?: ProgramacionAnualItem[];
+  programacionY3?: ProgramacionAnualItem[];
+  itemsCambianPorAnio?: boolean;
+  selectedItemsY2?: string[];
+  selectedItemsY3?: string[];
+  preserveProgramacionSinSeleccion?: boolean;
 }
 
 // ── Constants ──
@@ -1057,6 +1087,7 @@ export const PlaneacionWizard: React.FC<Props> = ({
   const [itemsCambianPorAnio, setItemsCambianPorAnio] = useState<boolean>(false);
   const [selectedItemsY2, setSelectedItemsY2] = useState<Set<string>>(new Set());
   const [selectedItemsY3, setSelectedItemsY3] = useState<Set<string>>(new Set());
+  const [preserveNextProgramacionBuild, setPreserveNextProgramacionBuild] = useState(false);
 
   // Derived
   const isMonitoreo = selectedLinea?.usaMatriz === true;
@@ -1113,14 +1144,54 @@ export const PlaneacionWizard: React.FC<Props> = ({
         ...DEFAULT_DATOS_AUXILIARES,
         ...initialData.datosAuxiliaresPresupuestales,
       });
-      setSelectedParams(new Set());
-      setSelectedItems(new Set());
-      setSelectedLogistica(new Set(ITEMS_LOGISTICA.map(it => it.id)));
-      setSelectedMatrices(new Set());
+      setSelectedParams(new Set(initialData.selectedParamKeys ?? []));
+      setSelectedItems(new Set(initialData.selectedItemIds ?? []));
+      setSelectedLogistica(new Set(initialData.selectedLogisticaIds ?? ITEMS_LOGISTICA.map(it => it.id)));
+      setSelectedMatrices(new Set(initialData.selectedMatrices ?? []));
+      setCustomMonitoreoRows(initialData.customMonitoreoRows ?? []);
+      if (cfg) {
+        setCustomItemsMap(prev => ({
+          ...prev,
+          [cfg.value]: initialData.customItems ?? [],
+        }));
+      }
+      setParamTipoMuestra(new Map(Object.entries(initialData.paramTipoMuestra ?? {})));
+      setParamCantCompuestos(new Map(
+        Object.entries(initialData.paramCantCompuestos ?? {}).map(([key, value]) => [key, Number(value) || 1])
+      ));
       setMonthlyData(initialData.programacion ?? []);
+      setIpcGlobalActivo(initialData.ipcGlobalActivo ?? false);
+      setIpcGlobalPorcentaje(initialData.ipcGlobalPorcentaje ?? 0);
+      setIpcMeses(new Set(initialData.ipcMeses ?? []));
       setIvaGlobalActivo(initialData.ivaGlobalActivo ?? false);
       setIvaGlobalPorcentaje(initialData.ivaGlobalPorcentaje ?? 19);
       setIvaMeses(new Set(initialData.ivaMeses ?? []));
+      setSelectedSistema(initialData.sistema ?? '');
+      setSelectedSector(initialData.sector ?? '');
+      setObligacionId(initialData.obligacion?.id ?? '');
+      setObligacionFechaCreacion(initialData.obligacion?.fechaCreacion ?? new Date().toISOString().split('T')[0]);
+      setObligacionActoTipo(initialData.obligacion?.actoAdministrativo?.tipo ?? 'Resolución');
+      setObligacionActoNumero(initialData.obligacion?.actoAdministrativo?.numero ?? '');
+      setObligacionActoFecha(initialData.obligacion?.actoAdministrativo?.fecha ?? '');
+      setObligacionPermiso(initialData.obligacion?.permiso ?? '');
+      setObligacionAutoridad(initialData.obligacion?.autoridad ?? '');
+      setObligacionJurisdiccionCorp(initialData.obligacion?.jurisdiccion?.corporacion ?? '');
+      setObligacionDepartamento(initialData.obligacion?.jurisdiccion?.departamento ?? '');
+      setObligacionMunicipio(initialData.obligacion?.jurisdiccion?.municipio ?? '');
+      setObligacionVeredaPredio(initialData.obligacion?.jurisdiccion?.veredaPredio ?? '');
+      setObligacionExpediente(initialData.obligacion?.expediente ?? '');
+      setObligacionCategoria(initialData.obligacion?.categoria ?? '');
+      setAsignacionRecursos(initialData.asignacionRecursos ?? false);
+      setSaldoDisponible(initialData.saldoDisponible ?? 0);
+      setAniosAPlanear(initialData.aniosAPlanear ?? 1);
+      setContratoSeleccionado(initialData.contratoSeleccionado ?? '');
+      setProgY2(initialData.programacionY2 ?? []);
+      setProgY3(initialData.programacionY3 ?? []);
+      setTabAnio(1);
+      setItemsCambianPorAnio(initialData.itemsCambianPorAnio ?? false);
+      setSelectedItemsY2(new Set(initialData.selectedItemsY2 ?? []));
+      setSelectedItemsY3(new Set(initialData.selectedItemsY3 ?? []));
+      setPreserveNextProgramacionBuild(!!initialData.preserveProgramacionSinSeleccion);
     } else {
       setStep(0);
       setSelectedLinea(null);
@@ -1137,11 +1208,18 @@ export const PlaneacionWizard: React.FC<Props> = ({
       setSelectedItems(new Set());
       setSelectedLogistica(new Set(ITEMS_LOGISTICA.map(it => it.id)));
       setSelectedMatrices(new Set());
+      setParamTipoMuestra(new Map());
+      setParamCantCompuestos(new Map());
+      setCustomMonitoreoRows([]);
+      setCustomItemsMap({});
       setFuentePresupuesto('OPEX');
       setTipoPlaneacion('Plan');
       setAnioPlaneacion(new Date().getFullYear() + 1);
       setDatosAuxiliaresPresupuestales({ ...DEFAULT_DATOS_AUXILIARES });
       setMonthlyData([]);
+      setIpcGlobalActivo(false);
+      setIpcGlobalPorcentaje(0);
+      setIpcMeses(new Set());
       setSelectedSistema('');
       setSelectedSector('');
       setObligacionId('');
@@ -1170,6 +1248,7 @@ export const PlaneacionWizard: React.FC<Props> = ({
       setIvaGlobalActivo(false);
       setIvaGlobalPorcentaje(19);
       setIvaMeses(new Set());
+      setPreserveNextProgramacionBuild(false);
     }
   }, [open, initialData]);
 
@@ -1247,6 +1326,11 @@ export const PlaneacionWizard: React.FC<Props> = ({
   // ── Build monthly data when entering Programación step ──
   useEffect(() => {
     if (step !== STEP_PROGRAMACION) return;
+
+    if (preserveNextProgramacionBuild && monthlyData.length > 0) {
+      setPreserveNextProgramacionBuild(false);
+      return;
+    }
 
     // Build individual price entries from selected params/items + logística
     const buildEntry = (
@@ -1626,6 +1710,7 @@ export const PlaneacionWizard: React.FC<Props> = ({
             && datosAuxiliaresPresupuestales.proveedor.trim().length > 0;
         }
         if (step === STEP_PARAMETROS) {
+          if (preserveNextProgramacionBuild && monthlyData.length > 0) return true;
           // Si estamos planeando Año 2/3 con itemsCambian, validar contra Y2/Y3
           if (isCompensaciones && itemsCambianPorAnio && tabAnio === 2) return selectedItemsY2.size > 0;
           if (isCompensaciones && itemsCambianPorAnio && tabAnio === 3) return selectedItemsY3.size > 0;
@@ -1695,6 +1780,12 @@ export const PlaneacionWizard: React.FC<Props> = ({
         parametrosSeleccionados: selRows,
         itemsSeleccionados: selItems,
         logisticaSeleccionada: selLog,
+        selectedParamKeys: [...selectedParams],
+        selectedItemIds: [...selectedItems],
+        selectedLogisticaIds: [...selectedLogistica],
+        selectedMatrices: [...selectedMatrices],
+        customItems: customItemsMap[selectedLinea!.value] ?? [],
+        customMonitoreoRows,
         programacion: monthlyData,
         valorTotal,
         paramTipoMuestra: Object.fromEntries(paramTipoMuestra),

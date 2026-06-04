@@ -11,10 +11,18 @@ import { ActivityTable } from './ActivityTable';
 import { ActivityForm } from './ActivityForm';
 import { ActivityDetailPanel } from './ActivityDetailPanel';
 import { BulkUploadPanel, BulkUploadResult } from './BulkUploadPanel';
-import { PlaneacionWizard, PlaneacionWizardResult, PlaneacionInitialData } from './PlaneacionWizard';
+import {
+  PlaneacionMensual,
+  PlaneacionMensualParam,
+  PlaneacionWizard,
+  PlaneacionWizardResult,
+  PlaneacionInitialData,
+} from './PlaneacionWizard';
 import { exportOpexToExcel, exportDetalleInternoToExcel } from '../../utils/exportOpex';
 import { useAuth } from '../../auth/AuthContext';
 import { RevisionNotificationService } from '../../services/RevisionNotificationService';
+import { ItemLinea, ItemsLineaService } from '../../services/ItemsLineaService';
+import { LineaOperativa } from '../../types';
 
 const useStyles = makeStyles({
   root: {
@@ -55,6 +63,192 @@ const useStyles = makeStyles({
   },
   subtitle: { color: tokens.colorNeutralForeground2 },
 });
+
+const asArray = <T,>(value: unknown): T[] => Array.isArray(value) ? value as T[] : [];
+
+const asNumber = (value: unknown, fallback = 0) => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+};
+
+const getParamKeyFromRow = (row: any) =>
+  `${row?.estacion ?? ''}|${row?.parametro ?? ''}|${row?.matriz ?? ''}|${row?.norma ?? ''}`;
+
+const normalizeProgramacion = (meses: any[] = []): PlaneacionMensual[] =>
+  meses.map((m: any, i: number) => {
+    const preciosIndividuales: PlaneacionMensualParam[] = asArray<any>(m?.preciosIndividuales)
+      .map((p: any) => ({
+        key: String(p?.key ?? ''),
+        nombre: String(p?.nombre ?? p?.key ?? ''),
+        precio: asNumber(p?.precio),
+        cantidad: asNumber(p?.cantidad),
+        frecuencia: asNumber(p?.frecuencia, 1),
+        total: asNumber(p?.total),
+      }))
+      .filter(p => p.key);
+
+    return {
+      mes: m?.mes ?? '',
+      mesIndex: asNumber(m?.mesIndex, i),
+      cantidad: asNumber(m?.cantidad),
+      frecuencia: asNumber(m?.frecuencia, 1),
+      precio: asNumber(m?.precio),
+      preciosIndividuales,
+      total: asNumber(m?.total, preciosIndividuales.reduce((s, p) => s + p.total, 0)),
+    };
+  });
+
+const unique = (values: string[]) => [...new Set(values.filter(Boolean))];
+
+const getStoredEntries = (programacion: PlaneacionMensual[]) => {
+  const entries = new Map<string, PlaneacionMensualParam>();
+  for (const mes of programacion) {
+    for (const entry of mes.preciosIndividuales ?? []) {
+      if (entry.key && !entries.has(entry.key)) entries.set(entry.key, entry);
+    }
+  }
+  return entries;
+};
+
+const normalizeItemLinea = (item: any, lineaOperativa: LineaOperativa): ItemLinea | null => {
+  if (!item?.id) return null;
+  return {
+    id: String(item.id),
+    lineaOperativa: item.lineaOperativa ?? lineaOperativa,
+    item: String(item.item ?? item.nombre ?? item.id),
+    descripcion: String(item.descripcion ?? item.item ?? item.nombre ?? item.id),
+    unidad: String(item.unidad ?? 'Global'),
+    precioReferencia: asNumber(item.precioReferencia ?? item.precio),
+    preciosMensuales: item.preciosMensuales,
+    tipoIca: item.tipoIca,
+    zonaIca: item.zonaIca,
+    baseServicio: item.baseServicio,
+    ordenInterna: item.ordenInterna,
+    cuentaContable: item.cuentaContable,
+    servicioEZona: item.servicioEZona,
+    servicioEBase: item.servicioEBase,
+    servicioEComplejidad: item.servicioEComplejidad,
+    requiereComplejidad: item.requiereComplejidad,
+  };
+};
+
+const buildCustomItemsForEdit = (
+  lineaOperativa: LineaOperativa,
+  opx: any,
+  programacion: PlaneacionMensual[],
+  selectedItemIds: string[],
+) => {
+  const storedItems = asArray<any>(opx?.customItems)
+    .concat(asArray<any>(opx?.itemsSeleccionados))
+    .map(item => normalizeItemLinea(item, lineaOperativa))
+    .filter((item): item is ItemLinea => !!item);
+
+  const customItems = new Map<string, ItemLinea>();
+  for (const item of storedItems) {
+    if (item.id.startsWith('CUSTOM-') || !ItemsLineaService.getItemById(item.id)) {
+      customItems.set(item.id, item);
+    }
+  }
+
+  const entries = getStoredEntries(programacion);
+  for (const itemId of selectedItemIds) {
+    if (itemId.startsWith('LOG-') || itemId.startsWith('MATRIZ|') || ItemsLineaService.getItemById(itemId)) continue;
+    const entry = entries.get(itemId);
+    if (!entry || customItems.has(itemId)) continue;
+    customItems.set(itemId, {
+      id: itemId,
+      lineaOperativa,
+      item: entry.nombre || itemId,
+      descripcion: entry.nombre || itemId,
+      unidad: opx?.unidadMedida ?? 'Global',
+      precioReferencia: entry.precio,
+    });
+  }
+
+  return [...customItems.values()];
+};
+
+const buildInitialDataFromActividad = (actividad: ActividadAmbiental, opx: any): PlaneacionInitialData | null => {
+  if (!opx?.meses) return null;
+
+  const programacion = normalizeProgramacion(opx.meses);
+  const entries = [...getStoredEntries(programacion).values()];
+  const selectedItemIds = unique(
+    asArray<string>(opx.selectedItemIds)
+      .concat(asArray<any>(opx.itemsSeleccionados).map(it => String(it?.id ?? '')))
+      .concat(entries.filter(e => !e.key.startsWith('LOG-') && !e.key.startsWith('MATRIZ|')).map(e => e.key))
+  );
+  const selectedLogisticaIds = unique(
+    asArray<string>(opx.selectedLogisticaIds)
+      .concat(asArray<any>(opx.logisticaSeleccionada).map(it => String(it?.id ?? '')))
+      .concat(entries.filter(e => e.key.startsWith('LOG-')).map(e => e.key))
+  );
+  const selectedParamKeys = unique(
+    asArray<string>(opx.selectedParamKeys)
+      .concat(asArray<any>(opx.parametrosSeleccionados).map(getParamKeyFromRow))
+  );
+  const selectedMatrices = unique(
+    asArray<string>(opx.selectedMatrices)
+      .concat(asArray<any>(opx.parametrosSeleccionados).map(row => String(row?.matriz ?? '')))
+      .concat(entries.filter(e => e.key.startsWith('MATRIZ|')).map(e => e.key.replace(/^MATRIZ\|/, '')))
+  );
+  const customItems = buildCustomItemsForEdit(actividad.lineaOperativa, opx, programacion, selectedItemIds);
+  const preserveProgramacionSinSeleccion = actividad.lineaOperativa === 'Monitoreos'
+    && selectedParamKeys.length === 0
+    && entries.some(entry => entry.key.startsWith('MATRIZ|'));
+
+  return {
+    lineaOperativa: actividad.lineaOperativa,
+    zona: actividad.zona ?? '',
+    tipoLugar: (actividad as any).tipoLugar ?? opx.tipoLugar ?? 'Estación',
+    estacion: actividad.estacion ?? '',
+    pk: (actividad as any).pk ?? opx.pk ?? '',
+    fuentePresupuesto: (actividad as any).fuentePresupuesto ?? opx.fuentePresupuesto ?? 'OPEX',
+    tipoPlaneacion: (actividad as any).tipoPlaneacion ?? opx.tipoPlaneacion ?? 'Plan',
+    anioPlaneacion: (actividad as any).anioPlaneacion ?? opx.anioPlaneacion ?? new Date().getFullYear() + 1,
+    servicioEComplejidad: opx.servicioEComplejidad,
+    selectedItemIds,
+    selectedLogisticaIds,
+    selectedParamKeys,
+    selectedMatrices,
+    customItems,
+    customMonitoreoRows: asArray<any>(opx.customMonitoreoRows),
+    paramTipoMuestra: opx.paramTipoMuestra ?? {},
+    paramCantCompuestos: opx.paramCantCompuestos ?? {},
+    ipcGlobalActivo: opx.ipcGlobalActivo ?? false,
+    ipcGlobalPorcentaje: opx.ipcGlobalPorcentaje ?? 0,
+    ipcMeses: opx.ipcMeses ?? [],
+    ivaGlobalActivo: opx.ivaGlobalActivo ?? false,
+    ivaGlobalPorcentaje: opx.ivaGlobalPorcentaje ?? 19,
+    ivaMeses: opx.ivaMeses ?? [],
+    sistema: opx.sistema,
+    sector: opx.sector,
+    obligacion: opx.obligacion,
+    asignacionRecursos: opx.asignacionRecursos ?? false,
+    saldoDisponible: opx.saldoDisponible ?? 0,
+    aniosAPlanear: opx.aniosAPlanear ?? 1,
+    contratoSeleccionado: opx.contratoSeleccionado ?? '',
+    programacionY2: opx.programacionY2 ?? [],
+    programacionY3: opx.programacionY3 ?? [],
+    itemsCambianPorAnio: opx.itemsCambianPorAnio ?? false,
+    selectedItemsY2: opx.selectedItemsY2 ?? [],
+    selectedItemsY3: opx.selectedItemsY3 ?? [],
+    preserveProgramacionSinSeleccion,
+    datosAuxiliaresPresupuestales: {
+      contrato:              opx.contrato     ?? actividad.contrato ?? '',
+      proveedor:             opx.proveedor    ?? '',
+      objeto:                opx.objeto       ?? '',
+      administrador:         opx.administrador ?? actividad.responsable ?? '',
+      supervisor:            opx.supervisor   ?? '',
+      fechaInicio:           opx.fechaInicio  ?? actividad.fechaInicio ?? '',
+      fechaFin:              opx.fechaFin     ?? actividad.fechaFin    ?? '',
+      estadoContrato:        opx.estadoContrato        ?? 'VIGENTE',
+      procesoAbastecimiento: opx.procesoAbastecimiento ?? 'Ejecución contractual',
+      descripcionNecesidad:  opx.descripcionNecesidad  ?? '',
+    },
+    programacion,
+  };
+};
 
 export const PlaneacionModule: React.FC = () => {
   const styles = useStyles();
@@ -193,43 +387,9 @@ export const PlaneacionModule: React.FC = () => {
     let opx: any = null;
     try { opx = actividad.opexDataRaw ? JSON.parse(actividad.opexDataRaw) : null; } catch { /* noop */ }
 
-    if (opx?.meses) {
-      // Reconstruir initial para PlaneacionWizard
-      setPlaneacionInitial({
-        lineaOperativa: actividad.lineaOperativa,
-        zona:           actividad.zona    ?? '',
-        tipoLugar:      (actividad as any).tipoLugar ?? 'Estación',
-        estacion:       actividad.estacion ?? '',
-        pk:             (actividad as any).pk ?? '',
-        fuentePresupuesto: (actividad as any).fuentePresupuesto ?? 'OPEX',
-        tipoPlaneacion:    (actividad as any).tipoPlaneacion ?? 'Plan',
-        anioPlaneacion:    (actividad as any).anioPlaneacion ?? new Date().getFullYear() + 1,
-        servicioEComplejidad: opx.servicioEComplejidad,
-        ivaGlobalActivo: opx.ivaGlobalActivo ?? false,
-        ivaGlobalPorcentaje: opx.ivaGlobalPorcentaje ?? 19,
-        ivaMeses: opx.ivaMeses ?? [],
-        datosAuxiliaresPresupuestales: {
-          contrato:              opx.contrato     ?? actividad.contrato ?? '',
-          proveedor:             opx.proveedor    ?? '',
-          objeto:                opx.objeto       ?? '',
-          administrador:         opx.administrador ?? actividad.responsable ?? '',
-          supervisor:            opx.supervisor   ?? '',
-          fechaInicio:           opx.fechaInicio  ?? actividad.fechaInicio ?? '',
-          fechaFin:              opx.fechaFin     ?? actividad.fechaFin    ?? '',
-          estadoContrato:        opx.estadoContrato        ?? 'VIGENTE',
-          procesoAbastecimiento: opx.procesoAbastecimiento ?? 'Ejecución contractual',
-          descripcionNecesidad:  opx.descripcionNecesidad  ?? '',
-        },
-        programacion:   opx.meses.map((m: any, i: number) => ({
-          mes:               m.mes,
-          mesIndex:          i,
-          cantidad:          m.cantidad ?? 0,
-          frecuencia:        m.frecuencia ?? 1,
-          precio:            m.precio   ?? 0,
-          preciosIndividuales: [],
-          total:             m.total    ?? 0,
-        })),
-      });
+    const initial = buildInitialDataFromActividad(actividad, opx);
+    if (initial) {
+      setPlaneacionInitial(initial);
       setWizardAbierto(true);
     } else {
       // Sin opexDataRaw — abrir el form manual como fallback
@@ -332,6 +492,10 @@ export const PlaneacionModule: React.FC = () => {
       setErrorGuardar('No tienes permisos para crear planeaciones en esta línea y zona.');
       return;
     }
+    if (planeacionInitial && !actividadEditar) {
+      setErrorGuardar('No se encontró la actividad original para editar. Cierra el wizard y abre de nuevo el detalle.');
+      return;
+    }
     const datosAuxiliares = result.datosAuxiliaresPresupuestales;
     const solicitanteNombre = actividadEditar?.solicitanteNombre || currentUser?.nombre || '';
     const solicitanteEmail = actividadEditar?.solicitanteEmail || currentUser?.email || '';
@@ -369,6 +533,15 @@ export const PlaneacionModule: React.FC = () => {
       servicioEComplejidad: result.servicioEComplejidad,
       solicitanteNombre,
       solicitanteEmail,
+      selectedParamKeys: result.selectedParamKeys,
+      selectedItemIds: result.selectedItemIds,
+      selectedLogisticaIds: result.selectedLogisticaIds,
+      selectedMatrices: result.selectedMatrices,
+      parametrosSeleccionados: result.parametrosSeleccionados,
+      itemsSeleccionados: result.itemsSeleccionados,
+      logisticaSeleccionada: result.logisticaSeleccionada,
+      customItems: result.customItems,
+      customMonitoreoRows: result.customMonitoreoRows,
       // Compensaciones fields
       sistema: result.sistema,
       sector: result.sector,
@@ -445,7 +618,7 @@ export const PlaneacionModule: React.FC = () => {
     } catch (err) {
       setErrorGuardar(err instanceof Error ? err.message : 'Error al guardar la planeación.');
     }
-  }, [crear, actualizar, actividadEditar, canEditActividad, canPlan, currentUser, sendRevisionRequested, withSolicitante]);
+  }, [crear, actualizar, actividadEditar, canEditActividad, canPlan, currentUser, planeacionInitial, sendRevisionRequested, withSolicitante]);
 
   return (
     <div className={styles.root}>
