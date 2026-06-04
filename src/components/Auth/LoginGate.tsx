@@ -35,6 +35,7 @@ const useStyles = makeStyles({
     display: 'grid',
     gridTemplateColumns: '1.1fr 0.9fr',
     overflow: 'hidden',
+    minWidth: 0,
     borderRadius: '28px',
     background: 'rgba(255,255,255,0.12)',
     backdropFilter: 'blur(24px)',
@@ -53,6 +54,10 @@ const useStyles = makeStyles({
     ...shorthands.padding('42px'),
     background: `linear-gradient(145deg, rgba(0,48,87,0.95) 0%, rgba(0,51,160,0.74) 100%),
       url('https://cenit-transporte.com/wp-content/uploads/2025/10/geodesicos1.jpg') center/cover`,
+    '@media (max-width: 620px)': {
+      minHeight: '320px',
+      ...shorthands.padding('28px'),
+    },
   },
   logoRow: {
     display: 'flex',
@@ -94,6 +99,9 @@ const useStyles = makeStyles({
     fontWeight: 900,
     letterSpacing: '-0.04em',
     color: '#fff',
+    '@media (max-width: 620px)': {
+      fontSize: '34px',
+    },
   },
   subtitle: {
     maxWidth: '460px',
@@ -109,6 +117,10 @@ const useStyles = makeStyles({
     ...shorthands.padding('42px'),
     background: 'rgba(255,255,255,0.94)',
     color: tokens.colorNeutralForeground1,
+    minWidth: 0,
+    '@media (max-width: 620px)': {
+      ...shorthands.padding('28px'),
+    },
   },
   formHeader: {
     display: 'flex',
@@ -129,29 +141,46 @@ const useStyles = makeStyles({
     display: 'flex',
     flexDirection: 'column',
     ...shorthands.gap('12px'),
+    minWidth: 0,
   },
   helper: {
     color: tokens.colorNeutralForeground3,
     lineHeight: 1.5,
   },
+  errorBar: {
+    width: '100%',
+    maxWidth: '100%',
+    minWidth: 0,
+    overflow: 'hidden',
+    alignItems: 'flex-start',
+  },
+  errorBody: {
+    minWidth: 0,
+    whiteSpace: 'normal',
+    overflowWrap: 'anywhere',
+    wordBreak: 'break-word',
+    lineHeight: 1.4,
+  },
 });
 
 interface LoginGateProps {
-  children: React.ReactNode;
+  onLoginSuccess?: () => void;
 }
 
-export const LoginGate: React.FC<LoginGateProps> = ({ children }) => {
+export const LoginGate: React.FC<LoginGateProps> = ({ onLoginSuccess }) => {
   const styles = useStyles();
-  const { currentUser, login } = useAuth();
+  const { login } = useAuth();
   const [email, setEmail] = useState('');
   const [error, setError] = useState('');
-
-  if (currentUser) return <>{children}</>;
 
   const handleSubmit = (event: React.FormEvent) => {
     event.preventDefault();
     const result = login(email);
-    if (!result.ok) setError(result.message ?? 'No fue posible iniciar sesión.');
+    if (!result.ok) {
+      setError(result.message ?? 'No fue posible iniciar sesión.');
+      return;
+    }
+    onLoginSuccess?.();
   };
 
   return (
@@ -189,8 +218,8 @@ export const LoginGate: React.FC<LoginGateProps> = ({ children }) => {
           </div>
 
           {error && (
-            <MessageBar intent="error">
-              <MessageBarBody>
+            <MessageBar intent="error" className={styles.errorBar}>
+              <MessageBarBody className={styles.errorBody}>
                 <MessageBarTitle>Acceso no habilitado</MessageBarTitle>
                 {error}
               </MessageBarBody>
