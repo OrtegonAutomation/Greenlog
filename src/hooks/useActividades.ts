@@ -35,18 +35,31 @@ export function useActividades(): UseActividadesReturn {
     setCargando(true);
     setErrorCarga(null);
 
-    // Intento 1: Cargar datos reales de SharePoint
-    SharePointService.getAll()
-      .then((data) => { if (!cancelled) setActividades(data); })
-      .catch((err) => {
-        console.warn('Fallo conexión SharePoint (esperado en localhost). Usando datos Mock.', err);
-        // Fallback: Si falla (403/401 probables en local), usar MockService invisiblemente
-        MockService.getAll().then((mockData) => {
+    const cargarActividades = async () => {
+      try {
+        const data = await ActividadesService.getAll();
+        if (!cancelled) setActividades(data);
+      } catch (err) {
+        if (!USE_REAL_DATA) {
+          if (!cancelled) setErrorCarga('No se pudieron cargar los datos de prueba.');
+          console.error('Error cargando datos mock.', err);
+          return;
+        }
+
+        console.warn('Fallo conexión SharePoint. Usando datos mock.', err);
+        try {
+          const mockData = await MockService.getAll();
           if (!cancelled) setActividades(mockData);
-        });
-        // No mostramos error UI para que la experiencia sea fluida
-      })
-      .finally(() => { if (!cancelled) setCargando(false); });
+        } catch (mockErr) {
+          if (!cancelled) setErrorCarga('No se pudieron cargar actividades.');
+          console.error('Error cargando fallback mock.', mockErr);
+        }
+      } finally {
+        if (!cancelled) setCargando(false);
+      }
+    };
+
+    cargarActividades();
 
     return () => { cancelled = true; };
   }, [version]);

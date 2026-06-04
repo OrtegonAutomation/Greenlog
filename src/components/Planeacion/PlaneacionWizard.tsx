@@ -80,9 +80,11 @@ export interface PlaneacionWizardResult {
   ipcGlobalActivo?: boolean;
   ipcGlobalPorcentaje?: number;
   ipcMeses?: number[];
-  // IVA global por ítem (acordado en reunión martes 9:16)
+  // IVA global por mes
   ivaGlobalActivo?: boolean;
   ivaGlobalPorcentaje?: number;
+  ivaMeses?: number[];
+  // Compatibilidad histórica con planeaciones antiguas que tenían IVA por ítem.
   ivaItemsExcluidos?: string[];
   // Compensaciones: Sistema + Sector
   sistema?: string;
@@ -138,6 +140,9 @@ export interface PlaneacionInitialData {
   datosAuxiliaresPresupuestales?: Partial<DatosAuxiliaresPresupuestales>;
   programacion?: PlaneacionMensual[];
   servicioEComplejidad?: ServicioEComplejidad;
+  ivaGlobalActivo?: boolean;
+  ivaGlobalPorcentaje?: number;
+  ivaMeses?: number[];
 }
 
 // ── Constants ──
@@ -149,12 +154,19 @@ const MESES = [
 const MESES_SHORT = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
 
 const fmtCOP = (n: number) => `$${n.toLocaleString('es-CO')}`;
+const formatCOPInput = (value: string) => {
+  const digits = value.replace(/\D/g, '');
+  return digits ? Number(digits).toLocaleString('es-CO') : '';
+};
+const parseCOPInput = (value: string) => {
+  const digits = value.replace(/\D/g, '');
+  return digits ? Number(digits) : 0;
+};
 
 const CATEGORIAS_ORDEN: string[] = ['Gestión Ambiental', 'Iniciativas Tecnológicas', 'Servicios HSE'];
 const LINEAS_COMPENSACIONES: LineaOperativa[] = [
   'Compensaciones estaciones',
   'Compensaciones e Inv',
-  'Compensaciones provisiones',
 ];
 
 const UNIDADES_CONTRATO = [
@@ -964,11 +976,9 @@ export const PlaneacionWizard: React.FC<Props> = ({ open, onClose, onComplete, i
   // Cambio 4: IPC global (uno solo para toda la planeación)
   const [ipcGlobalActivo, setIpcGlobalActivo] = useState<boolean>(false);
   const [ipcGlobalPorcentaje, setIpcGlobalPorcentaje] = useState<number>(0);
-  // IVA global por ítem (acordado en reunión martes 9:16): toggle global + opción por ítem
+  // IVA global por mes: toggle global + selección mensual en programación
   const [ivaGlobalActivo, setIvaGlobalActivo] = useState<boolean>(false);
   const [ivaGlobalPorcentaje, setIvaGlobalPorcentaje] = useState<number>(19);
-  // Cuando IVA está activo, todos los ítems aplican por defecto; el usuario excluye los que NO
-  const [ivaItemsExcluidos, setIvaItemsExcluidos] = useState<Set<string>>(new Set());
   const [customMonitoreoRows, setCustomMonitoreoRows] = useState<MonitoreoRow[]>([]);
   const [addingParamStep3, setAddingParamStep3] = useState(false);
   const [s3ParamEstacion, setS3ParamEstacion] = useState('');
@@ -998,6 +1008,7 @@ export const PlaneacionWizard: React.FC<Props> = ({ open, onClose, onComplete, i
   const [monthlyData, setMonthlyData] = useState<PlaneacionMensual[]>([]);
   // IPC per month toggle (which months apply IPC adjustment)
   const [ipcMeses, setIpcMeses] = useState<Set<number>>(new Set());
+  const [ivaMeses, setIvaMeses] = useState<Set<number>>(new Set());
 
   // Step 2: Sistema + Sector (Compensaciones only)
   const [selectedSistema, setSelectedSistema] = useState('');
@@ -1040,6 +1051,7 @@ export const PlaneacionWizard: React.FC<Props> = ({ open, onClose, onComplete, i
   const isMonitoreo = selectedLinea?.usaMatriz === true;
   const isCompensaciones = !!selectedLinea && LINEAS_COMPENSACIONES.includes(selectedLinea.value);
   const isCompensacionesProvisiones = selectedLinea?.value === 'Compensaciones provisiones';
+  const isIcas = selectedLinea?.value === 'ICAs';
   const isServiciosE = selectedLinea?.value === 'Servicios E';
   const tiposLugarDisponibles = useMemo(
     () => isServiciosE ? TIPOS_LUGAR.filter(t => t.value !== 'Estación') : TIPOS_LUGAR,
@@ -1084,6 +1096,9 @@ export const PlaneacionWizard: React.FC<Props> = ({ open, onClose, onComplete, i
       setSelectedLogistica(new Set(ITEMS_LOGISTICA.map(it => it.id)));
       setSelectedMatrices(new Set());
       setMonthlyData(initialData.programacion ?? []);
+      setIvaGlobalActivo(initialData.ivaGlobalActivo ?? false);
+      setIvaGlobalPorcentaje(initialData.ivaGlobalPorcentaje ?? 19);
+      setIvaMeses(new Set(initialData.ivaMeses ?? []));
     } else {
       setStep(0);
       setSelectedLinea(null);
@@ -1132,7 +1147,7 @@ export const PlaneacionWizard: React.FC<Props> = ({ open, onClose, onComplete, i
       setSelectedItemsY3(new Set());
       setIvaGlobalActivo(false);
       setIvaGlobalPorcentaje(19);
-      setIvaItemsExcluidos(new Set());
+      setIvaMeses(new Set());
     }
   }, [open, initialData]);
 
@@ -1302,9 +1317,9 @@ export const PlaneacionWizard: React.FC<Props> = ({ open, onClose, onComplete, i
     const q = paramSearch.toLowerCase();
     return availableItems.filter(it =>
       it.item.toLowerCase().includes(q) ||
-      it.descripcion.toLowerCase().includes(q)
+      (!isIcas && it.descripcion.toLowerCase().includes(q))
     );
-  }, [availableItems, paramSearch]);
+  }, [availableItems, paramSearch, isIcas]);
 
   const totalSelectedCount = isMonitoreo
     ? selectedParams.size
@@ -1415,14 +1430,14 @@ export const PlaneacionWizard: React.FC<Props> = ({ open, onClose, onComplete, i
     if (tipoLugar === 'Zona') setS3ParamEstacion('');
   }, [selectedZona, selectedEstacion, tipoLugar, s3ParamEstacion, s3ParamNombre, s3ParamMatriz, s3ParamNorma, s3ParamPermiso, s3ParamRequerimiento, s3ParamReceptor, s3ParamPrecio, availableEstaciones, paramKey]);
 
-  // ── Helper: factor IPC × IVA por mes/ítem ──
-  const computeFactor = useCallback((mesIndex: number, itemKey: string) => {
+  // ── Helper: factor IPC × IVA por mes ──
+  const computeFactor = useCallback((mesIndex: number) => {
     const ipcFactor = (ipcGlobalActivo && ipcMeses.has(mesIndex) && ipcGlobalPorcentaje > 0)
       ? (1 + (ipcGlobalPorcentaje / 100)) : 1;
-    const ivaFactor = (ivaGlobalActivo && !ivaItemsExcluidos.has(itemKey) && ivaGlobalPorcentaje > 0)
+    const ivaFactor = (ivaGlobalActivo && ivaMeses.has(mesIndex) && ivaGlobalPorcentaje > 0)
       ? (1 + (ivaGlobalPorcentaje / 100)) : 1;
     return ipcFactor * ivaFactor;
-  }, [ipcMeses, ipcGlobalActivo, ipcGlobalPorcentaje, ivaGlobalActivo, ivaGlobalPorcentaje, ivaItemsExcluidos]);
+  }, [ipcMeses, ipcGlobalActivo, ipcGlobalPorcentaje, ivaMeses, ivaGlobalActivo, ivaGlobalPorcentaje]);
 
   // ── Monthly per-item update ──
   const updateItemMonth = useCallback((mesIndex: number, itemKey: string, field: 'cantidad' | 'frecuencia', value: number) => {
@@ -1433,7 +1448,7 @@ export const PlaneacionWizard: React.FC<Props> = ({ open, onClose, onComplete, i
       const idx = list.findIndex(p => p.key === itemKey);
       if (idx >= 0) {
         const entry = { ...list[idx], [field]: value };
-        entry.total = entry.precio * entry.cantidad * entry.frecuencia * computeFactor(mesIndex, itemKey);
+        entry.total = entry.precio * entry.cantidad * entry.frecuencia * computeFactor(mesIndex);
         list[idx] = entry;
       }
       month.preciosIndividuales = list;
@@ -1449,7 +1464,7 @@ export const PlaneacionWizard: React.FC<Props> = ({ open, onClose, onComplete, i
       if (idx < 0) return month;
       const list = [...month.preciosIndividuales];
       const entry = { ...list[idx], precio: newPrice };
-      entry.total = entry.precio * entry.cantidad * entry.frecuencia * computeFactor(mi, itemKey);
+      entry.total = entry.precio * entry.cantidad * entry.frecuencia * computeFactor(mi);
       list[idx] = entry;
       return { ...month, preciosIndividuales: list, total: list.reduce((s, p) => s + p.total, 0) };
     }));
@@ -1462,7 +1477,7 @@ export const PlaneacionWizard: React.FC<Props> = ({ open, onClose, onComplete, i
     } else {
       MESES.forEach((_, i) => ItemsLineaService.updatePrecioMensual(itemKey, i, newPrice));
     }
-  }, [isMonitoreo, availableParams, paramKey]);
+  }, [isMonitoreo, availableParams, paramKey, computeFactor]);
 
   // ── Recalculate totals when IPC / IVA toggles change ──
   useEffect(() => {
@@ -1470,12 +1485,12 @@ export const PlaneacionWizard: React.FC<Props> = ({ open, onClose, onComplete, i
     setMonthlyData(prev => prev.map((month, mi) => {
       const list = month.preciosIndividuales.map(entry => ({
         ...entry,
-        total: entry.precio * entry.cantidad * entry.frecuencia * computeFactor(mi, entry.key),
+        total: entry.precio * entry.cantidad * entry.frecuencia * computeFactor(mi),
       }));
       return { ...month, preciosIndividuales: list, total: list.reduce((s, p) => s + p.total, 0) };
     }));
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ipcMeses, ipcGlobalActivo, ipcGlobalPorcentaje, ivaGlobalActivo, ivaGlobalPorcentaje, ivaItemsExcluidos]);
+  }, [ipcMeses, ipcGlobalActivo, ipcGlobalPorcentaje, ivaMeses, ivaGlobalActivo, ivaGlobalPorcentaje]);
 
   // ── Totals ──
   const valorTotalY1 = useMemo(() => monthlyData.reduce((s, m) => s + m.total, 0), [monthlyData]);
@@ -1667,7 +1682,7 @@ export const PlaneacionWizard: React.FC<Props> = ({ open, onClose, onComplete, i
         ipcMeses: [...ipcMeses],
         ivaGlobalActivo,
         ivaGlobalPorcentaje,
-        ivaItemsExcluidos: [...ivaItemsExcluidos],
+        ivaMeses: [...ivaMeses],
         ...(isServiciosE && { servicioEComplejidad }),
         ...(isCompensaciones && {
           sistema: selectedSistema || undefined,
@@ -1763,7 +1778,7 @@ export const PlaneacionWizard: React.FC<Props> = ({ open, onClose, onComplete, i
       id: `TMPITEM-${Date.now()}`,
       nombre: tempItemNombre.trim(),
       unidad: tempItemUnidad,
-      precio: parseFloat(tempItemPrecio) || 0,
+      precio: parseCOPInput(tempItemPrecio),
     }]);
     setTempItemNombre('');
     setTempItemPrecio('');
@@ -1815,7 +1830,7 @@ export const PlaneacionWizard: React.FC<Props> = ({ open, onClose, onComplete, i
       item: s3Nombre.trim(),
       descripcion: s3Nombre.trim(),
       unidad: s3Unidad,
-      precioReferencia: parseFloat(s3Precio) || 0,
+      precioReferencia: parseCOPInput(s3Precio),
     };
     setCustomItemsMap(prev => ({
       ...prev,
@@ -2018,7 +2033,7 @@ export const PlaneacionWizard: React.FC<Props> = ({ open, onClose, onComplete, i
                         </select>
                         <Input
                           value={tempItemPrecio}
-                          onChange={(_, d) => setTempItemPrecio(d.value)}
+                          onChange={(_, d) => setTempItemPrecio(formatCOPInput(d.value))}
                           placeholder="Precio COP"
                           style={{ flex: 1, minWidth: '100px' }}
                         />
@@ -2458,7 +2473,7 @@ export const PlaneacionWizard: React.FC<Props> = ({ open, onClose, onComplete, i
                       )}
                     </div>
                   )}
-                  {/* IVA global por ítem */}
+                  {/* IVA global por mes */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                     <Checkbox
                       label="¿IVA?"
@@ -2666,7 +2681,7 @@ export const PlaneacionWizard: React.FC<Props> = ({ open, onClose, onComplete, i
                             />
                           </th>
                           <th className={styles.paramTh}>Ítem</th>
-                          <th className={styles.paramTh}>Descripción</th>
+                          {!isIcas && <th className={styles.paramTh}>Descripción</th>}
                           <th className={styles.paramTh}>Unidad</th>
                           <th className={styles.paramTh}>Precio Ref.</th>
                         </tr>
@@ -2682,31 +2697,33 @@ export const PlaneacionWizard: React.FC<Props> = ({ open, onClose, onComplete, i
                             >
                               <td className={styles.paramTd}><Checkbox checked={sel} onChange={() => toggleItem(it)} /></td>
                               <td className={styles.paramTd} style={{ fontWeight: '600' }}>{it.item}</td>
-                              <td className={styles.paramTd} style={{ maxWidth: '260px' }}>
-                                <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                  {it.descripcion}
-                                </div>
-                                {it.requiereComplejidad && (
-                                  <div
-                                    style={{ marginTop: '6px', display: 'flex', alignItems: 'center', gap: '6px' }}
-                                    onClick={e => e.stopPropagation()}
-                                  >
-                                    <Caption1 style={{ color: tokens.colorNeutralForeground3 }}>Complejidad</Caption1>
-                                    <select
-                                      value={servicioEComplejidad}
-                                      onChange={e => {
-                                        setServicioEComplejidad(e.target.value as ServicioEComplejidad);
-                                        setMonthlyData([]);
-                                      }}
-                                      style={{ padding: '4px 8px', borderRadius: '6px', border: '1px solid #ccc', fontSize: '12px' }}
-                                    >
-                                      {SERVICIO_E_COMPLEJIDADES.map(complejidad => (
-                                        <option key={complejidad} value={complejidad}>{complejidad}</option>
-                                      ))}
-                                    </select>
+                              {!isIcas && (
+                                <td className={styles.paramTd} style={{ maxWidth: '260px' }}>
+                                  <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                    {it.descripcion}
                                   </div>
-                                )}
-                              </td>
+                                  {it.requiereComplejidad && (
+                                    <div
+                                      style={{ marginTop: '6px', display: 'flex', alignItems: 'center', gap: '6px' }}
+                                      onClick={e => e.stopPropagation()}
+                                    >
+                                      <Caption1 style={{ color: tokens.colorNeutralForeground3 }}>Complejidad</Caption1>
+                                      <select
+                                        value={servicioEComplejidad}
+                                        onChange={e => {
+                                          setServicioEComplejidad(e.target.value as ServicioEComplejidad);
+                                          setMonthlyData([]);
+                                        }}
+                                        style={{ padding: '4px 8px', borderRadius: '6px', border: '1px solid #ccc', fontSize: '12px' }}
+                                      >
+                                        {SERVICIO_E_COMPLEJIDADES.map(complejidad => (
+                                          <option key={complejidad} value={complejidad}>{complejidad}</option>
+                                        ))}
+                                      </select>
+                                    </div>
+                                  )}
+                                </td>
+                              )}
                               <td className={styles.paramTd}>{it.unidad}</td>
                               <td className={styles.paramTd} style={{ fontWeight: '600' }}>{fmtCOP(it.precioReferencia)}</td>
                             </tr>
@@ -2714,7 +2731,7 @@ export const PlaneacionWizard: React.FC<Props> = ({ open, onClose, onComplete, i
                         })}
                         {filteredItems.length === 0 && (
                           <tr>
-                            <td className={styles.paramTd} colSpan={5} style={{ textAlign: 'center', padding: '32px', color: tokens.colorNeutralForeground3 }}>
+                            <td className={styles.paramTd} colSpan={isIcas ? 4 : 5} style={{ textAlign: 'center', padding: '32px', color: tokens.colorNeutralForeground3 }}>
                               {isCompensacionesProvisiones
                                 ? 'Agrega ítems manualmente para esta provisión.'
                                 : `No se encontraron ítems para ${selectedLinea?.label}`}
@@ -2745,7 +2762,7 @@ export const PlaneacionWizard: React.FC<Props> = ({ open, onClose, onComplete, i
                         </div>
                         <div style={{ minWidth: '140px' }}>
                           <Caption1>Precio ref. (COP)</Caption1>
-                          <Input value={s3Precio} onChange={(_, d) => setS3Precio(d.value)} placeholder="0" style={{ width: '100%' }} />
+                          <Input value={s3Precio} onChange={(_, d) => setS3Precio(formatCOPInput(d.value))} placeholder="0" style={{ width: '100%' }} />
                         </div>
                       </div>
                       <div style={{ display: 'flex', gap: '8px' }}>
@@ -3142,6 +3159,22 @@ export const PlaneacionWizard: React.FC<Props> = ({ open, onClose, onComplete, i
                           <th className={styles.progMatrixTotalTh}></th>
                         </tr>
                       )}
+                      {ivaGlobalActivo && ivaGlobalPorcentaje > 0 && (
+                        <tr style={{ background: CENIT_COLORS.green }}>
+                          <th className={styles.progMatrixItemTh} style={{ fontSize: '11px', fontWeight: '700', color: '#ffffff', textAlign: 'right' }} title={`Marca los meses donde aplicar +${ivaGlobalPorcentaje}% de IVA`}>
+                            Aplicar IVA (+{ivaGlobalPorcentaje}%) →
+                          </th>
+                          {MESES_SHORT.map((_, i) => (
+                            <th key={i} className={styles.progMatrixMonthTh} style={{ textAlign: 'center' }}>
+                              <Checkbox
+                                checked={ivaMeses.has(i)}
+                                onChange={() => { const s = new Set(ivaMeses); s.has(i) ? s.delete(i) : s.add(i); setIvaMeses(s); }}
+                              />
+                            </th>
+                          ))}
+                          <th className={styles.progMatrixTotalTh}></th>
+                        </tr>
+                      )}
                     </thead>
                     <tbody>
                       {(monthlyData[0]?.preciosIndividuales ?? []).map(item => {
@@ -3158,21 +3191,6 @@ export const PlaneacionWizard: React.FC<Props> = ({ open, onClose, onComplete, i
                                 {isLog && <span style={{ marginRight: '4px', fontSize: '10px' }}>🚐</span>}
                                 {item.nombre}
                               </div>
-                              {ivaGlobalActivo && (
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '4px' }}>
-                                  <Checkbox
-                                    checked={!ivaItemsExcluidos.has(item.key)}
-                                    onChange={(_, d) => {
-                                      const s = new Set(ivaItemsExcluidos);
-                                      if (d.checked) s.delete(item.key); else s.add(item.key);
-                                      setIvaItemsExcluidos(s);
-                                    }}
-                                  />
-                                  <Caption1 style={{ fontSize: '10px', color: tokens.colorNeutralForeground3 }}>
-                                    Aplica IVA (+{ivaGlobalPorcentaje}%)
-                                  </Caption1>
-                                </div>
-                              )}
                               <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                                 <Caption1 style={{ color: tokens.colorNeutralForeground3, fontSize: '10px', whiteSpace: 'nowrap' }}>$/u:</Caption1>
                                 <Input

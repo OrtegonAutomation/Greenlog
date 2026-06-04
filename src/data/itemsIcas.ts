@@ -106,6 +106,11 @@ const normalizeZona = (value: string): string => {
 const preciosMensuales = (tipo: TipoIca): Record<number, number> =>
   Object.fromEntries(PRECIOS_ICA[tipo].map((precio, mesIndex) => [mesIndex, precio])) as Record<number, number>;
 
+const ITEM_ICA_CONSOLIDADO: Record<TipoIca, string> = {
+  consolidacion: 'Consolidar información para Informes de Cumplimiento Ambiental',
+  elaboracion: 'Elaborar Informes de Cumplimiento Ambiental',
+};
+
 export const ITEMS_ICAS: ItemLinea[] = ICA_ROWS.map(([tipoIca, item, zonaIca, baseServicio, ordenInterna, cuentaContable], index) => {
   const precios = preciosMensuales(tipoIca);
   return {
@@ -124,10 +129,30 @@ export const ITEMS_ICAS: ItemLinea[] = ICA_ROWS.map(([tipoIca, item, zonaIca, ba
   };
 });
 
+const consolidarPorTipo = (items: ItemLinea[]): ItemLinea[] => {
+  const tipos = new Set(items.map(item => item.tipoIca).filter(Boolean));
+  return (['consolidacion', 'elaboracion'] as TipoIca[])
+    .filter(tipoIca => tipos.has(tipoIca))
+    .map(tipoIca => {
+      const precios = preciosMensuales(tipoIca);
+      return {
+        id: `ICAS-${tipoIca.toUpperCase()}`,
+        lineaOperativa: 'ICAs',
+        item: ITEM_ICA_CONSOLIDADO[tipoIca],
+        descripcion: '',
+        unidad: 'Global',
+        precioReferencia: precios[0],
+        preciosMensuales: precios,
+        tipoIca,
+        cuentaContable: '7407020251',
+      };
+    });
+};
+
 export const getItemsIcasPorZona = (zona?: string): ItemLinea[] => {
-  if (!zona) return ITEMS_ICAS;
+  if (!zona) return consolidarPorTipo(ITEMS_ICAS);
   const zonaNormalizada = normalizeZona(zona);
-  return ITEMS_ICAS.filter(item => {
+  const itemsZona = ITEMS_ICAS.filter(item => {
     const itemZona = normalizeZona(item.zonaIca ?? '');
     const base = normalizeZona(item.baseServicio ?? '');
     return itemZona.includes(zonaNormalizada)
@@ -135,4 +160,5 @@ export const getItemsIcasPorZona = (zona?: string): ItemLinea[] => {
       || zonaNormalizada.includes(itemZona)
       || zonaNormalizada.includes(base);
   });
+  return consolidarPorTipo(itemsZona);
 };
