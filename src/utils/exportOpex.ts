@@ -195,6 +195,8 @@ export const exportDetalleInternoToExcel = (actividades: ActividadAmbiental[]) =
     const tipo    = (item as any).tipoPlaneacion    || opx.tipoPlaneacion    || 'Plan';
     const anio    = (item as any).anioPlaneacion    || opx.anioPlaneacion    || '';
     const estacion = item.estacion || opx.pk || zona;
+    const objetoContrato = opx.objeto || '';
+    const descripcionNecesidad = opx.descripcionNecesidad || item.descripcion || item.tarea || '';
 
     // New format: per-item rows using preciosIndividuales
     const firstMonth = opx.meses[0];
@@ -215,6 +217,8 @@ export const exportDetalleInternoToExcel = (actividades: ActividadAmbiental[]) =
           "Tipo": tipo,
           "Año": anio,
           "Estación / Ubicación": estacion,
+          "Objeto del contrato": objetoContrato,
+          "Descripcion de la necesidad": descripcionNecesidad,
           "Ítem / Parámetro": firstEntry.nombre,
           "Puntos": opx.paramTipoMuestra?.[itemKey] === 'compuesto' ? 0 : 1,
           "Compuestos": opx.paramTipoMuestra?.[itemKey] === 'compuesto' ? (opx.paramCantCompuestos?.[itemKey] || 1) : 0,
@@ -248,6 +252,8 @@ export const exportDetalleInternoToExcel = (actividades: ActividadAmbiental[]) =
         "Tipo": tipo,
         "Año": anio,
         "Estación / Ubicación": estacion,
+        "Objeto del contrato": objetoContrato,
+        "Descripcion de la necesidad": descripcionNecesidad,
         "Ítem / Parámetro": item.tarea || '',
         "Puntos": 0,
         "Compuestos": 0,
@@ -293,6 +299,7 @@ export const exportDetalleInternoToExcel = (actividades: ActividadAmbiental[]) =
 
   worksheet['!cols'] = keys.map(k =>
     MESES_LABEL.includes(k) ? { wch: 14 } :
+    (k.includes('Objeto') || k.includes('Descripcion')) ? { wch: 42 } :
     (k.includes('Ítem') || k.includes('Parámetro')) ? { wch: 38 } :
     { wch: 18 }
   );
