@@ -84,6 +84,7 @@ const ITEMS_DB: ItemLinea[] = [
 
 /** Líneas que usan el catálogo BQS con tarifas por estación */
 const LINEAS_BQS: LineaOperativa[] = ['Compensaciones estaciones', 'Compensaciones e Inv'];
+const LINEAS_MANUALES: LineaOperativa[] = ['Compensaciones provisiones'];
 
 function isEstacionBQS(v: string | undefined): v is EstacionBQS {
   return !!v && (ESTACIONES_BQS as string[]).includes(v);
@@ -107,6 +108,10 @@ export const ItemsLineaService = {
 
     if (linea === 'Servicios E') {
       return getItemsServiciosEPorZona(zona, servicioEComplejidad);
+    }
+
+    if (LINEAS_MANUALES.includes(linea)) {
+      return [];
     }
 
     if (LINEAS_BQS.includes(linea)) {

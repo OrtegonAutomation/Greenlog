@@ -523,8 +523,8 @@ function validateCompensacionesRow(
   // Validaciones
   if (!idObligacion) errors.push(`Fila ${rowIdx}: "ID Obligación" es obligatorio`);
   else if (!/^[A-Z]+_\d+$/.test(idObligacion)) errors.push(`Fila ${rowIdx}: "ID Obligación" debe tener formato COMP_NN o INV_NN`);
-  if (!['Compensaciones estaciones', 'Compensaciones e Inv'].includes(lineaStr)) {
-    errors.push(`Fila ${rowIdx}: "Línea Operativa" debe ser "Compensaciones estaciones" o "Compensaciones e Inv"`);
+  if (!['Compensaciones estaciones', 'Compensaciones e Inv', 'Compensaciones provisiones'].includes(lineaStr)) {
+    errors.push(`Fila ${rowIdx}: "Línea Operativa" debe ser "Compensaciones estaciones", "Compensaciones e Inv" o "Compensaciones provisiones"`);
   }
   if (!fechaCreacion) errors.push(`Fila ${rowIdx}: "Fecha Creación" es obligatoria`);
   if (!actoTipo) errors.push(`Fila ${rowIdx}: "Acto - Tipo" es obligatorio`);
@@ -632,7 +632,7 @@ function validateCompensacionesRow(
 
   // Construir payload
   payload.tarea = `${lineaStr || 'Compensación'} — ${idObligacion}`;
-  payload.lineaOperativa = (lineaStr || 'Compensaciones estaciones') as LineaOperativa;
+  payload.lineaOperativa = (lineaStr || 'Compensaciones provisiones') as LineaOperativa;
   payload.descripcion = permiso ? `Permiso: ${permiso} | Acto: ${actoTipo} ${actoNumero}` : '';
   payload.responsable = responsableStr.replace(/\s*\(.+\)\s*$/, '').trim() || 'Sistema';
   payload.zona = zona;
@@ -968,7 +968,7 @@ async function generateTemplateCompensaciones(): Promise<void> {
 
   // Mapear el ID de "Línea Operativa" según prefijo del ID (COMP_* o INV_*)
   const lineaFromId = (id: string): LineaOperativa =>
-    id.startsWith('INV_') ? 'Compensaciones e Inv' : 'Compensaciones estaciones';
+    id.startsWith('INV_') ? 'Compensaciones e Inv' : 'Compensaciones provisiones';
 
   samples.forEach((s, idx) => {
     const row = ws.addRow([
@@ -1137,7 +1137,7 @@ async function generateTemplateCompensaciones(): Promise<void> {
     'Categorías', 'Contratos', 'Tipos Planeación', 'Fuentes Presupuesto', 'Responsables',
   ];
   const refCols: string[][] = [
-    ['Compensaciones estaciones', 'Compensaciones e Inv'],
+    ['Compensaciones estaciones', 'Compensaciones e Inv', 'Compensaciones provisiones'],
     ZONAS_COMPENSACIONES,
     SISTEMAS_CENIT as string[],
     TIPOS_ACTO as string[],

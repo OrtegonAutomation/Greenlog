@@ -26,6 +26,7 @@ export type LineaOperativa =
   | 'Servicios E'
   | 'Compensaciones estaciones'
   | 'Compensaciones e Inv'
+  | 'Compensaciones provisiones'
   | 'Estudios Ambientales'
   | 'Servicios Generales'
   | 'Hojas de Ruta Sostenibilidad Ambiental'
@@ -227,6 +228,7 @@ export const LINEAS_OPERATIVAS: { value: LineaOperativa; label: string }[] = [
   { value: 'Servicios E',                 label: 'Servicios E' },
   { value: 'Compensaciones estaciones',                label: 'Compensaciones Estaciones' },
   { value: 'Compensaciones e Inv',                     label: 'Compensaciones e Inversión' },
+  { value: 'Compensaciones provisiones',               label: 'Compensaciones Provisiones' },
   { value: 'Estudios Ambientales',                     label: 'Estudios Ambientales' },
   { value: 'Servicios Generales',                      label: 'Servicios Generales' },
   { value: 'Hojas de Ruta Sostenibilidad Ambiental',   label: 'Hojas de Ruta Sostenibilidad' },
@@ -253,6 +255,7 @@ export const LINEAS_PLANEACION: LineaPlaneacionConfig[] = [
   { value: 'Residuos peligrosos', label: 'Disposición RESPEL',      icon: '♻️', descripcion: 'Ítems de disposición de residuos peligrosos por estación', usaMatriz: false, lugarPorDefecto: 'Estación', categoria: 'Gestión Ambiental' },
   { value: 'Servicios E', label: 'Servicios E', icon: '🌿', descripcion: 'Compensaciones ambientales y servicios ecosistémicos', usaMatriz: false, lugarPorDefecto: 'Zona', categoria: 'Gestión Ambiental' },
   { value: 'Compensaciones estaciones', label: 'Compensaciones Estaciones', icon: '🌱', descripcion: 'Compensaciones específicas de estaciones', usaMatriz: false, lugarPorDefecto: 'Estación', categoria: 'Gestión Ambiental' },
+  { value: 'Compensaciones provisiones', label: 'Compensaciones Provisiones', icon: '💰', descripcion: 'Captura manual de provisiones ambientales por obligación', usaMatriz: false, lugarPorDefecto: 'Zona', categoria: 'Gestión Ambiental' },
   { value: 'Estudios Ambientales', label: 'Estudios Ambientales',    icon: '📊', descripcion: 'Estudios y diagnósticos ambientales', usaMatriz: false, lugarPorDefecto: 'Zona', categoria: 'Gestión Ambiental' },
   { value: 'Hojas de Ruta Sostenibilidad Ambiental', label: 'Hojas de Ruta Sostenibilidad', icon: '🗺️', descripcion: 'Acciones de sostenibilidad ambiental', usaMatriz: false, lugarPorDefecto: 'Zona', categoria: 'Gestión Ambiental' },
   { value: 'Pagos',            label: 'Pagos y Publicaciones',      icon: '💳', descripcion: 'Pagos a autoridades ambientales y publicaciones', usaMatriz: false, lugarPorDefecto: 'Zona', categoria: 'Gestión Ambiental' },

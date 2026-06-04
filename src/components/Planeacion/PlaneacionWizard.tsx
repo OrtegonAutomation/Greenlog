@@ -151,6 +151,11 @@ const MESES_SHORT = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct'
 const fmtCOP = (n: number) => `$${n.toLocaleString('es-CO')}`;
 
 const CATEGORIAS_ORDEN: string[] = ['Gestión Ambiental', 'Iniciativas Tecnológicas', 'Servicios HSE'];
+const LINEAS_COMPENSACIONES: LineaOperativa[] = [
+  'Compensaciones estaciones',
+  'Compensaciones e Inv',
+  'Compensaciones provisiones',
+];
 
 const UNIDADES_CONTRATO = [
   'Global', 'Mes', 'Día', 'Kg', 'Und', 'Visita', 'Ha', 'Árbol', 'ml',
@@ -1033,7 +1038,8 @@ export const PlaneacionWizard: React.FC<Props> = ({ open, onClose, onComplete, i
 
   // Derived
   const isMonitoreo = selectedLinea?.usaMatriz === true;
-  const isCompensaciones = selectedLinea?.value === 'Compensaciones estaciones' || selectedLinea?.value === 'Compensaciones e Inv';
+  const isCompensaciones = !!selectedLinea && LINEAS_COMPENSACIONES.includes(selectedLinea.value);
+  const isCompensacionesProvisiones = selectedLinea?.value === 'Compensaciones provisiones';
   const isServiciosE = selectedLinea?.value === 'Servicios E';
   const tiposLugarDisponibles = useMemo(
     () => isServiciosE ? TIPOS_LUGAR.filter(t => t.value !== 'Estación') : TIPOS_LUGAR,
@@ -2709,7 +2715,9 @@ export const PlaneacionWizard: React.FC<Props> = ({ open, onClose, onComplete, i
                         {filteredItems.length === 0 && (
                           <tr>
                             <td className={styles.paramTd} colSpan={5} style={{ textAlign: 'center', padding: '32px', color: tokens.colorNeutralForeground3 }}>
-                              No se encontraron ítems para {selectedLinea?.label}
+                              {isCompensacionesProvisiones
+                                ? 'Agrega ítems manualmente para esta provisión.'
+                                : `No se encontraron ítems para ${selectedLinea?.label}`}
                             </td>
                           </tr>
                         )}
