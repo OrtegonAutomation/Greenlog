@@ -137,22 +137,28 @@ const buildCustomItemsForEdit = (
   opx: any,
   programacion: PlaneacionMensual[],
   selectedItemIds: string[],
+  zona?: string,
 ) => {
+  const catalogIds = new Set(
+    ItemsLineaService.getItems(lineaOperativa, undefined, opx?.zona ?? zona, opx?.servicioEComplejidad)
+      .map(item => item.id)
+  );
+  const isCatalogItem = (itemId: string) => catalogIds.has(itemId) || !!ItemsLineaService.getItemById(itemId);
+
   const storedItems = asArray<any>(opx?.customItems)
-    .concat(asArray<any>(opx?.itemsSeleccionados))
     .map(item => normalizeItemLinea(item, lineaOperativa))
     .filter((item): item is ItemLinea => !!item);
 
   const customItems = new Map<string, ItemLinea>();
   for (const item of storedItems) {
-    if (item.id.startsWith('CUSTOM-') || !ItemsLineaService.getItemById(item.id)) {
+    if (item.id.startsWith('CUSTOM-') || !isCatalogItem(item.id)) {
       customItems.set(item.id, item);
     }
   }
 
   const entries = getStoredEntries(programacion);
   for (const itemId of selectedItemIds) {
-    if (itemId.startsWith('LOG-') || itemId.startsWith('MATRIZ|') || ItemsLineaService.getItemById(itemId)) continue;
+    if (itemId.startsWith('LOG-') || itemId.startsWith('MATRIZ|') || isCatalogItem(itemId)) continue;
     const entry = entries.get(itemId);
     if (!entry || customItems.has(itemId)) continue;
     customItems.set(itemId, {
@@ -192,7 +198,7 @@ const buildInitialDataFromActividad = (actividad: ActividadAmbiental, opx: any):
       .concat(asArray<any>(opx.parametrosSeleccionados).map(row => String(row?.matriz ?? '')))
       .concat(entries.filter(e => e.key.startsWith('MATRIZ|')).map(e => e.key.replace(/^MATRIZ\|/, '')))
   );
-  const customItems = buildCustomItemsForEdit(actividad.lineaOperativa, opx, programacion, selectedItemIds);
+  const customItems = buildCustomItemsForEdit(actividad.lineaOperativa, opx, programacion, selectedItemIds, actividad.zona);
   const preserveProgramacionSinSeleccion = actividad.lineaOperativa === 'Monitoreos'
     && selectedParamKeys.length === 0
     && entries.some(entry => entry.key.startsWith('MATRIZ|'));

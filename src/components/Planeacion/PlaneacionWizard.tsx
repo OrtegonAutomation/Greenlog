@@ -502,6 +502,15 @@ const useStyles = makeStyles({
     background: 'rgba(0,51,160,0.03)',
     boxShadow: '0 6px 20px rgba(0,51,160,0.1)',
   },
+  lineaCardDisabled: {
+    cursor: 'not-allowed',
+    opacity: 0.48,
+    ':hover': {
+      ...shorthands.border('2px', 'solid', 'rgba(0,0,0,0.06)'),
+      transform: 'none',
+      boxShadow: 'none',
+    },
+  },
   lineaIcon: {
     fontSize: '22px',
     width: '36px', height: '36px',
@@ -1108,6 +1117,7 @@ export const PlaneacionWizard: React.FC<Props> = ({
   const TOTAL_STEPS        = isCompensaciones ? 8 : 7;
 
   const STEPS = useMemo(() => getStepLabels(isMonitoreo, isCompensaciones), [isMonitoreo, isCompensaciones]);
+  const isEditMode = !!initialData;
 
   const lineasPlaneacionVisibles = useMemo(
     () => LINEAS_PLANEACION.filter(linea => !canSelectLinea || canSelectLinea(linea.value)),
@@ -1312,7 +1322,9 @@ export const PlaneacionWizard: React.FC<Props> = ({
       isServiciosE ? servicioEComplejidad : undefined,
     );
     const custom = customItemsMap[selectedLinea.value] ?? [];
-    let merged = [...serviceItems, ...custom];
+    let merged = [...serviceItems, ...custom].filter((item, index, items) =>
+      index === items.findIndex(candidate => candidate.id === item.id)
+    );
     // Compensaciones: filtrar adicionalmente por contrato seleccionado si los ítems traen campo `contrato`
     if (isCompensaciones && contratoSeleccionado) {
       merged = merged.filter(it => {
@@ -1855,6 +1867,7 @@ export const PlaneacionWizard: React.FC<Props> = ({
 
   // ── Selection handlers with reset cascade ──
   const handleSelectLinea = useCallback((cfg: LineaPlaneacionConfig) => {
+    if (isEditMode) return;
     setSelectedLinea(cfg);
     setTipoLugar(cfg.value === 'Servicios E' && cfg.lugarPorDefecto === 'Estación' ? 'Zona' : cfg.lugarPorDefecto);
     // Reset downstream
@@ -1865,7 +1878,7 @@ export const PlaneacionWizard: React.FC<Props> = ({
     setSelectedItems(new Set());
     setSelectedMatrices(new Set());
     setMonthlyData([]);
-  }, []);
+  }, [isEditMode]);
 
   const handleSelectZona = useCallback((z: string) => {
     setSelectedZona(z);
@@ -2023,7 +2036,9 @@ export const PlaneacionWizard: React.FC<Props> = ({
               <div>
                 <Title3 style={{ color: '#003057', display: 'block', marginBottom: '4px' }}>Selecciona la línea operativa</Title3>
                 <Caption1 style={{ color: tokens.colorNeutralForeground3, display: 'block' }}>
-                  Define el tipo de actividad a planear. Cada línea tiene sus propios ítems y flujo.
+                  {isEditMode
+                    ? 'La línea operativa se conserva para no convertir esta actividad en otra distinta. Puedes editar ubicación, clasificación, datos auxiliares, ítems y programación.'
+                    : 'Define el tipo de actividad a planear. Cada línea tiene sus propios ítems y flujo.'}
                 </Caption1>
 
                 {[...lineasPorCategoria.entries()].map(([cat, items]) => items.length > 0 && (
@@ -2033,7 +2048,11 @@ export const PlaneacionWizard: React.FC<Props> = ({
                       {items.map(cfg => (
                         <div
                           key={cfg.value}
-                          className={mergeClasses(styles.lineaCard, selectedLinea?.value === cfg.value && styles.lineaCardActive)}
+                          className={mergeClasses(
+                            styles.lineaCard,
+                            selectedLinea?.value === cfg.value && styles.lineaCardActive,
+                            isEditMode && selectedLinea?.value !== cfg.value && styles.lineaCardDisabled,
+                          )}
                           onClick={() => handleSelectLinea(cfg)}
                         >
                           <div className={styles.lineaIcon}>{cfg.icon}</div>
@@ -2050,7 +2069,7 @@ export const PlaneacionWizard: React.FC<Props> = ({
                 ))}
 
                 {/* Nueva línea inline */}
-                {allowCustomLineas && (!creandoLinea ? (
+                {allowCustomLineas && !isEditMode && (!creandoLinea ? (
                   <div className={styles.addLineaCard} onClick={() => setCreandoLinea(true)}>
                     <AddRegular /> Nueva línea operativa
                   </div>
