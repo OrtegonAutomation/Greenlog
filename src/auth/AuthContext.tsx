@@ -7,7 +7,6 @@ import {
   findEquipoAmbientalUser,
   normalizeEmail,
 } from '../data/equipoAmbiental';
-import { getSectionPath } from '../utils/appRoutes';
 import { getSupabaseClient, isSupabaseEnabled } from '../services/supabaseClient';
 
 const STORAGE_KEY = 'greenlog-auth-email';
@@ -65,10 +64,8 @@ const AuthContext = createContext<AuthContextValue>({
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const supabaseEnabled = isSupabaseEnabled();
-  const [currentUser, setCurrentUser] = useState<EquipoAmbientalUser | null>(() => (
-    supabaseEnabled ? null : getInitialUser()
-  ));
-  const [authLoading, setAuthLoading] = useState(supabaseEnabled);
+  const [currentUser, setCurrentUser] = useState<EquipoAmbientalUser | null>(() => getInitialUser());
+  const [authLoading, setAuthLoading] = useState(supabaseEnabled && !getInitialUser());
 
   const isAdmin = !!currentUser?.admin;
 
@@ -98,14 +95,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     supabase.auth.getSession()
       .then(async ({ data }) => {
         if (!active) return;
-        await setUserFromEmail(data.session?.user.email);
+        if (data.session?.user.email) {
+          window.localStorage.setItem(STORAGE_KEY, normalizeEmail(data.session.user.email));
+          await setUserFromEmail(data.session.user.email);
+        }
       })
       .finally(() => {
         if (active) setAuthLoading(false);
       });
 
     const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
-      void setUserFromEmail(session?.user.email);
+      if (session?.user.email) {
+        window.localStorage.setItem(STORAGE_KEY, normalizeEmail(session.user.email));
+        void setUserFromEmail(session.user.email);
+      }
     });
 
     return () => {
@@ -121,29 +124,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return {
         ok: false,
         message: 'Este correo no está habilitado para GreenLog. Verifica el correo o solicita actualización de la matriz de accesos.',
-      };
-    }
-
-    if (supabaseEnabled) {
-      const redirectTo = typeof window === 'undefined'
-        ? undefined
-        : `${window.location.origin}${getSectionPath('dashboard')}`;
-      const { error } = await getSupabaseClient().auth.signInWithOtp({
-        email: normalized,
-        options: {
-          emailRedirectTo: redirectTo,
-          shouldCreateUser: true,
-        },
-      });
-
-      if (error) {
-        return { ok: false, message: error.message };
-      }
-
-      return {
-        ok: true,
-        pendingEmail: true,
-        message: 'Te enviamos un enlace de acceso. Abre el correo para entrar a GreenLog.',
       };
     }
 
