@@ -45,6 +45,7 @@ export interface PlaneacionMensualParam {
   precio: number;      // Unit price
   cantidad: number;    // Units this month
   frecuencia: number;  // Composite multiplier (monitoreos) or 1
+  aplicaIva?: boolean; // Applies IVA to this item/parameter across scheduled months
   total: number;       // precio × cantidad × frecuencia
 }
 
@@ -86,7 +87,7 @@ export interface PlaneacionWizardResult {
   ipcGlobalActivo?: boolean;
   ipcGlobalPorcentaje?: number;
   ipcMeses?: number[];
-  // IVA global por mes
+  // IVA global por item
   ivaGlobalActivo?: boolean;
   ivaGlobalPorcentaje?: number;
   ivaMeses?: number[];
@@ -1026,7 +1027,7 @@ export const PlaneacionWizard: React.FC<Props> = ({
   // Cambio 4: IPC global (uno solo para toda la planeación)
   const [ipcGlobalActivo, setIpcGlobalActivo] = useState<boolean>(false);
   const [ipcGlobalPorcentaje, setIpcGlobalPorcentaje] = useState<number>(0);
-  // IVA global por mes: toggle global + selección mensual en programación
+  // IVA por item: toggle global + porcentaje; la selección vive en cada ítem programado.
   const [ivaGlobalActivo, setIvaGlobalActivo] = useState<boolean>(false);
   const [ivaGlobalPorcentaje, setIvaGlobalPorcentaje] = useState<number>(19);
   const [customMonitoreoRows, setCustomMonitoreoRows] = useState<MonitoreoRow[]>([]);
@@ -1347,14 +1348,23 @@ export const PlaneacionWizard: React.FC<Props> = ({
     // Build individual price entries from selected params/items + logística
     const buildEntry = (
       key: string, nombre: string, basePrice: number,
-      prev?: PlaneacionMensual, defaultFrec = 1,
+      mesIndex: number, prev?: PlaneacionMensual, defaultFrec = 1,
       forcePrice = false, // si true, siempre usa basePrice (ignora el precio guardado)
     ): PlaneacionMensualParam => {
       const ex = prev?.preciosIndividuales?.find(p => p.key === key);
       const precio    = (forcePrice || !ex) ? basePrice : ex.precio;
       const cantidad  = ex?.cantidad  ?? 0;
       const frecuencia = ex?.frecuencia ?? defaultFrec;
-      return { key, nombre, precio, cantidad, frecuencia, total: precio * cantidad * frecuencia };
+      const aplicaIva = ex?.aplicaIva ?? false;
+      return {
+        key,
+        nombre,
+        precio,
+        cantidad,
+        frecuencia,
+        aplicaIva,
+        total: precio * cantidad * frecuencia * computeFactor(mesIndex, aplicaIva),
+      };
     };
 
     setMonthlyData(prev => {
@@ -1381,18 +1391,18 @@ export const PlaneacionWizard: React.FC<Props> = ({
                 ? (paramCantCompuestos.get(key) || 1) : 1;
               return s + precioParam * compuestos;
             }, 0);
-            list.push(buildEntry(`MATRIZ|${matriz}`, `${matriz} (${rows.length} params)`, matrizPrecio, existing, 1, true));
+            list.push(buildEntry(`MATRIZ|${matriz}`, `${matriz} (${rows.length} params)`, matrizPrecio, i, existing, 1, true));
           }
         } else {
           for (const it of availableItems.filter(it => selectedItems.has(it.id))) {
-            list.push(buildEntry(it.id, it.item, ItemsLineaService.getPrecioEfectivo(it, i), existing, 1));
+            list.push(buildEntry(it.id, it.item, ItemsLineaService.getPrecioEfectivo(it, i), i, existing, 1));
           }
         }
 
         // Logística — solo en Monitoreos (no aplica para Compensaciones u otras líneas)
         if (isMonitoreo) {
           for (const log of ITEMS_LOGISTICA.filter(l => selectedLogistica.has(l.id))) {
-            list.push(buildEntry(log.id, log.item, ItemsLineaService.getPrecioEfectivo(log, i), existing, 1));
+            list.push(buildEntry(log.id, log.item, ItemsLineaService.getPrecioEfectivo(log, i), i, existing, 1));
           }
         }
 
@@ -1548,14 +1558,14 @@ export const PlaneacionWizard: React.FC<Props> = ({
     if (tipoLugar === 'Zona') setS3ParamEstacion('');
   }, [selectedZona, selectedEstacion, tipoLugar, s3ParamEstacion, s3ParamNombre, s3ParamMatriz, s3ParamNorma, s3ParamPermiso, s3ParamRequerimiento, s3ParamReceptor, s3ParamPrecio, availableEstaciones, paramKey]);
 
-  // ── Helper: factor IPC × IVA por mes ──
-  const computeFactor = useCallback((mesIndex: number) => {
+  // ── Helper: factor IPC por mes × IVA por ítem ──
+  const computeFactor = useCallback((mesIndex: number, aplicaIva?: boolean) => {
     const ipcFactor = (ipcGlobalActivo && ipcMeses.has(mesIndex) && ipcGlobalPorcentaje > 0)
       ? (1 + (ipcGlobalPorcentaje / 100)) : 1;
-    const ivaFactor = (ivaGlobalActivo && ivaMeses.has(mesIndex) && ivaGlobalPorcentaje > 0)
+    const ivaFactor = (ivaGlobalActivo && aplicaIva && ivaGlobalPorcentaje > 0)
       ? (1 + (ivaGlobalPorcentaje / 100)) : 1;
     return ipcFactor * ivaFactor;
-  }, [ipcMeses, ipcGlobalActivo, ipcGlobalPorcentaje, ivaMeses, ivaGlobalActivo, ivaGlobalPorcentaje]);
+  }, [ipcMeses, ipcGlobalActivo, ipcGlobalPorcentaje, ivaGlobalActivo, ivaGlobalPorcentaje]);
 
   // ── Monthly per-item update ──
   const updateItemMonth = useCallback((mesIndex: number, itemKey: string, field: 'cantidad' | 'frecuencia', value: number) => {
@@ -1566,7 +1576,7 @@ export const PlaneacionWizard: React.FC<Props> = ({
       const idx = list.findIndex(p => p.key === itemKey);
       if (idx >= 0) {
         const entry = { ...list[idx], [field]: value };
-        entry.total = entry.precio * entry.cantidad * entry.frecuencia * computeFactor(mesIndex);
+        entry.total = entry.precio * entry.cantidad * entry.frecuencia * computeFactor(mesIndex, entry.aplicaIva);
         list[idx] = entry;
       }
       month.preciosIndividuales = list;
@@ -1582,7 +1592,7 @@ export const PlaneacionWizard: React.FC<Props> = ({
       if (idx < 0) return month;
       const list = [...month.preciosIndividuales];
       const entry = { ...list[idx], precio: newPrice };
-      entry.total = entry.precio * entry.cantidad * entry.frecuencia * computeFactor(mi);
+      entry.total = entry.precio * entry.cantidad * entry.frecuencia * computeFactor(mi, entry.aplicaIva);
       list[idx] = entry;
       return { ...month, preciosIndividuales: list, total: list.reduce((s, p) => s + p.total, 0) };
     }));
@@ -1597,18 +1607,30 @@ export const PlaneacionWizard: React.FC<Props> = ({
     }
   }, [isMonitoreo, availableParams, paramKey, computeFactor]);
 
+  const updateItemIva = useCallback((itemKey: string, aplicaIva: boolean) => {
+    setMonthlyData(prev => prev.map((month, mi) => {
+      const idx = month.preciosIndividuales.findIndex(p => p.key === itemKey);
+      if (idx < 0) return month;
+      const list = [...month.preciosIndividuales];
+      const entry = { ...list[idx], aplicaIva };
+      entry.total = entry.precio * entry.cantidad * entry.frecuencia * computeFactor(mi, entry.aplicaIva);
+      list[idx] = entry;
+      return { ...month, preciosIndividuales: list, total: list.reduce((s, p) => s + p.total, 0) };
+    }));
+  }, [computeFactor]);
+
   // ── Recalculate totals when IPC / IVA toggles change ──
   useEffect(() => {
     if (monthlyData.length === 0) return;
     setMonthlyData(prev => prev.map((month, mi) => {
       const list = month.preciosIndividuales.map(entry => ({
         ...entry,
-        total: entry.precio * entry.cantidad * entry.frecuencia * computeFactor(mi),
+        total: entry.precio * entry.cantidad * entry.frecuencia * computeFactor(mi, entry.aplicaIva),
       }));
       return { ...month, preciosIndividuales: list, total: list.reduce((s, p) => s + p.total, 0) };
     }));
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ipcMeses, ipcGlobalActivo, ipcGlobalPorcentaje, ivaMeses, ivaGlobalActivo, ivaGlobalPorcentaje]);
+  }, [ipcMeses, ipcGlobalActivo, ipcGlobalPorcentaje, ivaGlobalActivo, ivaGlobalPorcentaje]);
 
   // ── Totals ──
   const valorTotalY1 = useMemo(() => monthlyData.reduce((s, m) => s + m.total, 0), [monthlyData]);
@@ -1808,6 +1830,11 @@ export const PlaneacionWizard: React.FC<Props> = ({
         ivaGlobalActivo,
         ivaGlobalPorcentaje,
         ivaMeses: [...ivaMeses],
+        ivaItemsExcluidos: ivaGlobalActivo
+          ? (monthlyData[0]?.preciosIndividuales ?? [])
+              .filter(item => !item.aplicaIva)
+              .map(item => item.key)
+          : [],
         ...(isServiciosE && { servicioEComplejidad }),
         ...(isCompensaciones && {
           sistema: selectedSistema || undefined,
@@ -2606,7 +2633,7 @@ export const PlaneacionWizard: React.FC<Props> = ({
                       )}
                     </div>
                   )}
-                  {/* IVA global por mes */}
+                  {/* IVA por ítem */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                     <Checkbox
                       label="¿IVA?"
@@ -3155,6 +3182,11 @@ export const PlaneacionWizard: React.FC<Props> = ({
                       💡 Marca los meses a partir de los cuales aplicar el ajuste de IPC (+{ipcGlobalPorcentaje}%). El precio de esos meses se multiplicará por {(1 + ipcGlobalPorcentaje / 100).toFixed(2)}.
                     </span>
                   )}
+                  {ivaGlobalActivo && ivaGlobalPorcentaje > 0 && (
+                    <span style={{ display: 'block', marginTop: '4px', color: CENIT_COLORS.green, fontWeight: 600 }}>
+                      💡 Marca IVA en cada ítem o parámetro que lo requiera. El ajuste (+{ivaGlobalPorcentaje}%) aplica a todos los meses programados de esa fila.
+                    </span>
+                  )}
                 </Caption1>
 
                 {/* Indicador de progreso multi-año — solo Compensaciones con aniosAPlanear > 1 */}
@@ -3292,22 +3324,6 @@ export const PlaneacionWizard: React.FC<Props> = ({
                           <th className={styles.progMatrixTotalTh}></th>
                         </tr>
                       )}
-                      {ivaGlobalActivo && ivaGlobalPorcentaje > 0 && (
-                        <tr style={{ background: CENIT_COLORS.green }}>
-                          <th className={styles.progMatrixItemTh} style={{ fontSize: '11px', fontWeight: '700', color: '#ffffff', textAlign: 'right' }} title={`Marca los meses donde aplicar +${ivaGlobalPorcentaje}% de IVA`}>
-                            Aplicar IVA (+{ivaGlobalPorcentaje}%) →
-                          </th>
-                          {MESES_SHORT.map((_, i) => (
-                            <th key={i} className={styles.progMatrixMonthTh} style={{ textAlign: 'center' }}>
-                              <Checkbox
-                                checked={ivaMeses.has(i)}
-                                onChange={() => { const s = new Set(ivaMeses); s.has(i) ? s.delete(i) : s.add(i); setIvaMeses(s); }}
-                              />
-                            </th>
-                          ))}
-                          <th className={styles.progMatrixTotalTh}></th>
-                        </tr>
-                      )}
                     </thead>
                     <tbody>
                       {(monthlyData[0]?.preciosIndividuales ?? []).map(item => {
@@ -3335,6 +3351,15 @@ export const PlaneacionWizard: React.FC<Props> = ({
                                   style={{ width: '90px' }}
                                 />
                               </div>
+                              {ivaGlobalActivo && ivaGlobalPorcentaje > 0 && (
+                                <div style={{ marginTop: '4px' }}>
+                                  <Checkbox
+                                    label={`IVA +${ivaGlobalPorcentaje}%`}
+                                    checked={!!item.aplicaIva}
+                                    onChange={(_, d) => updateItemIva(item.key, !!d.checked)}
+                                  />
+                                </div>
+                              )}
                             </td>
                             {/* Month cells */}
                             {monthlyData.map((month, mi) => {

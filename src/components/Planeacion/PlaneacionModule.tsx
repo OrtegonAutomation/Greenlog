@@ -74,17 +74,28 @@ const asNumber = (value: unknown, fallback = 0) => {
 const getParamKeyFromRow = (row: any) =>
   `${row?.estacion ?? ''}|${row?.parametro ?? ''}|${row?.matriz ?? ''}|${row?.norma ?? ''}`;
 
-const normalizeProgramacion = (meses: any[] = []): PlaneacionMensual[] =>
+const normalizeProgramacion = (
+  meses: any[] = [],
+  ivaItemsExcluidos: string[] = [],
+  ivaActivo = false,
+  usarIvaItemsLegacy = false,
+): PlaneacionMensual[] =>
   meses.map((m: any, i: number) => {
     const preciosIndividuales: PlaneacionMensualParam[] = asArray<any>(m?.preciosIndividuales)
-      .map((p: any) => ({
-        key: String(p?.key ?? ''),
-        nombre: String(p?.nombre ?? p?.key ?? ''),
-        precio: asNumber(p?.precio),
-        cantidad: asNumber(p?.cantidad),
-        frecuencia: asNumber(p?.frecuencia, 1),
-        total: asNumber(p?.total),
-      }))
+      .map((p: any) => {
+        const key = String(p?.key ?? '');
+        return {
+          key,
+          nombre: String(p?.nombre ?? p?.key ?? ''),
+          precio: asNumber(p?.precio),
+          cantidad: asNumber(p?.cantidad),
+          frecuencia: asNumber(p?.frecuencia, 1),
+          aplicaIva: typeof p?.aplicaIva === 'boolean'
+            ? p.aplicaIva
+            : usarIvaItemsLegacy && ivaActivo && key ? !ivaItemsExcluidos.includes(key) : false,
+          total: asNumber(p?.total),
+        };
+      })
       .filter(p => p.key);
 
     return {
@@ -177,7 +188,12 @@ const buildCustomItemsForEdit = (
 const buildInitialDataFromActividad = (actividad: ActividadAmbiental, opx: any): PlaneacionInitialData | null => {
   if (!opx?.meses) return null;
 
-  const programacion = normalizeProgramacion(opx.meses);
+  const programacion = normalizeProgramacion(
+    opx.meses,
+    asArray<string>(opx.ivaItemsExcluidos),
+    !!opx.ivaGlobalActivo,
+    Array.isArray(opx.ivaItemsExcluidos),
+  );
   const entries = [...getStoredEntries(programacion).values()];
   const selectedItemIds = unique(
     asArray<string>(opx.selectedItemIds)
@@ -536,6 +552,7 @@ export const PlaneacionModule: React.FC = () => {
       ivaGlobalActivo: result.ivaGlobalActivo,
       ivaGlobalPorcentaje: result.ivaGlobalPorcentaje,
       ivaMeses: result.ivaMeses,
+      ivaItemsExcluidos: result.ivaItemsExcluidos,
       servicioEComplejidad: result.servicioEComplejidad,
       solicitanteNombre,
       solicitanteEmail,

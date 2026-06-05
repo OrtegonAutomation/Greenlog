@@ -565,7 +565,7 @@ function validateCompensacionesRow(
       if (total > 0 && !primerMesActivo) primerMesActivo = mes;
       totalY1 += total;
       opexMeses[mi].preciosIndividuales.push({
-        key: item, nombre: item, precio, cantidad, frecuencia: 1, total,
+        key: item, nombre: item, precio, cantidad, frecuencia: 1, aplicaIva, total,
       });
       opexMeses[mi].precio += precio;
       opexMeses[mi].total += total;
