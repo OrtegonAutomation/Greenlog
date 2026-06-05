@@ -63,6 +63,8 @@ const scope = (lineas: LineaOperativa[], zonas: string[], global = false): Ambit
   global,
 });
 
+const serviciosEGlobal = () => scope(['Servicios E'], ZONAS, true);
+
 export const EQUIPO_AMBIENTAL: EquipoAmbientalUser[] = [
   {
     nombre: 'Camilo Ortegón',
@@ -80,8 +82,8 @@ export const EQUIPO_AMBIENTAL: EquipoAmbientalUser[] = [
     alcance: 'Especialista HSE-Ambiental CENIT',
     baseTrabajo: 'Santa Marta',
     zonaBase: 'Norte-Coveñas',
-    planeador: [scope(LINEAS_GESTION_AMBIENTAL, ['Norte', 'Coveñas'])],
-    revisor: [],
+    planeador: [scope(LINEAS_GESTION_AMBIENTAL, ['Norte', 'Coveñas']), serviciosEGlobal()],
+    revisor: [serviciosEGlobal()],
   },
   {
     nombre: 'Eliana Cortes',
@@ -89,8 +91,8 @@ export const EQUIPO_AMBIENTAL: EquipoAmbientalUser[] = [
     alcance: 'Especialista HSE-Ambiental CENIT',
     baseTrabajo: 'Bogotá',
     zonaBase: 'Oriente',
-    planeador: [scope(LINEAS_GESTION_AMBIENTAL, ['Oriente'])],
-    revisor: [scope(['Monitoreos'], ['Oriente'])],
+    planeador: [scope(LINEAS_GESTION_AMBIENTAL, ['Oriente']), serviciosEGlobal()],
+    revisor: [scope(['Monitoreos'], ['Oriente']), serviciosEGlobal()],
   },
   {
     nombre: 'Luis Alberto Pelaez',
@@ -98,8 +100,8 @@ export const EQUIPO_AMBIENTAL: EquipoAmbientalUser[] = [
     alcance: 'Especialista HSE-Ambiental CENIT',
     baseTrabajo: 'Cali',
     zonaBase: 'Occidente-Sur',
-    planeador: [scope(LINEAS_GESTION_AMBIENTAL, ['Occidente'])],
-    revisor: [],
+    planeador: [scope(LINEAS_GESTION_AMBIENTAL, ['Occidente']), serviciosEGlobal()],
+    revisor: [serviciosEGlobal()],
   },
   {
     nombre: 'Javier Hernandez',
@@ -107,8 +109,8 @@ export const EQUIPO_AMBIENTAL: EquipoAmbientalUser[] = [
     alcance: 'Especialista HSE-Ambiental CENIT',
     baseTrabajo: 'Cúcuta',
     zonaBase: 'CLC',
-    planeador: [scope(LINEAS_GESTION_AMBIENTAL, ['CLC'])],
-    revisor: [],
+    planeador: [scope(LINEAS_GESTION_AMBIENTAL, ['CLC']), serviciosEGlobal()],
+    revisor: [serviciosEGlobal()],
   },
   {
     nombre: 'Maria Ximena Puerto',
@@ -116,8 +118,8 @@ export const EQUIPO_AMBIENTAL: EquipoAmbientalUser[] = [
     alcance: 'Especialista HSE-Ambiental CENIT',
     baseTrabajo: 'Barrancabermeja',
     zonaBase: 'Centro',
-    planeador: [scope(LINEAS_GESTION_AMBIENTAL, ['Centro'])],
-    revisor: [scope(['Residuos peligrosos'], ['Centro'])],
+    planeador: [scope(LINEAS_GESTION_AMBIENTAL, ['Centro']), serviciosEGlobal()],
+    revisor: [scope(['Residuos peligrosos'], ['Centro']), serviciosEGlobal()],
   },
   {
     nombre: 'Paola Ferreira',
@@ -125,8 +127,8 @@ export const EQUIPO_AMBIENTAL: EquipoAmbientalUser[] = [
     alcance: 'Especialista HSE-Ambiental CENIT',
     baseTrabajo: 'Villavicencio',
     zonaBase: 'Llanos',
-    planeador: [scope(LINEAS_GESTION_AMBIENTAL, ['Llanos'])],
-    revisor: [],
+    planeador: [scope(LINEAS_GESTION_AMBIENTAL, ['Llanos']), serviciosEGlobal()],
+    revisor: [serviciosEGlobal()],
   },
   {
     nombre: 'Carmen Rosero',
@@ -134,8 +136,8 @@ export const EQUIPO_AMBIENTAL: EquipoAmbientalUser[] = [
     alcance: 'Especialista HSE-Ambiental CENIT',
     baseTrabajo: 'Pereira',
     zonaBase: 'Occidente-Norte',
-    planeador: [scope(LINEAS_GESTION_AMBIENTAL, ['Occidente'])],
-    revisor: [],
+    planeador: [scope(LINEAS_GESTION_AMBIENTAL, ['Occidente']), serviciosEGlobal()],
+    revisor: [serviciosEGlobal()],
   },
   {
     nombre: 'Viviana Buitrago',
@@ -143,8 +145,8 @@ export const EQUIPO_AMBIENTAL: EquipoAmbientalUser[] = [
     alcance: 'Especialista HSE-Ambiental CENIT',
     baseTrabajo: 'Bogotá',
     zonaBase: 'Transversal',
-    planeador: [],
-    revisor: [scope(['Servicios E'], ZONAS, true)],
+    planeador: [serviciosEGlobal()],
+    revisor: [serviciosEGlobal()],
   },
   {
     nombre: 'Diana Basto',
@@ -152,8 +154,8 @@ export const EQUIPO_AMBIENTAL: EquipoAmbientalUser[] = [
     alcance: 'Especialista HSE-Ambiental CENIT',
     baseTrabajo: 'Bogotá',
     zonaBase: 'Transversal',
-    planeador: [scope(['ICAs', 'Herramienta Digital', 'Pagos'], ZONAS, true)],
-    revisor: [scope(['ICAs', 'Herramienta Digital', 'Pagos', ...LINEAS_COMPENSACIONES], ZONAS, true)],
+    planeador: [scope(['ICAs', 'Herramienta Digital', 'Pagos'], ZONAS, true), serviciosEGlobal()],
+    revisor: [scope(['ICAs', 'Herramienta Digital', 'Pagos', ...LINEAS_COMPENSACIONES], ZONAS, true), serviciosEGlobal()],
   },
   {
     nombre: 'Andrés Yara',
@@ -161,8 +163,8 @@ export const EQUIPO_AMBIENTAL: EquipoAmbientalUser[] = [
     alcance: 'Especialista HSE-Ambiental CENIT',
     baseTrabajo: 'Bogotá',
     zonaBase: 'Transversal',
-    planeador: [],
-    revisor: [],
+    planeador: [serviciosEGlobal()],
+    revisor: [serviciosEGlobal()],
   },
   {
     nombre: 'Diego Efren Enriquez',
@@ -170,8 +172,8 @@ export const EQUIPO_AMBIENTAL: EquipoAmbientalUser[] = [
     alcance: 'Especialista HSE-Ambiental CENIT',
     baseTrabajo: 'Bogotá',
     zonaBase: 'Transversal',
-    planeador: [],
-    revisor: [],
+    planeador: [serviciosEGlobal()],
+    revisor: [serviciosEGlobal()],
   },
   {
     nombre: 'Juan Helderth Cardenas Ospina',
