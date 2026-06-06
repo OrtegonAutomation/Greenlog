@@ -393,6 +393,7 @@ const useStyles = makeStyles({
     animationFillMode: 'both',
   },
   wizard: {
+    position: 'relative',
     width: '960px',
     maxWidth: '95vw',
     maxHeight: '90vh',
@@ -432,6 +433,46 @@ const useStyles = makeStyles({
     transition: 'background 0.15s ease',
     color: tokens.colorNeutralForeground2,
     ':hover': { background: 'rgba(0,0,0,0.06)' },
+  },
+  exitConfirmBackdrop: {
+    position: 'absolute',
+    top: 0, left: 0, right: 0, bottom: 0,
+    background: 'rgba(0,12,36,0.42)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 5,
+    ...shorthands.padding('24px'),
+  },
+  exitConfirmCard: {
+    width: '460px',
+    maxWidth: '92vw',
+    background: '#fff',
+    borderRadius: '20px',
+    ...shorthands.padding('24px'),
+    boxShadow: '0 24px 64px rgba(0,0,0,0.28)',
+    ...shorthands.border('1px', 'solid', 'rgba(0,51,160,0.12)'),
+    display: 'flex',
+    flexDirection: 'column',
+    ...shorthands.gap('14px'),
+  },
+  exitConfirmIcon: {
+    width: '48px',
+    height: '48px',
+    borderRadius: '16px',
+    background: 'rgba(250,173,20,0.14)',
+    color: '#9a5b00',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    fontSize: '24px',
+    fontWeight: 800,
+  },
+  exitConfirmActions: {
+    display: 'flex',
+    justifyContent: 'flex-end',
+    ...shorthands.gap('10px'),
+    marginTop: '6px',
   },
 
   // Steps indicator
@@ -1040,6 +1081,7 @@ export const PlaneacionWizard: React.FC<Props> = ({
 
   // ── State ──
   const [step, setStep] = useState(0);
+  const [showExitConfirm, setShowExitConfirm] = useState(false);
 
   // Step 0: Línea
   const [selectedLinea, setSelectedLinea] = useState<LineaPlaneacionConfig | null>(null);
@@ -1221,6 +1263,7 @@ export const PlaneacionWizard: React.FC<Props> = ({
     if (!open) return;
     setParamSearch('');
     setCatalogWarning(null);
+    setShowExitConfirm(false);
     if (initialData) {
       const cfg = LINEAS_PLANEACION.find(l => l.value === initialData.lineaOperativa) ?? null;
       const initialTipoLugar = initialData.tipoLugar ?? cfg?.lugarPorDefecto ?? 'Estación';
@@ -2422,12 +2465,53 @@ export const PlaneacionWizard: React.FC<Props> = ({
     return map;
   }, [allowCustomLineas, customLineas, lineasPlaneacionVisibles]);
 
+  const hasWizardProgress = useMemo(() => (
+    step > 0 ||
+    !!selectedLinea ||
+    !!selectedZona ||
+    !!selectedEstacion ||
+    !!pk.trim() ||
+    selectedMatrices.size > 0 ||
+    selectedParams.size > 0 ||
+    selectedItems.size > 0 ||
+    monthlyData.some(m => m.total > 0) ||
+    datosAuxiliaresPresupuestales.contrato.trim().length > 0 ||
+    datosAuxiliaresPresupuestales.proveedor.trim().length > 0 ||
+    obligacionId.trim().length > 0
+  ), [
+    datosAuxiliaresPresupuestales.contrato,
+    datosAuxiliaresPresupuestales.proveedor,
+    monthlyData,
+    obligacionId,
+    pk,
+    selectedEstacion,
+    selectedItems,
+    selectedLinea,
+    selectedMatrices,
+    selectedParams,
+    selectedZona,
+    step,
+  ]);
+
+  const requestClose = useCallback(() => {
+    if (hasWizardProgress) {
+      setShowExitConfirm(true);
+      return;
+    }
+    onClose();
+  }, [hasWizardProgress, onClose]);
+
+  const confirmExit = useCallback(() => {
+    setShowExitConfirm(false);
+    onClose();
+  }, [onClose]);
+
   if (!open) return null;
 
   // ── Render ──
   return (
     <Portal>
-      <div className={styles.overlay} onClick={onClose}>
+      <div className={styles.overlay} onClick={requestClose}>
         <div className={styles.wizard} onClick={e => e.stopPropagation()} onKeyDown={handleWizardKeyDown}>
           {/* Header */}
           <div className={styles.wizardHeader}>
@@ -2439,7 +2523,7 @@ export const PlaneacionWizard: React.FC<Props> = ({
                 {STEPS[step].label} — Paso {step + 1} de {STEPS.length}
               </Caption1>
             </div>
-            <div className={styles.closeBtn} onClick={onClose}><DismissRegular /></div>
+            <div className={styles.closeBtn} onClick={requestClose}><DismissRegular /></div>
           </div>
 
           {/* Steps bar */}
@@ -4141,6 +4225,28 @@ export const PlaneacionWizard: React.FC<Props> = ({
               </Button>
             </div>
           </div>
+
+          {showExitConfirm && (
+            <div className={styles.exitConfirmBackdrop} onClick={e => e.stopPropagation()}>
+              <div className={styles.exitConfirmCard}>
+                <div className={styles.exitConfirmIcon}>!</div>
+                <Title3 style={{ color: '#003057', margin: 0 }}>
+                  Cuidado, podrías perder tu progreso
+                </Title3>
+                <Body1 style={{ color: tokens.colorNeutralForeground2, lineHeight: 1.5 }}>
+                  Le diste a salir del wizard. ¿Estás seguro de salir? Si sales ahora, perderás el progreso que no hayas guardado.
+                </Body1>
+                <div className={styles.exitConfirmActions}>
+                  <Button appearance="secondary" onClick={() => setShowExitConfirm(false)}>
+                    Seguir editando
+                  </Button>
+                  <Button appearance="primary" onClick={confirmExit} style={{ background: '#a4262c' }}>
+                    Salir y perder progreso
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
