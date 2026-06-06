@@ -71,8 +71,37 @@ const asNumber = (value: unknown, fallback = 0) => {
   return Number.isFinite(parsed) ? parsed : fallback;
 };
 
+const normalizeMatrizName = (value: unknown) => {
+  const raw = String(value ?? '').trim();
+  const key = raw
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toUpperCase()
+    .replace(/[^A-Z0-9]+/g, ' ')
+    .trim();
+  const aliases: Record<string, string> = {
+    ARD: 'ARD',
+    ARND: 'ARnD',
+    'AGUA SUPERFICIAL': 'Agua Superficial',
+    'AGUA SUBTERRANEA': 'Agua Subterranea',
+    'AGUA MARINA': 'Agua Marina',
+    AIRE: 'Aire',
+    SUELO: 'Suelo',
+    ISOCINETICO: 'Isocinetico',
+    'OLORES OFENSIVOS': 'Olores Ofensivos',
+  };
+  return aliases[key] ?? raw;
+};
+
+const normalizeParamKey = (value: string) => {
+  const parts = String(value ?? '').split('|');
+  if (parts.length < 4) return value;
+  parts[2] = normalizeMatrizName(parts[2]);
+  return parts.join('|');
+};
+
 const getParamKeyFromRow = (row: any) =>
-  `${row?.estacion ?? ''}|${row?.parametro ?? ''}|${row?.matriz ?? ''}|${row?.norma ?? ''}`;
+  `${row?.estacion ?? ''}|${row?.parametro ?? ''}|${normalizeMatrizName(row?.matriz)}|${row?.norma ?? ''}`;
 
 const normalizeProgramacion = (
   meses: any[] = [],
@@ -208,12 +237,14 @@ const buildInitialDataFromActividad = (actividad: ActividadAmbiental, opx: any):
   );
   const selectedParamKeys = unique(
     asArray<string>(opx.selectedParamKeys)
+      .map(normalizeParamKey)
       .concat(asArray<any>(opx.parametrosSeleccionados).map(getParamKeyFromRow))
   );
   const selectedMatrices = unique(
     asArray<string>(opx.selectedMatrices)
-      .concat(asArray<any>(opx.parametrosSeleccionados).map(row => String(row?.matriz ?? '')))
-      .concat(entries.filter(e => e.key.startsWith('MATRIZ|')).map(e => e.key.replace(/^MATRIZ\|/, '')))
+      .map(normalizeMatrizName)
+      .concat(asArray<any>(opx.parametrosSeleccionados).map(row => normalizeMatrizName(row?.matriz)))
+      .concat(entries.filter(e => e.key.startsWith('MATRIZ|')).map(e => normalizeMatrizName(e.key.replace(/^MATRIZ\|/, ''))))
   );
   const customItems = buildCustomItemsForEdit(actividad.lineaOperativa, opx, programacion, selectedItemIds, actividad.zona);
   const preserveProgramacionSinSeleccion = actividad.lineaOperativa === 'Monitoreos'
@@ -588,7 +619,9 @@ export const PlaneacionModule: React.FC = () => {
     const lugarLabel = result.sistema
       ? `${result.sistema}${result.sector ? ' — ' + result.sector : ''}`
       : result.tipoLugar === 'Estación' ? result.estacion
-      : result.tipoLugar === 'Línea' ? `PK ${result.pk}` : result.zona;
+      : result.tipoLugar === 'Línea' ? `PK ${result.pk}`
+      : result.tipoLugar === 'Transversal' ? 'Transversal'
+      : result.zona;
 
     const payload: NuevaActividadPayload = {
       tarea: `${result.lineaOperativa} — ${lugarLabel}`,

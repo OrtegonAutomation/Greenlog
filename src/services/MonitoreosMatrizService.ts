@@ -12,6 +12,10 @@ export interface MonitoreoRow {
   requerimiento: string;
   norma: string;
   parametro: string;
+  item?: string;
+  sistema?: string;
+  mes?: string;
+  totalChemilab?: number;
   chemilab: number; // Base reference price
   preciosMensuales?: Record<number, number>; // MonthIndex -> Overridden Price
   puntos: number;

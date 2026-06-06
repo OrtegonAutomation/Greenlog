@@ -11,7 +11,7 @@ export type EstadoAprobacion  = 'Pendiente' | 'Aprobado' | 'Rechazado';
 export type SeccionApp        = 'dashboard' | 'planeacion' | 'ejecucion' | 'reportes';
 export type ServicioApp       = 'none' | 'planeacion_ambiental' | 'provisiones';
 
-export type TipoLugar         = 'Estación' | 'Línea' | 'Zona';
+export type TipoLugar         = 'Estación' | 'Línea' | 'Zona' | 'Transversal';
 export type TipoPlaneacion    = 'Plan' | 'Adicional' | 'Emergencia';
 export type FuentePresupuesto = 'OPEX' | 'CAPEX';
 
@@ -64,7 +64,7 @@ export interface ActividadAmbiental {
   contrato?: string;
   zona: string;               // Zona geográfica CENIT
   estacion?: string;           // Estación específica dentro de la zona
-  tipoLugar?: TipoLugar;       // Estación, Línea o Zona completa
+  tipoLugar?: TipoLugar;       // Estación, Línea, Zona completa o Transversal
   pk?: string;                 // PK si tipoLugar es 'Línea'
   fuentePresupuesto?: FuentePresupuesto;  // OPEX o CAPEX
   tipoPlaneacion?: TipoPlaneacion;        // Plan, Adicional o Emergencia
@@ -269,6 +269,7 @@ export const TIPOS_LUGAR: { value: TipoLugar; label: string; descripcion: string
   { value: 'Estación', label: 'Estación',      descripcion: 'Estación específica (punto fijo)' },
   { value: 'Línea',    label: 'Línea (PK)',     descripcion: 'Ubicación en línea por PK (kilómetro)' },
   { value: 'Zona',     label: 'Zona completa',  descripcion: 'Aplica a toda la zona geográfica' },
+  { value: 'Transversal', label: 'Transversal', descripcion: 'Aplica transversalmente sin zona o PK específico' },
 ];
 
 export const TIPOS_PLANEACION: { value: TipoPlaneacion; label: string; descripcion: string }[] = [

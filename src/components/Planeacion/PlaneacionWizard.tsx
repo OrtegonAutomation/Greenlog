@@ -1064,6 +1064,7 @@ export const PlaneacionWizard: React.FC<Props> = ({
   // Step 4: Parámetros / Ítems
   const [availableMatrices, setAvailableMatrices] = useState<string[]>([]);
   const [selectedMatrices, setSelectedMatrices] = useState<Set<string>>(new Set());
+  const [matrizDetalleActiva, setMatrizDetalleActiva] = useState<string | null>(null);
   const [availableParams, setAvailableParams] = useState<MonitoreoRow[]>([]);
   const [selectedParams, setSelectedParams] = useState<Set<string>>(new Set());
   // Cambio 5: Simple/Compuesto per parameter
@@ -1157,7 +1158,9 @@ export const PlaneacionWizard: React.FC<Props> = ({
   const isServiciosE = selectedLinea?.value === 'Servicios E';
   const isPagosDiferidosDisponible = isIcas || isEstudiosAmbientales;
   const tiposLugarDisponibles = useMemo(
-    () => isServiciosE ? TIPOS_LUGAR.filter(t => t.value !== 'Estación') : TIPOS_LUGAR,
+    () => isServiciosE
+      ? TIPOS_LUGAR.filter(t => t.value !== 'Estación')
+      : TIPOS_LUGAR.filter(t => t.value !== 'Transversal'),
     [isServiciosE],
   );
 
@@ -1178,8 +1181,13 @@ export const PlaneacionWizard: React.FC<Props> = ({
 
   const zonasDisponiblesPaso = useMemo(() => {
     const zonasBase = isCompensaciones ? ZONAS_COMPENSACIONES : ZONAS;
-    if (!selectedLinea || !canSelectZona) return zonasBase;
-    return zonasBase.filter(zona => canSelectZona(selectedLinea.value, zona));
+    const zonasFiltradas = !selectedLinea || !canSelectZona
+      ? zonasBase
+      : zonasBase.filter(zona => canSelectZona(selectedLinea.value, zona));
+    if (selectedLinea?.value !== 'Servicios E') return zonasFiltradas;
+    return zonasFiltradas.includes('Transversal')
+      ? zonasFiltradas
+      : [...zonasFiltradas, 'Transversal'];
   }, [canSelectZona, isCompensaciones, selectedLinea]);
 
   // ── Reset on open ──
@@ -1210,6 +1218,7 @@ export const PlaneacionWizard: React.FC<Props> = ({
       setSelectedItems(new Set(initialData.selectedItemIds ?? []));
       setSelectedLogistica(new Set(initialData.selectedLogisticaIds ?? ITEMS_LOGISTICA.map(it => it.id)));
       setSelectedMatrices(new Set(initialData.selectedMatrices ?? []));
+      setMatrizDetalleActiva(null);
       setCustomMonitoreoRows(initialData.customMonitoreoRows ?? []);
       if (cfg) {
         setCustomItemsMap(prev => ({
@@ -1272,6 +1281,7 @@ export const PlaneacionWizard: React.FC<Props> = ({
       setSelectedItems(new Set());
       setSelectedLogistica(new Set(ITEMS_LOGISTICA.map(it => it.id)));
       setSelectedMatrices(new Set());
+      setMatrizDetalleActiva(null);
       setParamTipoMuestra(new Map());
       setParamCantCompuestos(new Map());
       setCustomMonitoreoRows([]);
@@ -1508,13 +1518,14 @@ export const PlaneacionWizard: React.FC<Props> = ({
     });
   }, [step, paramTipoMuestra, paramCantCompuestos]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // ── Param key helper ──
+  const paramKey = useCallback((r: MonitoreoRow) => `${r.estacion}|${r.parametro}|${r.matriz}|${r.norma}`, []);
+
   // ── Filtered params (monitoreos) ──
   const filteredParams = useMemo(() => {
     let rows = availableParams;
-    // Apply matrix filter
-    if (selectedMatrices.size > 0) {
-      rows = rows.filter(r => selectedMatrices.has(r.matriz));
-    }
+    if (!matrizDetalleActiva || !selectedMatrices.has(matrizDetalleActiva)) return [];
+    rows = rows.filter(r => r.matriz === matrizDetalleActiva);
     // Apply text search
     if (paramSearch) {
       const q = paramSearch.toLowerCase();
@@ -1527,7 +1538,20 @@ export const PlaneacionWizard: React.FC<Props> = ({
       );
     }
     return rows;
-  }, [availableParams, selectedMatrices, paramSearch]);
+  }, [availableParams, matrizDetalleActiva, selectedMatrices, paramSearch]);
+
+  const matrixSummaries = useMemo(() => {
+    const map = new Map<string, { matriz: string; params: number; estaciones: Set<string>; selected: number }>();
+    for (const row of availableParams) {
+      const key = row.matriz;
+      const current = map.get(key) ?? { matriz: key, params: 0, estaciones: new Set<string>(), selected: 0 };
+      current.params += 1;
+      if (row.estacion) current.estaciones.add(row.estacion);
+      if (selectedParams.has(paramKey(row))) current.selected += 1;
+      map.set(key, current);
+    }
+    return [...map.values()].sort((a, b) => a.matriz.localeCompare(b.matriz));
+  }, [availableParams, selectedParams, paramKey]);
 
   // ── Filtered items (non-monitoreos) ──
   const filteredItems = useMemo(() => {
@@ -1545,9 +1569,6 @@ export const PlaneacionWizard: React.FC<Props> = ({
        : isCompensaciones && itemsCambianPorAnio && tabAnio === 3 ? selectedItemsY3.size
        : selectedItems.size);
 
-  // ── Param key helper ──
-  const paramKey = useCallback((r: MonitoreoRow) => `${r.estacion}|${r.parametro}|${r.matriz}|${r.norma}`, []);
-
   // ── Toggle helpers ──
   const toggleParam = useCallback((r: MonitoreoRow) => {
     const key = paramKey(r);
@@ -1559,11 +1580,17 @@ export const PlaneacionWizard: React.FC<Props> = ({
   }, [paramKey]);
 
   const toggleAllParams = useCallback(() => {
-    if (selectedParams.size === filteredParams.length && filteredParams.length > 0) {
-      setSelectedParams(new Set());
-    } else {
-      setSelectedParams(new Set(filteredParams.map(r => paramKey(r))));
-    }
+    const visibleKeys = filteredParams.map(r => paramKey(r));
+    const allVisibleSelected = visibleKeys.length > 0 && visibleKeys.every(key => selectedParams.has(key));
+    setSelectedParams(prev => {
+      const next = new Set(prev);
+      if (allVisibleSelected) {
+        visibleKeys.forEach(key => next.delete(key));
+      } else {
+        visibleKeys.forEach(key => next.add(key));
+      }
+      return next;
+    });
   }, [filteredParams, selectedParams, paramKey]);
 
   const toggleItem = useCallback((it: ItemLinea) => {
@@ -1602,12 +1629,43 @@ export const PlaneacionWizard: React.FC<Props> = ({
   }, []);
 
   const toggleMatriz = useCallback((m: string) => {
+    const matrixRows = availableParams.filter(r => r.matriz === m);
+    const matrixSelected = selectedMatrices.has(m);
     setSelectedMatrices(prev => {
       const next = new Set(prev);
       if (next.has(m)) next.delete(m); else next.add(m);
       return next;
     });
+    if (matrixSelected && matrizDetalleActiva === m) {
+      setMatrizDetalleActiva(null);
+    }
+    setSelectedParams(prev => {
+      const next = new Set(prev);
+      for (const row of matrixRows) {
+        const key = paramKey(row);
+        if (matrixSelected) next.delete(key);
+        else next.add(key);
+      }
+      return next;
+    });
+  }, [availableParams, matrizDetalleActiva, paramKey, selectedMatrices]);
+
+  const clearMatrices = useCallback(() => {
+    setSelectedMatrices(new Set());
+    setSelectedParams(new Set());
+    setMatrizDetalleActiva(null);
   }, []);
+
+  const updateParamPrice = useCallback((row: MonitoreoRow, newPrice: number) => {
+    const key = paramKey(row);
+    const preciosMensuales = Object.fromEntries(MESES.map((_, index) => [index, newPrice]));
+    const updater = (r: MonitoreoRow) => paramKey(r) === key
+      ? { ...r, chemilab: newPrice, preciosMensuales }
+      : r;
+    setAvailableParams(prev => prev.map(updater));
+    setCustomMonitoreoRows(prev => prev.map(updater));
+    setMonthlyData([]);
+  }, [paramKey]);
 
   const handleAddParametroStep3 = useCallback(() => {
     if (!selectedZona || !s3ParamNombre.trim()) return;
@@ -2153,6 +2211,7 @@ export const PlaneacionWizard: React.FC<Props> = ({
     setSelectedParams(new Set());
     setSelectedItems(new Set());
     setSelectedMatrices(new Set());
+    setMatrizDetalleActiva(null);
     setMonthlyData([]);
     setPagosDiferidosActivo(false);
     setPagosDiferidosItems({});
@@ -2161,13 +2220,19 @@ export const PlaneacionWizard: React.FC<Props> = ({
 
   const handleSelectZona = useCallback((z: string) => {
     setSelectedZona(z);
+    if (selectedLinea?.value === 'Servicios E' && z === 'Transversal') {
+      setTipoLugar('Transversal');
+    } else if (selectedLinea?.value === 'Servicios E' && tipoLugar === 'Transversal') {
+      setTipoLugar('Zona');
+    }
     setSelectedEstacion(null);
     setPk('');
     setSelectedParams(new Set());
     setSelectedItems(new Set());
     setSelectedMatrices(new Set());
+    setMatrizDetalleActiva(null);
     setMonthlyData([]);
-  }, []);
+  }, [selectedLinea, tipoLugar]);
 
   const handleSelectEstacion = useCallback((e: string) => {
     setSelectedEstacion(e);
@@ -2604,7 +2669,12 @@ export const PlaneacionWizard: React.FC<Props> = ({
                         <div
                           key={tl.value}
                           className={mergeClasses(styles.tipoLugarCard, tipoLugar === tl.value && styles.tipoLugarCardActive)}
-                          onClick={() => { setTipoLugar(tl.value); setSelectedEstacion(null); setPk(''); }}
+                          onClick={() => {
+                            setTipoLugar(tl.value);
+                            if (tl.value === 'Transversal') setSelectedZona('Transversal');
+                            setSelectedEstacion(null);
+                            setPk('');
+                          }}
                         >
                           <Body2 style={{ fontWeight: '700' }}>{tl.label}</Body2>
                           <Caption1 style={{ color: tokens.colorNeutralForeground3 }}>{tl.descripcion}</Caption1>
@@ -2656,6 +2726,12 @@ export const PlaneacionWizard: React.FC<Props> = ({
                     {tipoLugar === 'Zona' && (
                       <div className={styles.infoBox}>
                         La actividad aplica a toda la zona <strong>{selectedZona}</strong>. No es necesario seleccionar una estación.
+                      </div>
+                    )}
+
+                    {tipoLugar === 'Transversal' && (
+                      <div className={styles.infoBox}>
+                        La actividad aplica de forma transversal. No es necesario seleccionar estación ni PK.
                       </div>
                     )}
                   </>
@@ -2868,13 +2944,13 @@ export const PlaneacionWizard: React.FC<Props> = ({
                 <Title3 style={{ color: '#003057', display: 'block', marginBottom: '4px' }}>
                   {isItemsReselect
                     ? `Selecciona ítems para el Año ${tabAnio} (${anioPlaneacion + (tabAnio - 1)})`
-                    : isMonitoreo ? 'Selecciona parámetros' : 'Selecciona ítems de pago'}
+                    : isMonitoreo ? 'Selecciona matrices' : 'Selecciona ítems de pago'}
                 </Title3>
                 <Caption1 style={{ color: tokens.colorNeutralForeground3, display: 'block' }}>
                   {isItemsReselect
                     ? `Las actividades del Año ${tabAnio} son distintas a las del Año 1. Marca los ítems que aplican para el Año ${tabAnio}.`
                     : isMonitoreo
-                      ? `Parámetros de la matriz de monitoreo para ${selectedZona}${tipoLugar === 'Zona' ? ' — zona completa' : selectedEstacion ? ` — ${selectedEstacion}` : ''}`
+                      ? `Selecciona una o más matrices parametrizadas para ${selectedZona}${tipoLugar === 'Zona' ? ' — zona completa' : selectedEstacion ? ` — ${selectedEstacion}` : ''}`
                       : `Ítems de pago del contrato ${selectedLinea?.label} para ${selectedZona}`}
                 </Caption1>
                 {isItemsReselect && (
@@ -2885,44 +2961,70 @@ export const PlaneacionWizard: React.FC<Props> = ({
                   </div>
                 )}
 
-                {/* Matrix filter (monitoreos only) */}
-                {isMonitoreo && availableMatrices.length > 0 && (
-                  <div className={styles.matrizFilterBar}>
-                    <Caption1 style={{ fontWeight: '700', color: '#003057', alignSelf: 'center', marginRight: '4px' }}>
-                      Filtrar por matriz:
-                    </Caption1>
-                    {availableMatrices.map(m => (
-                      <span
-                        key={m}
-                        className={mergeClasses(styles.matrizChip, selectedMatrices.has(m) && styles.matrizChipActive)}
-                        onClick={() => toggleMatriz(m)}
-                      >
-                        {m}
-                      </span>
-                    ))}
+                {/* Matrix selection (monitoreos only) */}
+                {isMonitoreo && matrixSummaries.length > 0 && (
+                  <>
+                    <div className={styles.matrizFilterBar}>
+                      <Caption1 style={{ fontWeight: '700', color: '#003057', alignSelf: 'center', marginRight: '4px' }}>
+                        Matrices:
+                      </Caption1>
+                      {matrixSummaries.map(m => (
+                        <span
+                          key={m.matriz}
+                          className={mergeClasses(styles.matrizChip, selectedMatrices.has(m.matriz) && styles.matrizChipActive)}
+                          onClick={() => toggleMatriz(m.matriz)}
+                          title={`${m.params} parámetros · ${m.estaciones.size} estación(es)`}
+                        >
+                          {m.matriz} · {m.selected}/{m.params}
+                        </span>
+                      ))}
+                      {selectedMatrices.size > 0 && (
+                        <span
+                          className={styles.matrizChip}
+                          style={{ fontStyle: 'italic' }}
+                          onClick={clearMatrices}
+                        >
+                          Limpiar selección
+                        </span>
+                      )}
+                    </div>
                     {selectedMatrices.size > 0 && (
-                      <span
-                        className={styles.matrizChip}
-                        style={{ fontStyle: 'italic' }}
-                        onClick={() => setSelectedMatrices(new Set())}
-                      >
-                        Limpiar filtro
-                      </span>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '10px', alignItems: 'center' }}>
+                        <Caption1 style={{ color: tokens.colorNeutralForeground3, fontWeight: 700 }}>
+                          Editar detalle:
+                        </Caption1>
+                        {[...selectedMatrices].sort().map(matriz => {
+                          const summary = matrixSummaries.find(m => m.matriz === matriz);
+                          return (
+                            <Button
+                              key={matriz}
+                              size="small"
+                              appearance={matrizDetalleActiva === matriz ? 'primary' : 'secondary'}
+                              onClick={() => setMatrizDetalleActiva(prev => prev === matriz ? null : matriz)}
+                              style={{ borderRadius: '999px' }}
+                            >
+                              {matriz} {summary ? `(${summary.selected}/${summary.params})` : ''}
+                            </Button>
+                          );
+                        })}
+                      </div>
                     )}
-                  </div>
+                  </>
                 )}
 
                 {/* Search bar */}
-                <div className={styles.searchWrap} style={{ marginTop: isMonitoreo && availableMatrices.length > 0 ? '4px' : '14px' }}>
+                <div className={styles.searchWrap} style={{ marginTop: isMonitoreo && matrixSummaries.length > 0 ? '4px' : '14px' }}>
                   <Input
-                    placeholder={isMonitoreo ? 'Buscar por parámetro, matriz, norma...' : 'Buscar ítem...'}
+                    placeholder={isMonitoreo ? 'Buscar dentro de matrices seleccionadas...' : 'Buscar ítem...'}
                     contentBefore={<SearchRegular />}
                     value={paramSearch}
                     onChange={(_, d) => setParamSearch(d.value)}
                     style={{ flex: 1, maxWidth: '400px' }}
                   />
                   <span className={styles.selectedCount}>
-                    {totalSelectedCount} seleccionados
+                    {isMonitoreo
+                      ? `${selectedMatrices.size} matrices · ${selectedParams.size} parámetros`
+                      : `${totalSelectedCount} seleccionados`}
                   </span>
                   {/* IPC global */}
                   {selectedLinea?.value !== 'Hojas de Ruta Sostenibilidad Ambiental' && (
@@ -2992,23 +3094,39 @@ export const PlaneacionWizard: React.FC<Props> = ({
                 ) : isMonitoreo ? (
                   // ── Monitoreo params table ──
                   <>
+                    {!matrizDetalleActiva ? (
+                      <div className={styles.infoBox} style={{ marginTop: '12px' }}>
+                        Selecciona una matriz y usa <strong>Editar detalle</strong> para revisar o ajustar sus parámetros. La selección de matriz ya incluye sus parámetros automáticamente.
+                      </div>
+                    ) : (
                     <div className={styles.paramTableWrap}>
+                      <div style={{ padding: '10px 12px', borderBottom: '1px solid #e5e7eb', display: 'flex', justifyContent: 'space-between', gap: '12px', alignItems: 'center' }}>
+                        <Body2 style={{ fontWeight: 700, color: '#003057' }}>
+                          Editando matriz: {matrizDetalleActiva}
+                        </Body2>
+                        <Button size="small" appearance="subtle" onClick={() => setMatrizDetalleActiva(null)}>
+                          Cerrar detalle
+                        </Button>
+                      </div>
                       <table className={styles.paramTable}>
                         <thead>
                           <tr>
                             <th className={styles.paramTh} style={{ width: '36px' }}>
                               <Checkbox
-                                checked={selectedParams.size > 0 && selectedParams.size === filteredParams.length ? true : selectedParams.size > 0 ? 'mixed' : false}
+                                checked={
+                                  filteredParams.length > 0 && filteredParams.every(r => selectedParams.has(paramKey(r)))
+                                    ? true
+                                    : filteredParams.some(r => selectedParams.has(paramKey(r)))
+                                      ? 'mixed'
+                                      : false
+                                }
                                 onChange={toggleAllParams}
                               />
                             </th>
                             {tipoLugar === 'Zona' && <th className={styles.paramTh}>Estación</th>}
                             <th className={styles.paramTh}>Parámetro</th>
                             <th className={styles.paramTh}>Matriz</th>
-                            <th className={styles.paramTh}>Norma</th>
-                            <th className={styles.paramTh}>Permiso</th>
-                            <th className={styles.paramTh}>Requerimiento</th>
-                            <th className={styles.paramTh}>Receptor</th>
+                            <th className={styles.paramTh}>Precio</th>
                             <th className={styles.paramTh}>Tipo muestra</th>
                             <th className={styles.paramTh}>Compuestos</th>
                           </tr>
@@ -3027,18 +3145,28 @@ export const PlaneacionWizard: React.FC<Props> = ({
                                   <Checkbox checked={sel} onChange={() => toggleParam(r)} />
                                 </td>
                                 {tipoLugar === 'Zona' && <td className={styles.paramTd} style={{ fontWeight: '600' }}>{r.estacion}</td>}
-                                <td className={styles.paramTd} style={{ fontWeight: '600', maxWidth: '180px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                  {r.parametro}
+                                <td className={styles.paramTd} style={{ fontWeight: '600', maxWidth: '280px' }}>
+                                  <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                    {r.parametro}
+                                  </div>
+                                  <Caption1
+                                    title={[r.norma, r.permiso, r.receptor, r.requerimiento].filter(Boolean).join(' · ')}
+                                    style={{ display: 'block', color: tokens.colorNeutralForeground3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '260px' }}
+                                  >
+                                    {[r.permiso, r.receptor].filter(Boolean).join(' · ') || r.norma}
+                                  </Caption1>
                                 </td>
                                 <td className={styles.paramTd}>{r.matriz}</td>
-                                <td className={styles.paramTd} style={{ maxWidth: '160px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                  {r.norma}
+                                <td className={styles.paramTd} onClick={e => e.stopPropagation()}>
+                                  <Input
+                                    type="number"
+                                    size="small"
+                                    value={String(r.chemilab || '')}
+                                    placeholder="0"
+                                    onChange={(_, d) => updateParamPrice(r, Number(d.value) || 0)}
+                                    style={{ width: '96px' }}
+                                  />
                                 </td>
-                                <td className={styles.paramTd}>{r.permiso}</td>
-                                <td className={styles.paramTd} style={{ maxWidth: '140px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                  {r.requerimiento}
-                                </td>
-                                <td className={styles.paramTd}>{r.receptor}</td>
                                 <td className={styles.paramTd} onClick={e => e.stopPropagation()}>
                                   <select
                                     value={paramTipoMuestra.get(key) || 'simple'}
@@ -3066,14 +3194,17 @@ export const PlaneacionWizard: React.FC<Props> = ({
                           })}
                           {filteredParams.length === 0 && (
                             <tr>
-                              <td className={styles.paramTd} colSpan={tipoLugar === 'Zona' ? 10 : 9} style={{ textAlign: 'center', padding: '32px', color: tokens.colorNeutralForeground3 }}>
-                                No se encontraron parámetros{selectedMatrices.size > 0 ? ' para las matrices seleccionadas' : ''}
+                              <td className={styles.paramTd} colSpan={tipoLugar === 'Zona' ? 7 : 6} style={{ textAlign: 'center', padding: '32px', color: tokens.colorNeutralForeground3 }}>
+                                {selectedMatrices.size === 0
+                                  ? 'Selecciona una o más matrices para ver y editar sus parámetros.'
+                                  : 'No se encontraron parámetros para las matrices seleccionadas.'}
                               </td>
                             </tr>
                           )}
                         </tbody>
                       </table>
                     </div>
+                    )}
 
                     {!addingParamStep3 ? (
                       <div className={styles.addItemCard} onClick={() => { setAddingParamStep3(true); setS3ParamEstacion(selectedEstacion ?? availableEstaciones[0] ?? ''); }}>
