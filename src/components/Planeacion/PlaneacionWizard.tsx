@@ -241,6 +241,37 @@ const shouldIgnoreWizardEnter = (event: React.KeyboardEvent<HTMLElement>) => {
   return ['button', 'checkbox', 'color', 'date', 'datetime-local', 'file', 'radio', 'reset', 'submit', 'time'].includes(type);
 };
 
+const shouldIgnoreWizardEnterNative = (event: KeyboardEvent) => {
+  if (
+    event.defaultPrevented ||
+    event.key !== 'Enter' ||
+    event.shiftKey ||
+    event.ctrlKey ||
+    event.altKey ||
+    event.metaKey ||
+    event.isComposing
+  ) {
+    return true;
+  }
+
+  const target = event.target as HTMLElement | null;
+  if (!target || target.isContentEditable) return true;
+
+  if (
+    target.closest(
+      'textarea, select, button, a, [role="button"], [role="combobox"], [role="listbox"], [role="option"], [data-enter-ignore="true"]',
+    )
+  ) {
+    return true;
+  }
+
+  const input = target.closest('input') as HTMLInputElement | null;
+  if (!input) return false;
+
+  const type = (input.getAttribute('type') ?? 'text').toLowerCase();
+  return ['button', 'checkbox', 'color', 'date', 'datetime-local', 'file', 'radio', 'reset', 'submit', 'time'].includes(type);
+};
+
 const CATEGORIAS_ORDEN: string[] = ['Gestión Ambiental', 'Iniciativas Tecnológicas', 'Servicios HSE'];
 const LINEAS_COMPENSACIONES: LineaOperativa[] = [
   'Compensaciones estaciones',
@@ -2276,6 +2307,17 @@ export const PlaneacionWizard: React.FC<Props> = ({
     event.preventDefault();
     handleNext();
   };
+
+  useEffect(() => {
+    if (!open || showExitConfirm) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (addingItemStep3 || addingParamStep3 || shouldIgnoreWizardEnterNative(event)) return;
+      event.preventDefault();
+      handleNext();
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  });
 
   // ── Selection handlers with reset cascade ──
   const handleSelectLinea = useCallback((cfg: LineaPlaneacionConfig) => {
