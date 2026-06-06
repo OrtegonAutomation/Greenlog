@@ -172,6 +172,7 @@ export const LoginGate: React.FC<LoginGateProps> = ({ onLoginSuccess, loadingOnl
   const styles = useStyles();
   const { login } = useAuth();
   const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -181,14 +182,14 @@ export const LoginGate: React.FC<LoginGateProps> = ({ onLoginSuccess, loadingOnl
     setSubmitting(true);
     setError('');
     setSuccess('');
-    const result = await login(email);
+    const result = await login(email, password);
     setSubmitting(false);
     if (!result.ok) {
       setError(result.message ?? 'No fue posible iniciar sesión.');
       return;
     }
-    if (result.pendingEmail) {
-      setSuccess(result.message ?? 'Revisa tu correo para entrar a GreenLog.');
+    if (result.pendingConfirmation) {
+      setSuccess(result.message ?? 'Cuenta activada. Vuelve a ingresar con tu contraseña.');
       return;
     }
     onLoginSuccess?.();
@@ -210,7 +211,8 @@ export const LoginGate: React.FC<LoginGateProps> = ({ onLoginSuccess, loadingOnl
             <span className={styles.eyebrow}>Acceso temporal</span>
             <Title1 className={styles.title}>GreenLog Ambiental</Title1>
             <Body1 className={styles.subtitle}>
-              Ingresa con el correo registrado en la matriz del equipo ambiental CENIT. Esta barrera temporal se reemplazará por Entra ID.
+              Ingresa con el correo registrado en la matriz del equipo ambiental CENIT y la contraseña temporal asignada.
+              Esta barrera temporal se reemplazará por Entra ID.
             </Body1>
           </div>
         </section>
@@ -226,7 +228,7 @@ export const LoginGate: React.FC<LoginGateProps> = ({ onLoginSuccess, loadingOnl
             <Caption1 className={styles.helper}>
               {loadingOnly
                 ? 'Estamos restaurando tu acceso a GreenLog.'
-                : 'Solo los correos autorizados pueden consultar, planear o revisar actividades ambientales.'}
+                : 'Solo los usuarios autorizados pueden consultar, planear o revisar actividades ambientales.'}
             </Caption1>
           </div>
 
@@ -242,7 +244,7 @@ export const LoginGate: React.FC<LoginGateProps> = ({ onLoginSuccess, loadingOnl
           {success && (
             <MessageBar intent="success" className={styles.errorBar}>
               <MessageBarBody className={styles.errorBody}>
-                <MessageBarTitle>Revisa tu correo</MessageBarTitle>
+                <MessageBarTitle>Cuenta activada</MessageBarTitle>
                 {success}
               </MessageBarBody>
             </MessageBar>
@@ -254,6 +256,7 @@ export const LoginGate: React.FC<LoginGateProps> = ({ onLoginSuccess, loadingOnl
                 type="email"
                 required
                 size="large"
+                autoComplete="username"
                 value={email}
                 onChange={(_, data) => {
                   setEmail(data.value);
@@ -263,14 +266,28 @@ export const LoginGate: React.FC<LoginGateProps> = ({ onLoginSuccess, loadingOnl
                 contentBefore={<MailRegular />}
                 placeholder="correo@cenit-transporte.com"
               />
+              <Input
+                type="password"
+                required
+                size="large"
+                autoComplete="current-password"
+                value={password}
+                onChange={(_, data) => {
+                  setPassword(data.value);
+                  setError('');
+                  setSuccess('');
+                }}
+                contentBefore={<LockClosedRegular />}
+                placeholder="Contraseña temporal"
+              />
               <Button
                 appearance="primary"
                 size="large"
                 type="submit"
-                disabled={!email.trim() || submitting}
+                disabled={!email.trim() || !password.trim() || submitting}
                 style={{ background: CENIT_COLORS.green, color: '#003057', fontWeight: 800 }}
               >
-                {submitting ? 'Enviando...' : 'Enviar enlace de acceso'}
+                {submitting ? 'Validando...' : 'Entrar a GreenLog'}
               </Button>
             </form>
           )}

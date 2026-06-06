@@ -11,21 +11,18 @@ import { getSupabaseClient, isSupabaseEnabled } from '../services/supabaseClient
 import { getLoginPath } from '../utils/appRoutes';
 
 const STORAGE_KEY = 'greenlog-auth-email';
-const PENDING_EMAIL_KEY = 'greenlog-auth-pending-email';
-const OTP_COOLDOWN_PREFIX = 'greenlog-auth-otp-next:';
-const DEFAULT_OTP_COOLDOWN_MS = 60_000;
 
 interface LoginResult {
   ok: boolean;
   message?: string;
-  pendingEmail?: boolean;
+  pendingConfirmation?: boolean;
 }
 
 interface AuthContextValue {
   currentUser: EquipoAmbientalUser | null;
   isAdmin: boolean;
   authLoading: boolean;
-  login: (email: string) => Promise<LoginResult>;
+  login: (email: string, password: string) => Promise<LoginResult>;
   logout: () => Promise<void>;
   canPlan: (linea?: LineaOperativa, zona?: string) => boolean;
   canReview: (linea?: LineaOperativa, zona?: string) => boolean;
@@ -58,25 +55,6 @@ const getRedirectUrl = () => {
   return `${window.location.origin}${getLoginPath()}`;
 };
 
-const getCooldownKey = (email: string) => `${OTP_COOLDOWN_PREFIX}${email}`;
-
-const getCooldownRemainingSeconds = (email: string) => {
-  if (typeof window === 'undefined') return 0;
-  const nextAllowed = Number(window.localStorage.getItem(getCooldownKey(email)) ?? 0);
-  return Math.max(0, Math.ceil((nextAllowed - Date.now()) / 1000));
-};
-
-const setOtpCooldown = (email: string, seconds?: number) => {
-  if (typeof window === 'undefined') return;
-  const ms = Math.max(1, seconds ?? DEFAULT_OTP_COOLDOWN_MS / 1000) * 1000;
-  window.localStorage.setItem(getCooldownKey(email), String(Date.now() + ms));
-};
-
-const parseCooldownSeconds = (message?: string) => {
-  const match = message?.match(/after\s+(\d+)\s+seconds?/i);
-  return match ? Number(match[1]) : undefined;
-};
-
 const AuthContext = createContext<AuthContextValue>({
   currentUser: null,
   isAdmin: false,
@@ -104,7 +82,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     if (user) {
       window.localStorage.setItem(STORAGE_KEY, normalized);
-      window.localStorage.removeItem(PENDING_EMAIL_KEY);
     } else {
       window.localStorage.removeItem(STORAGE_KEY);
     }
@@ -156,13 +133,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
   }, [setUserFromEmail, supabaseEnabled]);
 
-  const login = useCallback(async (email: string): Promise<LoginResult> => {
+  const login = useCallback(async (email: string, password: string): Promise<LoginResult> => {
     const normalized = normalizeEmail(email);
+    const normalizedPassword = password.trim();
     const user = findEquipoAmbientalUser(normalized);
     if (!user) {
       return {
         ok: false,
         message: 'Este correo no está habilitado para GreenLog. Verifica el correo o solicita actualización de la matriz de accesos.',
+      };
+    }
+
+    if (!normalizedPassword) {
+      return {
+        ok: false,
+        message: 'Ingresa la contraseña temporal asignada.',
       };
     }
 
@@ -179,47 +164,68 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return { ok: true };
     }
 
-    const cooldown = getCooldownRemainingSeconds(normalized);
-    if (cooldown > 0) {
+    const { error: signInError } = await supabase.auth.signInWithPassword({
+      email: normalized,
+      password: normalizedPassword,
+    });
+
+    if (!signInError) {
+      await setUserFromEmail(normalized);
+      return { ok: true };
+    }
+
+    const signInMessage = signInError.message.toLowerCase();
+    if (signInMessage.includes('email not confirmed')) {
       return {
-        ok: true,
-        pendingEmail: true,
-        message: `Ya solicitamos un enlace para este correo. Revisa tu bandeja o intenta nuevamente en ${cooldown} segundos.`,
+        ok: false,
+        message: 'La cuenta existe, pero Supabase todavía pide confirmar el correo. Revisa la bandeja del correo registrado.',
       };
     }
 
-    const { error } = await supabase.auth.signInWithOtp({
+    if (!signInMessage.includes('invalid login credentials')) {
+      return {
+        ok: false,
+        message: `No fue posible iniciar sesión: ${signInError.message}`,
+      };
+    }
+
+    const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
       email: normalized,
+      password: normalizedPassword,
       options: {
         emailRedirectTo: getRedirectUrl(),
-        shouldCreateUser: true,
+        data: {
+          nombre: user.nombre,
+          greenlogAllowlisted: true,
+        },
       },
     });
 
-    if (error) {
-      const waitSeconds = parseCooldownSeconds(error.message);
-      if (waitSeconds) {
-        setOtpCooldown(normalized, waitSeconds);
-        return {
-          ok: true,
-          pendingEmail: true,
-          message: `Supabase ya envió un enlace recientemente. Revisa tu correo o intenta de nuevo en ${waitSeconds} segundos.`,
-        };
-      }
-
+    if (signUpError) {
       return {
         ok: false,
-        message: `No fue posible enviar el enlace de acceso: ${error.message}`,
+        message: `No fue posible activar la cuenta: ${signUpError.message}`,
       };
     }
 
-    setOtpCooldown(normalized);
-    window.localStorage.setItem(PENDING_EMAIL_KEY, normalized);
+    const identities = signUpData.user?.identities;
+    if (Array.isArray(identities) && identities.length === 0) {
+      return {
+        ok: false,
+        message: 'La cuenta ya existe y la contraseña no coincide. Verifica la contraseña temporal asignada.',
+      };
+    }
+
+    if (signUpData.session?.user.email) {
+      await setUserFromEmail(signUpData.session.user.email);
+      return { ok: true };
+    }
+
     setCurrentUser(null);
     return {
       ok: true,
-      pendingEmail: true,
-      message: 'Te enviamos un enlace seguro. Ábrelo desde tu correo para entrar a GreenLog.',
+      pendingConfirmation: true,
+      message: 'Cuenta activada. Si Supabase solicita confirmación de correo, abre el enlace enviado y vuelve a ingresar con esta contraseña.',
     };
   }, [setUserFromEmail, supabaseEnabled]);
 
@@ -228,7 +234,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       await getSupabaseClient().auth.signOut();
     }
     window.localStorage.removeItem(STORAGE_KEY);
-    window.localStorage.removeItem(PENDING_EMAIL_KEY);
     setCurrentUser(null);
   }, [supabaseEnabled]);
 
