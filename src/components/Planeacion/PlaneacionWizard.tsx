@@ -47,6 +47,7 @@ export interface PlaneacionMensualParam {
   cantidad: number;    // Units this month
   frecuencia: number;  // Composite multiplier (monitoreos) or 1
   aplicaIva?: boolean; // Applies IVA to this item/parameter across scheduled months
+  porcentajeDiferido?: number; // % of item value scheduled in this month
   total: number;       // precio × cantidad × frecuencia
 }
 
@@ -94,6 +95,8 @@ export interface PlaneacionWizardResult {
   ivaMeses?: number[];
   // Compatibilidad histórica con planeaciones antiguas que tenían IVA por ítem.
   ivaItemsExcluidos?: string[];
+  pagosDiferidosActivo?: boolean;
+  pagosDiferidosItems?: Record<string, PagoDiferidoItemConfig>;
   // Compensaciones: Sistema + Sector
   sistema?: string;
   sector?: string;
@@ -136,6 +139,12 @@ export interface ProgramacionAnualItem {
   total: number;
 }
 
+export interface PagoDiferidoItemConfig {
+  porcentajeAsignado: number;
+  mesesSeleccionados: number[];
+  porcentajesMensuales: Record<number, number>;
+}
+
 export interface PlaneacionInitialData {
   lineaOperativa?: LineaOperativa;
   zona?: string;
@@ -162,6 +171,8 @@ export interface PlaneacionInitialData {
   ivaGlobalActivo?: boolean;
   ivaGlobalPorcentaje?: number;
   ivaMeses?: number[];
+  pagosDiferidosActivo?: boolean;
+  pagosDiferidosItems?: Record<string, PagoDiferidoItemConfig>;
   sistema?: string;
   sector?: string;
   obligacion?: PlaneacionWizardResult['obligacion'];
@@ -194,6 +205,10 @@ const parseCOPInput = (value: string) => {
   const digits = value.replace(/\D/g, '');
   return digits ? Number(digits) : 0;
 };
+const clampPct = (value: number) => Math.min(100, Math.max(0, Number.isFinite(value) ? value : 0));
+const roundPct = (value: number) => Number(value.toFixed(6));
+const fmtPct = (value: number) =>
+  `${value.toLocaleString('es-CO', { maximumFractionDigits: 4 })}%`;
 
 const shouldIgnoreWizardEnter = (event: React.KeyboardEvent<HTMLElement>) => {
   if (
@@ -1093,6 +1108,9 @@ export const PlaneacionWizard: React.FC<Props> = ({
   // IPC per month toggle (which months apply IPC adjustment)
   const [ipcMeses, setIpcMeses] = useState<Set<number>>(new Set());
   const [ivaMeses, setIvaMeses] = useState<Set<number>>(new Set());
+  const [pagosDiferidosActivo, setPagosDiferidosActivo] = useState(false);
+  const [pagosDiferidosItems, setPagosDiferidosItems] = useState<Record<string, PagoDiferidoItemConfig>>({});
+  const [pagosDiferidosWarning, setPagosDiferidosWarning] = useState<string | null>(null);
 
   // Step 2: Sistema + Sector (Compensaciones only)
   const [selectedSistema, setSelectedSistema] = useState('');
@@ -1137,7 +1155,9 @@ export const PlaneacionWizard: React.FC<Props> = ({
   const isCompensaciones = !!selectedLinea && LINEAS_COMPENSACIONES.includes(selectedLinea.value);
   const isCompensacionesProvisiones = selectedLinea?.value === 'Compensaciones provisiones';
   const isIcas = selectedLinea?.value === 'ICAs';
+  const isEstudiosAmbientales = selectedLinea?.value === 'Estudios Ambientales';
   const isServiciosE = selectedLinea?.value === 'Servicios E';
+  const isPagosDiferidosDisponible = isIcas || isEstudiosAmbientales;
   const tiposLugarDisponibles = useMemo(
     () => isServiciosE ? TIPOS_LUGAR.filter(t => t.value !== 'Estación') : TIPOS_LUGAR,
     [isServiciosE],
@@ -1211,6 +1231,9 @@ export const PlaneacionWizard: React.FC<Props> = ({
       setIvaGlobalActivo(initialData.ivaGlobalActivo ?? false);
       setIvaGlobalPorcentaje(initialData.ivaGlobalPorcentaje ?? 19);
       setIvaMeses(new Set(initialData.ivaMeses ?? []));
+      setPagosDiferidosActivo(!!initialData.pagosDiferidosActivo);
+      setPagosDiferidosItems(initialData.pagosDiferidosItems ?? {});
+      setPagosDiferidosWarning(null);
       setSelectedSistema(initialData.sistema ?? '');
       setSelectedSector(initialData.sector ?? '');
       setObligacionId(initialData.obligacion?.id ?? '');
@@ -1293,6 +1316,9 @@ export const PlaneacionWizard: React.FC<Props> = ({
       setIvaGlobalActivo(false);
       setIvaGlobalPorcentaje(19);
       setIvaMeses(new Set());
+      setPagosDiferidosActivo(false);
+      setPagosDiferidosItems({});
+      setPagosDiferidosWarning(null);
       setPreserveNextProgramacionBuild(false);
     }
   }, [open, initialData]);
@@ -1302,6 +1328,13 @@ export const PlaneacionWizard: React.FC<Props> = ({
     setTipoLugar('Zona');
     setSelectedEstacion(null);
   }, [isServiciosE, tipoLugar]);
+
+  useEffect(() => {
+    if (isPagosDiferidosDisponible) return;
+    setPagosDiferidosActivo(false);
+    setPagosDiferidosItems({});
+    setPagosDiferidosWarning(null);
+  }, [isPagosDiferidosDisponible]);
 
   // ── Load estaciones when zona + tipoLugar change ──
   useEffect(() => {
@@ -1407,19 +1440,25 @@ export const PlaneacionWizard: React.FC<Props> = ({
       forcePrice = false, // si true, siempre usa basePrice (ignora el precio guardado)
     ): PlaneacionMensualParam => {
       const ex = prev?.preciosIndividuales?.find(p => p.key === key);
+      const porcentajeDiferido = isPagosDiferidosDisponible && pagosDiferidosActivo
+        ? (ex?.porcentajeDiferido ?? pagosDiferidosItems[key]?.porcentajesMensuales?.[mesIndex] ?? 0)
+        : undefined;
       const precio    = (forcePrice || !ex) ? basePrice : ex.precio;
       const cantidad  = ex?.cantidad  ?? 0;
       const frecuencia = ex?.frecuencia ?? defaultFrec;
       const aplicaIva = ex?.aplicaIva ?? false;
-      return {
+      const entry: PlaneacionMensualParam = {
         key,
         nombre,
         precio,
         cantidad,
         frecuencia,
         aplicaIva,
-        total: precio * cantidad * frecuencia * computeFactor(mesIndex, aplicaIva),
+        porcentajeDiferido,
+        total: 0,
       };
+      entry.total = calculateEntryTotal(entry, mesIndex);
+      return entry;
     };
 
     setMonthlyData(prev => {
@@ -1622,6 +1661,22 @@ export const PlaneacionWizard: React.FC<Props> = ({
     return ipcFactor * ivaFactor;
   }, [ipcMeses, ipcGlobalActivo, ipcGlobalPorcentaje, ivaGlobalActivo, ivaGlobalPorcentaje]);
 
+  const isPagoDiferidoItem = useCallback((itemKey: string) =>
+    isPagosDiferidosDisponible
+    && pagosDiferidosActivo
+    && !isMonitoreo
+    && !itemKey.startsWith('LOG-')
+    && !itemKey.startsWith('MATRIZ|'),
+  [isPagosDiferidosDisponible, pagosDiferidosActivo, isMonitoreo]);
+
+  const calculateEntryTotal = useCallback((entry: PlaneacionMensualParam, mesIndex: number) => {
+    const factor = computeFactor(mesIndex, entry.aplicaIva);
+    if (isPagoDiferidoItem(entry.key)) {
+      return entry.precio * (clampPct(entry.porcentajeDiferido ?? 0) / 100) * factor;
+    }
+    return entry.precio * entry.cantidad * entry.frecuencia * factor;
+  }, [computeFactor, isPagoDiferidoItem]);
+
   // ── Monthly per-item update ──
   const updateItemMonth = useCallback((mesIndex: number, itemKey: string, field: 'cantidad' | 'frecuencia', value: number) => {
     setMonthlyData(prev => {
@@ -1631,7 +1686,7 @@ export const PlaneacionWizard: React.FC<Props> = ({
       const idx = list.findIndex(p => p.key === itemKey);
       if (idx >= 0) {
         const entry = { ...list[idx], [field]: value };
-        entry.total = entry.precio * entry.cantidad * entry.frecuencia * computeFactor(mesIndex, entry.aplicaIva);
+        entry.total = calculateEntryTotal(entry, mesIndex);
         list[idx] = entry;
       }
       month.preciosIndividuales = list;
@@ -1639,7 +1694,7 @@ export const PlaneacionWizard: React.FC<Props> = ({
       next[mesIndex] = month;
       return next;
     });
-  }, [computeFactor]);
+  }, [calculateEntryTotal]);
 
   const updateItemPrice = useCallback((itemKey: string, newPrice: number) => {
     setMonthlyData(prev => prev.map((month, mi) => {
@@ -1647,7 +1702,7 @@ export const PlaneacionWizard: React.FC<Props> = ({
       if (idx < 0) return month;
       const list = [...month.preciosIndividuales];
       const entry = { ...list[idx], precio: newPrice };
-      entry.total = entry.precio * entry.cantidad * entry.frecuencia * computeFactor(mi, entry.aplicaIva);
+      entry.total = calculateEntryTotal(entry, mi);
       list[idx] = entry;
       return { ...month, preciosIndividuales: list, total: list.reduce((s, p) => s + p.total, 0) };
     }));
@@ -1660,7 +1715,7 @@ export const PlaneacionWizard: React.FC<Props> = ({
     } else {
       MESES.forEach((_, i) => ItemsLineaService.updatePrecioMensual(itemKey, i, newPrice));
     }
-  }, [isMonitoreo, availableParams, paramKey, computeFactor]);
+  }, [isMonitoreo, availableParams, paramKey, calculateEntryTotal]);
 
   const updateItemIva = useCallback((itemKey: string, aplicaIva: boolean) => {
     if (aplicaIva) setIvaGlobalActivo(true);
@@ -1669,11 +1724,120 @@ export const PlaneacionWizard: React.FC<Props> = ({
       if (idx < 0) return month;
       const list = [...month.preciosIndividuales];
       const entry = { ...list[idx], aplicaIva };
-      entry.total = entry.precio * entry.cantidad * entry.frecuencia * computeFactor(mi, entry.aplicaIva);
+      entry.total = calculateEntryTotal(entry, mi);
       list[idx] = entry;
       return { ...month, preciosIndividuales: list, total: list.reduce((s, p) => s + p.total, 0) };
     }));
-  }, [computeFactor]);
+  }, [calculateEntryTotal]);
+
+  const updatePagoDiferidoConfig = useCallback((
+    itemKey: string,
+    updater: (current: PagoDiferidoItemConfig) => PagoDiferidoItemConfig,
+  ) => {
+    setPagosDiferidosWarning(null);
+    setPagosDiferidosItems(prev => {
+      const current = prev[itemKey] ?? {
+        porcentajeAsignado: 0,
+        mesesSeleccionados: [],
+        porcentajesMensuales: {},
+      };
+      return { ...prev, [itemKey]: updater(current) };
+    });
+  }, []);
+
+  const syncPagoDiferidoMonth = useCallback((itemKey: string, mesIndex: number, porcentaje: number) => {
+    setMonthlyData(prev => prev.map((month, mi) => {
+      if (mi !== mesIndex) return month;
+      const idx = month.preciosIndividuales.findIndex(p => p.key === itemKey);
+      if (idx < 0) return month;
+      const list = [...month.preciosIndividuales];
+      const entry = { ...list[idx], porcentajeDiferido: roundPct(clampPct(porcentaje)), cantidad: 0, frecuencia: 1 };
+      entry.total = calculateEntryTotal(entry, mi);
+      list[idx] = entry;
+      return { ...month, preciosIndividuales: list, total: list.reduce((s, p) => s + p.total, 0) };
+    }));
+  }, [calculateEntryTotal]);
+
+  const updatePagoDiferidoAsignado = useCallback((itemKey: string, value: number) => {
+    updatePagoDiferidoConfig(itemKey, current => ({
+      ...current,
+      porcentajeAsignado: roundPct(clampPct(value)),
+    }));
+  }, [updatePagoDiferidoConfig]);
+
+  const togglePagoDiferidoMes = useCallback((itemKey: string, mesIndex: number, checked: boolean) => {
+    updatePagoDiferidoConfig(itemKey, current => {
+      const meses = new Set(current.mesesSeleccionados);
+      const porcentajes = { ...current.porcentajesMensuales };
+      if (checked) {
+        meses.add(mesIndex);
+      } else {
+        meses.delete(mesIndex);
+        delete porcentajes[mesIndex];
+        syncPagoDiferidoMonth(itemKey, mesIndex, 0);
+      }
+      return {
+        ...current,
+        mesesSeleccionados: [...meses].sort((a, b) => a - b),
+        porcentajesMensuales: porcentajes,
+      };
+    });
+  }, [syncPagoDiferidoMonth, updatePagoDiferidoConfig]);
+
+  const updatePagoDiferidoMes = useCallback((itemKey: string, mesIndex: number, value: number) => {
+    const porcentaje = roundPct(clampPct(value));
+    updatePagoDiferidoConfig(itemKey, current => {
+      const meses = new Set(current.mesesSeleccionados);
+      if (porcentaje > 0) meses.add(mesIndex);
+      return {
+        ...current,
+        mesesSeleccionados: [...meses].sort((a, b) => a - b),
+        porcentajesMensuales: {
+          ...current.porcentajesMensuales,
+          [mesIndex]: porcentaje,
+        },
+      };
+    });
+    syncPagoDiferidoMonth(itemKey, mesIndex, porcentaje);
+  }, [syncPagoDiferidoMonth, updatePagoDiferidoConfig]);
+
+  const distribuirPagoDiferido = useCallback((itemKey: string) => {
+    const config = pagosDiferidosItems[itemKey];
+    const meses = config?.mesesSeleccionados ?? [];
+    const porcentajeAsignado = config?.porcentajeAsignado ?? 0;
+    if (meses.length === 0) {
+      setPagosDiferidosWarning('Selecciona al menos un mes para diferir el pago de este ítem.');
+      return;
+    }
+    if (porcentajeAsignado <= 0) {
+      setPagosDiferidosWarning('Define primero el porcentaje asignado del ítem.');
+      return;
+    }
+
+    const porcentajeMes = roundPct(porcentajeAsignado / meses.length);
+    const porcentajesMensuales: Record<number, number> = {};
+    meses.forEach(mesIndex => { porcentajesMensuales[mesIndex] = porcentajeMes; });
+
+    setPagosDiferidosWarning(null);
+    setPagosDiferidosItems(prev => ({
+      ...prev,
+      [itemKey]: {
+        porcentajeAsignado,
+        mesesSeleccionados: [...meses].sort((a, b) => a - b),
+        porcentajesMensuales,
+      },
+    }));
+    setMonthlyData(prev => prev.map((month, mi) => {
+      const idx = month.preciosIndividuales.findIndex(p => p.key === itemKey);
+      if (idx < 0) return month;
+      const list = [...month.preciosIndividuales];
+      const porcentajeDiferido = porcentajesMensuales[mi] ?? 0;
+      const entry = { ...list[idx], porcentajeDiferido, cantidad: 0, frecuencia: 1 };
+      entry.total = calculateEntryTotal(entry, mi);
+      list[idx] = entry;
+      return { ...month, preciosIndividuales: list, total: list.reduce((s, p) => s + p.total, 0) };
+    }));
+  }, [calculateEntryTotal, pagosDiferidosItems]);
 
   // ── Recalculate totals when IPC / IVA toggles change ──
   useEffect(() => {
@@ -1681,12 +1845,12 @@ export const PlaneacionWizard: React.FC<Props> = ({
     setMonthlyData(prev => prev.map((month, mi) => {
       const list = month.preciosIndividuales.map(entry => ({
         ...entry,
-        total: entry.precio * entry.cantidad * entry.frecuencia * computeFactor(mi, entry.aplicaIva),
+        total: calculateEntryTotal(entry, mi),
       }));
       return { ...month, preciosIndividuales: list, total: list.reduce((s, p) => s + p.total, 0) };
     }));
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ipcMeses, ipcGlobalActivo, ipcGlobalPorcentaje, ivaGlobalActivo, ivaGlobalPorcentaje]);
+  }, [ipcMeses, ipcGlobalActivo, ipcGlobalPorcentaje, ivaGlobalActivo, ivaGlobalPorcentaje, pagosDiferidosActivo]);
 
   // ── Totals ──
   const valorTotalY1 = useMemo(() => monthlyData.reduce((s, m) => s + m.total, 0), [monthlyData]);
@@ -1700,8 +1864,32 @@ export const PlaneacionWizard: React.FC<Props> = ({
     return total;
   }, [isCompensaciones, aniosAPlanear, valorTotalY1, valorTotalY2, valorTotalY3]);
 
+  const getPagoDiferidoProgramado = useCallback((itemKey: string) =>
+    monthlyData.reduce((s, mes) => {
+      const entry = mes.preciosIndividuales.find(p => p.key === itemKey);
+      return s + (entry?.porcentajeDiferido ?? 0);
+    }, 0),
+  [monthlyData]);
+
+  const pagosDiferidosErrores = useMemo(() => {
+    if (!isPagosDiferidosDisponible || !pagosDiferidosActivo) return [];
+    return (monthlyData[0]?.preciosIndividuales ?? [])
+      .map(item => {
+        const asignado = pagosDiferidosItems[item.key]?.porcentajeAsignado ?? 0;
+        const programado = getPagoDiferidoProgramado(item.key);
+        return {
+          key: item.key,
+          nombre: item.nombre,
+          asignado,
+          programado,
+        };
+      })
+      .filter(item => item.programado > item.asignado + 0.0001);
+  }, [getPagoDiferidoProgramado, isPagosDiferidosDisponible, monthlyData, pagosDiferidosActivo, pagosDiferidosItems]);
+
   // Compensaciones: validación de tope (no superar saldo asignado)
   const excedeTope = isCompensaciones && asignacionRecursos && saldoDisponible > 0 && valorTotal > saldoDisponible;
+  const excedePagosDiferidos = pagosDiferidosErrores.length > 0;
 
   // Compensaciones: sincronizar Año 2 y Año 3.
   // - Si itemsCambianPorAnio=false → usa los mismos ítems del Año 1.
@@ -1809,6 +1997,7 @@ export const PlaneacionWizard: React.FC<Props> = ({
         if (step === STEP_PROGRAMACION) {
           // Compensaciones: bloquear si excede el saldo asignado (validación final)
           if (excedeTope) return false;
+          if (excedePagosDiferidos) return false;
           return true;
         }
         return false;
@@ -1893,6 +2082,8 @@ export const PlaneacionWizard: React.FC<Props> = ({
               .filter(item => !item.aplicaIva)
               .map(item => item.key)
           : [],
+        pagosDiferidosActivo: isPagosDiferidosDisponible ? pagosDiferidosActivo : false,
+        pagosDiferidosItems: isPagosDiferidosDisponible ? pagosDiferidosItems : undefined,
         ...(isServiciosE && { servicioEComplejidad }),
         ...(isCompensaciones && {
           sistema: selectedSistema || undefined,
@@ -1969,6 +2160,9 @@ export const PlaneacionWizard: React.FC<Props> = ({
     setSelectedItems(new Set());
     setSelectedMatrices(new Set());
     setMonthlyData([]);
+    setPagosDiferidosActivo(false);
+    setPagosDiferidosItems({});
+    setPagosDiferidosWarning(null);
   }, [isEditMode]);
 
   const handleSelectZona = useCallback((z: string) => {
@@ -3177,6 +3371,35 @@ export const PlaneacionWizard: React.FC<Props> = ({
                   </div>
                 )}
 
+                {isPagosDiferidosDisponible && (
+                  <div className={styles.clasificacionGroup}>
+                    <Body2 style={{ fontWeight: '700', color: '#003057' }}>Pagos diferidos</Body2>
+                    <Caption1 style={{ color: tokens.colorNeutralForeground3, display: 'block', marginBottom: '8px' }}>
+                      Activa esta opción si un ítem debe pagarse por porcentajes distribuidos entre varios meses.
+                    </Caption1>
+                    <div className={styles.clasificacionCards}>
+                      <div
+                        className={mergeClasses(styles.clasificacionCard, !pagosDiferidosActivo && styles.clasificacionCardActive)}
+                        onClick={() => setPagosDiferidosActivo(false)}
+                      >
+                        <Body2 style={{ fontWeight: '700' }}>Programación normal</Body2>
+                        <Caption1 style={{ color: tokens.colorNeutralForeground3 }}>
+                          Usa cantidad mensual como hasta ahora.
+                        </Caption1>
+                      </div>
+                      <div
+                        className={mergeClasses(styles.clasificacionCard, pagosDiferidosActivo && styles.clasificacionCardActive)}
+                        onClick={() => setPagosDiferidosActivo(true)}
+                      >
+                        <Body2 style={{ fontWeight: '700' }}>Pagos diferidos</Body2>
+                        <Caption1 style={{ color: tokens.colorNeutralForeground3 }}>
+                          Define % asignado por ítem y reparte el pago entre meses seleccionados.
+                        </Caption1>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 {/* ── Compensaciones: Asignación de recursos / Años / Contrato ── */}
                 {isCompensaciones && (
                   <>
@@ -3330,6 +3553,11 @@ export const PlaneacionWizard: React.FC<Props> = ({
                       💡 Marca IVA en cada ítem o parámetro que lo requiera. El ajuste (+{ivaGlobalPorcentaje}%) aplica a todos los meses programados de esa fila.
                     </span>
                   )}
+                  {isPagosDiferidosDisponible && pagosDiferidosActivo && (
+                    <span style={{ display: 'block', marginTop: '4px', color: CENIT_COLORS.blueBrand, fontWeight: 600 }}>
+                      💡 Para cada ítem define un % asignado, selecciona los meses y usa “Diferir pagos” para repartirlo.
+                    </span>
+                  )}
                 </Caption1>
 
                 {isMonitoreo && (
@@ -3422,6 +3650,39 @@ export const PlaneacionWizard: React.FC<Props> = ({
                     marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px',
                   }}>
                     ⚠️ El total planeado ({fmtCOP(valorTotal)}) excede el saldo disponible ({fmtCOP(saldoDisponible)}). Reduce cantidades para poder completar.
+                  </div>
+                )}
+
+                {pagosDiferidosWarning && (
+                  <div style={{
+                    padding: '10px 12px',
+                    borderRadius: '10px',
+                    background: 'rgba(250, 173, 20, 0.12)',
+                    border: '1px solid rgba(250, 173, 20, 0.28)',
+                    color: '#7a4b00',
+                    fontSize: '12px',
+                    fontWeight: 600,
+                    marginBottom: '12px',
+                  }}>
+                    {pagosDiferidosWarning}
+                  </div>
+                )}
+
+                {excedePagosDiferidos && (
+                  <div style={{
+                    padding: '12px 16px',
+                    borderRadius: '10px',
+                    background: 'rgba(232, 17, 35, 0.08)',
+                    border: '1px solid rgba(232, 17, 35, 0.3)',
+                    color: '#a4262c',
+                    fontSize: '13px',
+                    fontWeight: 600,
+                    marginBottom: '12px',
+                  }}>
+                    ⚠️ Hay pagos diferidos que superan el porcentaje asignado:{' '}
+                    {pagosDiferidosErrores.map(err =>
+                      `${err.nombre} (${fmtPct(err.programado)} de ${fmtPct(err.asignado)})`
+                    ).join('; ')}. Ajusta los porcentajes mensuales para completar.
                   </div>
                 )}
 
@@ -3518,6 +3779,15 @@ export const PlaneacionWizard: React.FC<Props> = ({
                           const e = m.preciosIndividuales.find(p => p.key === item.key);
                           return s + (e?.total ?? 0);
                         }, 0);
+                        const pagoDiferidoConfig = pagosDiferidosItems[item.key] ?? {
+                          porcentajeAsignado: 0,
+                          mesesSeleccionados: [],
+                          porcentajesMensuales: {},
+                        };
+                        const pagoDiferidoProgramado = getPagoDiferidoProgramado(item.key);
+                        const pagoDiferidoExcede = isPagosDiferidosDisponible
+                          && pagosDiferidosActivo
+                          && pagoDiferidoProgramado > pagoDiferidoConfig.porcentajeAsignado + 0.0001;
                         return (
                           <tr key={item.key} className={isLog ? styles.progMatrixLogRow : styles.progMatrixRow}>
                             {/* Item name + editable unit price */}
@@ -3538,6 +3808,50 @@ export const PlaneacionWizard: React.FC<Props> = ({
                                   style={{ width: '90px' }}
                                 />
                               </div>
+                              {isPagosDiferidosDisponible && pagosDiferidosActivo && (
+                                <div style={{
+                                  marginTop: '6px',
+                                  display: 'grid',
+                                  gridTemplateColumns: '1fr',
+                                  gap: '4px',
+                                  padding: '8px',
+                                  borderRadius: '8px',
+                                  background: pagoDiferidoExcede ? 'rgba(232,17,35,0.08)' : 'rgba(0,51,160,0.04)',
+                                  border: pagoDiferidoExcede ? '1px solid rgba(232,17,35,0.22)' : '1px solid rgba(0,51,160,0.12)',
+                                }}>
+                                  <Caption1 style={{ color: tokens.colorNeutralForeground3, fontSize: '10px', fontWeight: 700 }}>
+                                    % asignado
+                                  </Caption1>
+                                  <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+                                    <Input
+                                      type="number"
+                                      size="small"
+                                      min={0}
+                                      max={100}
+                                      value={pagoDiferidoConfig.porcentajeAsignado > 0 ? String(pagoDiferidoConfig.porcentajeAsignado) : ''}
+                                      placeholder="0"
+                                      onChange={(_, d) => updatePagoDiferidoAsignado(item.key, Number(d.value) || 0)}
+                                      style={{ width: '72px' }}
+                                    />
+                                    <span style={{ fontSize: '11px', color: tokens.colorNeutralForeground3 }}>%</span>
+                                    <Button
+                                      size="small"
+                                      appearance="secondary"
+                                      onClick={() => distribuirPagoDiferido(item.key)}
+                                      style={{ minWidth: '96px', borderRadius: '8px' }}
+                                    >
+                                      Diferir pagos
+                                    </Button>
+                                  </div>
+                                  <Caption1 style={{
+                                    fontSize: '10px',
+                                    color: pagoDiferidoExcede ? '#a4262c' : tokens.colorNeutralForeground3,
+                                    fontWeight: pagoDiferidoExcede ? 700 : 500,
+                                  }}>
+                                    Programado {fmtPct(pagoDiferidoProgramado)} de {fmtPct(pagoDiferidoConfig.porcentajeAsignado)}
+                                  </Caption1>
+                                </div>
+                              )}
                               {(isMonitoreo || ivaGlobalActivo) && ivaGlobalPorcentaje > 0 && (
                                 <div style={{ marginTop: '4px' }}>
                                   <Checkbox
@@ -3552,16 +3866,38 @@ export const PlaneacionWizard: React.FC<Props> = ({
                             {monthlyData.map((month, mi) => {
                               const entry = month.preciosIndividuales.find(p => p.key === item.key);
                               if (!entry) return <td key={mi} className={styles.progMatrixMonthTd}>—</td>;
+                              const mesDiferidoSeleccionado = pagoDiferidoConfig.mesesSeleccionados.includes(mi)
+                                || (entry.porcentajeDiferido ?? 0) > 0;
                               return (
                                 <td key={mi} className={styles.progMatrixMonthTd}>
-                                  <Input
-                                    type="number"
-                                    size="small"
-                                    value={entry.cantidad > 0 ? String(entry.cantidad) : ''}
-                                    placeholder="0"
-                                    onChange={(_, d) => updateItemMonth(mi, item.key, 'cantidad', Number(d.value) || 0)}
-                                    style={{ width: '100%', minWidth: 0 }}
-                                  />
+                                  {isPagosDiferidosDisponible && pagosDiferidosActivo ? (
+                                    <>
+                                      <Checkbox
+                                        checked={mesDiferidoSeleccionado}
+                                        onChange={(_, d) => togglePagoDiferidoMes(item.key, mi, !!d.checked)}
+                                      />
+                                      <Input
+                                        type="number"
+                                        size="small"
+                                        min={0}
+                                        max={100}
+                                        value={(entry.porcentajeDiferido ?? 0) > 0 ? String(entry.porcentajeDiferido) : ''}
+                                        placeholder="%"
+                                        disabled={!mesDiferidoSeleccionado}
+                                        onChange={(_, d) => updatePagoDiferidoMes(item.key, mi, Number(d.value) || 0)}
+                                        style={{ width: '100%', minWidth: 0, marginTop: '2px' }}
+                                      />
+                                    </>
+                                  ) : (
+                                    <Input
+                                      type="number"
+                                      size="small"
+                                      value={entry.cantidad > 0 ? String(entry.cantidad) : ''}
+                                      placeholder="0"
+                                      onChange={(_, d) => updateItemMonth(mi, item.key, 'cantidad', Number(d.value) || 0)}
+                                      style={{ width: '100%', minWidth: 0 }}
+                                    />
+                                  )}
                                   {isMonitoreo && !item.key.startsWith('MATRIZ|') && (
                                     <Input
                                       type="number"
@@ -3571,6 +3907,11 @@ export const PlaneacionWizard: React.FC<Props> = ({
                                       onChange={(_, d) => updateItemMonth(mi, item.key, 'frecuencia', Number(d.value) || 0)}
                                       style={{ width: '100%', minWidth: 0, marginTop: '2px' }}
                                     />
+                                  )}
+                                  {isPagosDiferidosDisponible && pagosDiferidosActivo && (entry.porcentajeDiferido ?? 0) > 0 && (
+                                    <Caption1 style={{ fontSize: '10px', color: tokens.colorNeutralForeground3, display: 'block', marginTop: '2px', textAlign: 'right' }}>
+                                      {fmtPct(entry.porcentajeDiferido ?? 0)}
+                                    </Caption1>
                                   )}
                                   {entry.total > 0 && (
                                     <Caption1 style={{ fontSize: '10px', color: CENIT_COLORS.blueBrand, display: 'block', marginTop: '2px', textAlign: 'right', whiteSpace: 'nowrap' }}>

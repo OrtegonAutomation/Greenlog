@@ -232,6 +232,9 @@ const fmtCOPShort = (n: number) => {
   return `$${n}`;
 };
 
+const fmtPctShort = (n: number) =>
+  `${n.toLocaleString('es-CO', { maximumFractionDigits: 2 })}%`;
+
 const parseOpex = (raw?: string) => {
   if (!raw) return null;
   try { return JSON.parse(raw); } catch { return null; }
@@ -300,6 +303,7 @@ export const ActivityDetailPanel: React.FC<ActivityDetailPanelProps> = ({
   [opx]);
 
   const esMonitoreo = actividad?.lineaOperativa === 'Monitoreos';
+  const tienePagosDiferidos = !!opx?.pagosDiferidosActivo;
 
   if (!actividad) return null;
 
@@ -476,6 +480,10 @@ export const ActivityDetailPanel: React.FC<ActivityDetailPanelProps> = ({
               <div className={styles.mesesGrid}>
                 {opx.meses.map((m: any) => {
                   const activo = m.total > 0;
+                  const porcentajeDiferidoMes = (m.preciosIndividuales ?? []).reduce(
+                    (s: number, entry: any) => s + (Number(entry?.porcentajeDiferido) || 0),
+                    0,
+                  );
                   return (
                     <div
                       key={m.mes}
@@ -503,6 +511,11 @@ export const ActivityDetailPanel: React.FC<ActivityDetailPanelProps> = ({
                           {m.cantidad > 0 && (
                             <span className={styles.mesCant} style={{ color: tokens.colorNeutralForeground3 }}>
                               {esMonitoreo ? `${m.cantidad} pts` : `x${m.cantidad}`}
+                            </span>
+                          )}
+                          {tienePagosDiferidos && porcentajeDiferidoMes > 0 && (
+                            <span className={styles.mesCant} style={{ color: tokens.colorNeutralForeground3 }}>
+                              {fmtPctShort(porcentajeDiferidoMes)} diferido
                             </span>
                           )}
                           <span className={styles.mesTotal} style={{ color: CENIT_COLORS.blueBrand }}>

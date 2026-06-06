@@ -93,6 +93,7 @@ const normalizeProgramacion = (
           aplicaIva: typeof p?.aplicaIva === 'boolean'
             ? p.aplicaIva
             : usarIvaItemsLegacy && ivaActivo && key ? !ivaItemsExcluidos.includes(key) : false,
+          porcentajeDiferido: p?.porcentajeDiferido == null ? undefined : asNumber(p?.porcentajeDiferido),
           total: asNumber(p?.total),
         };
       })
@@ -243,6 +244,8 @@ const buildInitialDataFromActividad = (actividad: ActividadAmbiental, opx: any):
     ivaGlobalActivo: opx.ivaGlobalActivo ?? false,
     ivaGlobalPorcentaje: opx.ivaGlobalPorcentaje ?? 19,
     ivaMeses: opx.ivaMeses ?? [],
+    pagosDiferidosActivo: opx.pagosDiferidosActivo ?? false,
+    pagosDiferidosItems: opx.pagosDiferidosItems ?? {},
     sistema: opx.sistema,
     sector: opx.sector,
     obligacion: opx.obligacion,
@@ -553,6 +556,8 @@ export const PlaneacionModule: React.FC = () => {
       ivaGlobalPorcentaje: result.ivaGlobalPorcentaje,
       ivaMeses: result.ivaMeses,
       ivaItemsExcluidos: result.ivaItemsExcluidos,
+      pagosDiferidosActivo: result.pagosDiferidosActivo,
+      pagosDiferidosItems: result.pagosDiferidosItems,
       servicioEComplejidad: result.servicioEComplejidad,
       solicitanteNombre,
       solicitanteEmail,
