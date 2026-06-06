@@ -15,11 +15,11 @@ La migracion crea:
 
 ## Seguridad
 
-La base queda preparada para Supabase Auth, pero el piloto publicado en GitHub Pages usa un acceso temporal por correo autorizado porque los magic links pueden fallar o quedar bloqueados en correos corporativos.
+El piloto publicado en GitHub Pages usa Supabase Auth con magic link. El frontend primero valida el correo contra `equipoAmbiental`; si esta autorizado, solicita el enlace seguro a Supabase.
 
-El frontend valida el correo contra `equipoAmbiental` y envia `x-greenlog-email` a Supabase. Las politicas RLS leen ese header mediante `greenlog_current_email()`.
+Las politicas RLS leen el email desde el JWT autenticado mediante `auth.jwt()->>'email'`. Ya no se usa `x-greenlog-email` como fuente de identidad.
 
-Este modo es temporal. En produccion debe reemplazarse por Entra ID o Supabase Auth real.
+Este modo sigue siendo temporal hasta reemplazarlo por Entra ID, pero ya protege la informacion con sesion autenticada y RLS.
 
 Regla practica:
 

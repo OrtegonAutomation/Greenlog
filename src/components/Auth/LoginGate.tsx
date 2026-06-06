@@ -179,6 +179,7 @@ export const LoginGate: React.FC<LoginGateProps> = ({ onLoginSuccess, loadingOnl
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
     setSubmitting(true);
+    setError('');
     setSuccess('');
     const result = await login(email);
     setSubmitting(false);
@@ -232,7 +233,7 @@ export const LoginGate: React.FC<LoginGateProps> = ({ onLoginSuccess, loadingOnl
           {error && (
             <MessageBar intent="error" className={styles.errorBar}>
               <MessageBarBody className={styles.errorBody}>
-                <MessageBarTitle>Acceso no habilitado</MessageBarTitle>
+                <MessageBarTitle>No fue posible iniciar sesión</MessageBarTitle>
                 {error}
               </MessageBarBody>
             </MessageBar>
@@ -269,7 +270,7 @@ export const LoginGate: React.FC<LoginGateProps> = ({ onLoginSuccess, loadingOnl
                 disabled={!email.trim() || submitting}
                 style={{ background: CENIT_COLORS.green, color: '#003057', fontWeight: 800 }}
               >
-                {submitting ? 'Validando...' : 'Entrar a GreenLog'}
+                {submitting ? 'Enviando...' : 'Enviar enlace de acceso'}
               </Button>
             </form>
           )}

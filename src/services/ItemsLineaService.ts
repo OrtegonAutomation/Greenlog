@@ -26,6 +26,9 @@ export interface ItemLinea {
   servicioEBase?: string;
   servicioEComplejidad?: ServicioEComplejidad;
   requiereComplejidad?: boolean;
+  catalogoGlobalId?: string;
+  catalogSource?: 'static' | 'global' | 'custom';
+  zonaCatalogo?: string;
 }
 
 /** Ítems de logística — aplican a todas las líneas (especialmente monitoreos) */
@@ -90,6 +93,14 @@ function isEstacionBQS(v: string | undefined): v is EstacionBQS {
   return !!v && (ESTACIONES_BQS as string[]).includes(v);
 }
 
+const normalizeItemText = (value: string) =>
+  value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+
 export const ItemsLineaService = {
   /**
    * Get all items for a specific línea operativa.
@@ -139,6 +150,32 @@ export const ItemsLineaService = {
     if (ITEMS_ICAS.length > 0) lineas.add('ICAs');
     if (ITEMS_SERVICIOS_E.length > 0) lineas.add('Servicios E');
     return [...lineas];
+  },
+
+  mergeItems(...groups: ItemLinea[][]): ItemLinea[] {
+    const result: ItemLinea[] = [];
+    const positions = new Map<string, number>();
+
+    const put = (item: ItemLinea) => {
+      const identity = `${item.lineaOperativa}|${normalizeItemText(item.item)}`;
+      const keys = [item.id ? `id:${item.id}` : '', `name:${identity}`].filter(Boolean);
+      const existingIndex = keys
+        .map(key => positions.get(key))
+        .find((index): index is number => index !== undefined);
+
+      if (existingIndex !== undefined) {
+        result[existingIndex] = item;
+        keys.forEach(key => positions.set(key, existingIndex));
+        return;
+      }
+
+      const index = result.length;
+      result.push(item);
+      keys.forEach(key => positions.set(key, index));
+    };
+
+    groups.flat().forEach(put);
+    return result;
   },
 
   /** Get a specific item by ID */

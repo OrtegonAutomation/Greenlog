@@ -8,8 +8,12 @@ import {
   normalizeEmail,
 } from '../data/equipoAmbiental';
 import { getSupabaseClient, isSupabaseEnabled } from '../services/supabaseClient';
+import { getLoginPath } from '../utils/appRoutes';
 
 const STORAGE_KEY = 'greenlog-auth-email';
+const PENDING_EMAIL_KEY = 'greenlog-auth-pending-email';
+const OTP_COOLDOWN_PREFIX = 'greenlog-auth-otp-next:';
+const DEFAULT_OTP_COOLDOWN_MS = 60_000;
 
 interface LoginResult {
   ok: boolean;
@@ -49,6 +53,30 @@ const getInitialUser = () => {
   return storedEmail ? findEquipoAmbientalUser(storedEmail) : null;
 };
 
+const getRedirectUrl = () => {
+  if (typeof window === 'undefined') return undefined;
+  return `${window.location.origin}${getLoginPath()}`;
+};
+
+const getCooldownKey = (email: string) => `${OTP_COOLDOWN_PREFIX}${email}`;
+
+const getCooldownRemainingSeconds = (email: string) => {
+  if (typeof window === 'undefined') return 0;
+  const nextAllowed = Number(window.localStorage.getItem(getCooldownKey(email)) ?? 0);
+  return Math.max(0, Math.ceil((nextAllowed - Date.now()) / 1000));
+};
+
+const setOtpCooldown = (email: string, seconds?: number) => {
+  if (typeof window === 'undefined') return;
+  const ms = Math.max(1, seconds ?? DEFAULT_OTP_COOLDOWN_MS / 1000) * 1000;
+  window.localStorage.setItem(getCooldownKey(email), String(Date.now() + ms));
+};
+
+const parseCooldownSeconds = (message?: string) => {
+  const match = message?.match(/after\s+(\d+)\s+seconds?/i);
+  return match ? Number(match[1]) : undefined;
+};
+
 const AuthContext = createContext<AuthContextValue>({
   currentUser: null,
   isAdmin: false,
@@ -64,8 +92,8 @@ const AuthContext = createContext<AuthContextValue>({
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const supabaseEnabled = isSupabaseEnabled();
-  const [currentUser, setCurrentUser] = useState<EquipoAmbientalUser | null>(() => getInitialUser());
-  const [authLoading, setAuthLoading] = useState(supabaseEnabled && !getInitialUser());
+  const [currentUser, setCurrentUser] = useState<EquipoAmbientalUser | null>(() => supabaseEnabled ? null : getInitialUser());
+  const [authLoading, setAuthLoading] = useState(supabaseEnabled);
 
   const isAdmin = !!currentUser?.admin;
 
@@ -73,6 +101,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const normalized = normalizeEmail(email ?? '');
     const user = normalized ? findEquipoAmbientalUser(normalized) : null;
     setCurrentUser(user);
+
+    if (user) {
+      window.localStorage.setItem(STORAGE_KEY, normalized);
+      window.localStorage.removeItem(PENDING_EMAIL_KEY);
+    } else {
+      window.localStorage.removeItem(STORAGE_KEY);
+    }
 
     if (supabaseEnabled && normalized && !user) {
       try {
@@ -96,8 +131,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       .then(async ({ data }) => {
         if (!active) return;
         if (data.session?.user.email) {
-          window.localStorage.setItem(STORAGE_KEY, normalizeEmail(data.session.user.email));
           await setUserFromEmail(data.session.user.email);
+        } else {
+          window.localStorage.removeItem(STORAGE_KEY);
+          setCurrentUser(null);
         }
       })
       .finally(() => {
@@ -106,8 +143,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
       if (session?.user.email) {
-        window.localStorage.setItem(STORAGE_KEY, normalizeEmail(session.user.email));
         void setUserFromEmail(session.user.email);
+      } else {
+        window.localStorage.removeItem(STORAGE_KEY);
+        setCurrentUser(null);
       }
     });
 
@@ -127,16 +166,69 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       };
     }
 
-    window.localStorage.setItem(STORAGE_KEY, normalized);
-    setCurrentUser(user);
-    return { ok: true };
-  }, [supabaseEnabled]);
+    if (!supabaseEnabled) {
+      window.localStorage.setItem(STORAGE_KEY, normalized);
+      setCurrentUser(user);
+      return { ok: true };
+    }
+
+    const supabase = getSupabaseClient();
+    const { data: sessionData } = await supabase.auth.getSession();
+    if (normalizeEmail(sessionData.session?.user.email ?? '') === normalized) {
+      await setUserFromEmail(normalized);
+      return { ok: true };
+    }
+
+    const cooldown = getCooldownRemainingSeconds(normalized);
+    if (cooldown > 0) {
+      return {
+        ok: true,
+        pendingEmail: true,
+        message: `Ya solicitamos un enlace para este correo. Revisa tu bandeja o intenta nuevamente en ${cooldown} segundos.`,
+      };
+    }
+
+    const { error } = await supabase.auth.signInWithOtp({
+      email: normalized,
+      options: {
+        emailRedirectTo: getRedirectUrl(),
+        shouldCreateUser: true,
+      },
+    });
+
+    if (error) {
+      const waitSeconds = parseCooldownSeconds(error.message);
+      if (waitSeconds) {
+        setOtpCooldown(normalized, waitSeconds);
+        return {
+          ok: true,
+          pendingEmail: true,
+          message: `Supabase ya envió un enlace recientemente. Revisa tu correo o intenta de nuevo en ${waitSeconds} segundos.`,
+        };
+      }
+
+      return {
+        ok: false,
+        message: `No fue posible enviar el enlace de acceso: ${error.message}`,
+      };
+    }
+
+    setOtpCooldown(normalized);
+    window.localStorage.setItem(PENDING_EMAIL_KEY, normalized);
+    setCurrentUser(null);
+    return {
+      ok: true,
+      pendingEmail: true,
+      message: 'Te enviamos un enlace seguro. Ábrelo desde tu correo para entrar a GreenLog.',
+    };
+  }, [setUserFromEmail, supabaseEnabled]);
 
   const logout = useCallback(async () => {
     if (supabaseEnabled) {
       await getSupabaseClient().auth.signOut();
     }
     window.localStorage.removeItem(STORAGE_KEY);
+    window.localStorage.removeItem(PENDING_EMAIL_KEY);
     setCurrentUser(null);
   }, [supabaseEnabled]);
 

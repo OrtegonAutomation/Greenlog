@@ -1,8 +1,6 @@
 import { ActividadAmbiental, MatrizAmbiental, NuevaActividadPayload } from '../types';
 import { getSupabaseClient } from './supabaseClient';
 
-const GREENLOG_AUTH_EMAIL_STORAGE_KEY = 'greenlog-auth-email';
-
 type SupabaseActividadRow = {
   id: string;
   tarea: string;
@@ -156,11 +154,10 @@ const mapPayloadToRow = (payload: Partial<NuevaActividadPayload>) => {
 const cleanUndefined = <T extends Record<string, unknown>>(obj: T) =>
   Object.fromEntries(Object.entries(obj).filter(([, value]) => value !== undefined));
 
-const getLocalGreenLogEmail = () => (
-  typeof window === 'undefined'
-    ? null
-    : window.localStorage.getItem(GREENLOG_AUTH_EMAIL_STORAGE_KEY)?.trim().toLowerCase() || null
-);
+const getSessionEmail = async () => {
+  const { data } = await getSupabaseClient().auth.getSession();
+  return data.session?.user.email?.toLowerCase() ?? null;
+};
 
 export const SupabaseService = {
   async getAll(): Promise<ActividadAmbiental[]> {
@@ -176,8 +173,7 @@ export const SupabaseService = {
 
   async create(payload: NuevaActividadPayload): Promise<ActividadAmbiental> {
     const supabase = getSupabaseClient();
-    const { data: userData } = await supabase.auth.getUser();
-    const email = userData.user?.email?.toLowerCase() ?? getLocalGreenLogEmail();
+    const email = await getSessionEmail();
     const row = {
       ...mapPayloadToRow(payload),
       creado_por_email: email,
@@ -196,8 +192,7 @@ export const SupabaseService = {
 
   async update(id: string, cambios: Partial<NuevaActividadPayload>): Promise<ActividadAmbiental> {
     const supabase = getSupabaseClient();
-    const { data: userData } = await supabase.auth.getUser();
-    const email = userData.user?.email?.toLowerCase() ?? getLocalGreenLogEmail();
+    const email = await getSessionEmail();
     const row = {
       ...mapPayloadToRow(cambios),
       actualizado_por_email: email,

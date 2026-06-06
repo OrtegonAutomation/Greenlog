@@ -23,6 +23,7 @@ import {
 } from '@fluentui/react-icons';
 import { MonitoreosMatrizService, MonitoreoRow } from '../../services/MonitoreosMatrizService';
 import { ItemsLineaService, ItemLinea, ITEMS_LOGISTICA } from '../../services/ItemsLineaService';
+import { CatalogoItemsGlobalService } from '../../services/CatalogoItemsGlobalService';
 import { DEPARTAMENTOS_MUNICIPIOS, DEPARTAMENTOS_LIST } from '../../data/jurisdiccionesCompensaciones';
 import { SERVICIO_E_COMPLEJIDADES, type ServicioEComplejidad } from '../../data/itemsServiciosE';
 import { CENIT_COLORS } from '../../theme/cenitTheme';
@@ -1045,6 +1046,7 @@ export const PlaneacionWizard: React.FC<Props> = ({
   const [selectedLogistica, setSelectedLogistica] = useState<Set<string>>(new Set(ITEMS_LOGISTICA.map(it => it.id)));
   const [paramSearch, setParamSearch] = useState('');
   const [loading, setLoading] = useState(false);
+  const [catalogWarning, setCatalogWarning] = useState<string | null>(null);
 
   // Step 4: Clasificación
   const [fuentePresupuesto, setFuentePresupuesto] = useState<FuentePresupuesto>('OPEX');
@@ -1135,6 +1137,7 @@ export const PlaneacionWizard: React.FC<Props> = ({
   useEffect(() => {
     if (!open) return;
     setParamSearch('');
+    setCatalogWarning(null);
     if (initialData) {
       const cfg = LINEAS_PLANEACION.find(l => l.value === initialData.lineaOperativa) ?? null;
       const initialTipoLugar = initialData.tipoLugar ?? cfg?.lugarPorDefecto ?? 'Estación';
@@ -1314,26 +1317,47 @@ export const PlaneacionWizard: React.FC<Props> = ({
   // ── Load items when entering Parámetros step (non-monitoreos) ──
   useEffect(() => {
     if (step !== STEP_PARAMETROS || isMonitoreo || !selectedLinea) return;
-    // Para Compensaciones la zona ES la estación (columnas del consolidado BQS)
-    const estacionParaTarifa = isCompensaciones ? (selectedZona ?? undefined) : undefined;
-    const serviceItems = ItemsLineaService.getItems(
-      selectedLinea.value,
-      estacionParaTarifa,
-      selectedZona ?? undefined,
-      isServiciosE ? servicioEComplejidad : undefined,
-    );
-    const custom = customItemsMap[selectedLinea.value] ?? [];
-    let merged = [...serviceItems, ...custom].filter((item, index, items) =>
-      index === items.findIndex(candidate => candidate.id === item.id)
-    );
-    // Compensaciones: filtrar adicionalmente por contrato seleccionado si los ítems traen campo `contrato`
-    if (isCompensaciones && contratoSeleccionado) {
-      merged = merged.filter(it => {
-        const c = (it as any).contrato;
-        return !c || c === contratoSeleccionado;
-      });
-    }
-    setAvailableItems(merged);
+    let cancelled = false;
+    setLoading(true);
+    setCatalogWarning(null);
+
+    (async () => {
+      // Para Compensaciones la zona ES la estación (columnas del consolidado BQS)
+      const estacionParaTarifa = isCompensaciones ? (selectedZona ?? undefined) : undefined;
+      const serviceItems = ItemsLineaService.getItems(
+        selectedLinea.value,
+        estacionParaTarifa,
+        selectedZona ?? undefined,
+        isServiciosE ? servicioEComplejidad : undefined,
+      );
+      const custom = customItemsMap[selectedLinea.value] ?? [];
+      let globalItems: ItemLinea[] = [];
+
+      try {
+        globalItems = await CatalogoItemsGlobalService.getItems(selectedLinea.value, selectedZona ?? undefined);
+      } catch (error) {
+        console.warn('No se pudo cargar el catálogo global de ítems.', error);
+        if (!cancelled) {
+          setCatalogWarning('No se pudo cargar el catálogo global. Puedes seguir planeando con el catálogo local.');
+        }
+      }
+
+      let merged = ItemsLineaService.mergeItems(serviceItems, globalItems, custom);
+      // Compensaciones: filtrar adicionalmente por contrato seleccionado si los ítems traen campo `contrato`
+      if (isCompensaciones && contratoSeleccionado) {
+        merged = merged.filter(it => {
+          const c = (it as any).contrato;
+          return !c || c === contratoSeleccionado;
+        });
+      }
+
+      if (!cancelled) {
+        setAvailableItems(merged);
+        setLoading(false);
+      }
+    })();
+
+    return () => { cancelled = true; };
   }, [step, isMonitoreo, selectedLinea, customItemsMap, isCompensaciones, selectedZona, contratoSeleccionado, isServiciosE, servicioEComplejidad]);
 
   // ── Build monthly data when entering Programación step ──
@@ -1608,6 +1632,7 @@ export const PlaneacionWizard: React.FC<Props> = ({
   }, [isMonitoreo, availableParams, paramKey, computeFactor]);
 
   const updateItemIva = useCallback((itemKey: string, aplicaIva: boolean) => {
+    if (aplicaIva) setIvaGlobalActivo(true);
     setMonthlyData(prev => prev.map((month, mi) => {
       const idx = month.preciosIndividuales.findIndex(p => p.key === itemKey);
       if (idx < 0) return month;
@@ -1975,6 +2000,67 @@ export const PlaneacionWizard: React.FC<Props> = ({
     handleSelectLinea(cfg);
   }, [allowCustomLineas, newLineaNombre, newLineaDesc, newLineaCategoria, newLineaLugar, tempItems, handleSelectLinea]);
 
+  const persistCatalogItem = useCallback(async (item: ItemLinea) => {
+    try {
+      const saved = await CatalogoItemsGlobalService.upsertItem(item, {
+        zona: selectedZona ?? undefined,
+        estacion: tipoLugar === 'Estación' ? selectedEstacion ?? undefined : undefined,
+      });
+
+      if (saved) {
+        setAvailableItems(prev => ItemsLineaService.mergeItems(prev, [saved]));
+        setCustomItemsMap(prev => {
+          const current = prev[item.lineaOperativa] ?? [];
+          if (!current.some(custom => custom.id === item.id)) return prev;
+          return {
+            ...prev,
+            [item.lineaOperativa]: current.map(custom => custom.id === item.id ? { ...custom, ...saved } : custom),
+          };
+        });
+      }
+    } catch (error) {
+      console.warn('No se pudo guardar el ítem en el catálogo global.', error);
+      setCatalogWarning('El ítem quedó en esta planeación, pero no se pudo guardar en el catálogo global.');
+    }
+  }, [selectedEstacion, selectedZona, tipoLugar]);
+
+  const persistCatalogPrice = useCallback(async (itemKey: string) => {
+    if (!selectedLinea) return;
+    const baseItem = availableItems.find(item => item.id === itemKey);
+    const entries = monthlyData
+      .map(month => ({
+        mesIndex: month.mesIndex,
+        entry: month.preciosIndividuales.find(entry => entry.key === itemKey),
+      }))
+      .filter((item): item is { mesIndex: number; entry: PlaneacionMensualParam } => !!item.entry);
+
+    const firstEntry = entries[0]?.entry;
+    if (!baseItem || !firstEntry) return;
+
+    const preciosMensuales = Object.fromEntries(
+      entries.map(({ mesIndex, entry }) => [mesIndex, entry.precio])
+    ) as Record<number, number>;
+
+    try {
+      const saved = await CatalogoItemsGlobalService.upsertItem({
+        ...baseItem,
+        precioReferencia: firstEntry.precio,
+        preciosMensuales,
+      }, {
+        zona: selectedZona ?? undefined,
+        estacion: tipoLugar === 'Estación' ? selectedEstacion ?? undefined : undefined,
+      });
+
+      if (saved) {
+        setAvailableItems(prev => ItemsLineaService.mergeItems(prev, [saved]));
+      }
+      setCatalogWarning('Esta tarifa aplicará para nuevas planeaciones; las actividades existentes no se recalculan.');
+    } catch (error) {
+      console.warn('No se pudo guardar la tarifa en el catálogo global.', error);
+      setCatalogWarning('La tarifa se actualizó en esta planeación, pero no se pudo guardar en el catálogo global.');
+    }
+  }, [availableItems, monthlyData, selectedEstacion, selectedLinea, selectedZona, tipoLugar]);
+
   // ── Añadir ítem en Step 3 (cualquier línea) ──
   const handleAddItemStep3 = useCallback(() => {
     if (!s3Nombre.trim() || !selectedLinea) return;
@@ -1992,10 +2078,11 @@ export const PlaneacionWizard: React.FC<Props> = ({
     }));
     setAvailableItems(prev => [...prev, item]);
     setSelectedItems(prev => new Set([...prev, item.id]));
+    void persistCatalogItem(item);
     setAddingItemStep3(false);
     setS3Nombre('');
     setS3Precio('');
-  }, [s3Nombre, s3Unidad, s3Precio, selectedLinea]);
+  }, [persistCatalogItem, s3Nombre, s3Unidad, s3Precio, selectedLinea]);
 
   // ── Grupo de líneas por categoría ──
   const lineasPorCategoria = useMemo(() => {
@@ -2633,28 +2720,45 @@ export const PlaneacionWizard: React.FC<Props> = ({
                       )}
                     </div>
                   )}
-                  {/* IVA por ítem */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <Checkbox
-                      label="¿IVA?"
-                      checked={ivaGlobalActivo}
-                      onChange={(_, d) => setIvaGlobalActivo(!!d.checked)}
-                    />
-                    {ivaGlobalActivo && (
-                      <>
-                        <Input
-                          type="number"
-                          size="small"
-                          value={String(ivaGlobalPorcentaje || '')}
-                          placeholder="%"
-                          onChange={(_, d) => setIvaGlobalPorcentaje(Number(d.value) || 0)}
-                          style={{ width: '70px' }}
-                        />
-                        <Caption1 style={{ color: tokens.colorNeutralForeground3 }}>%</Caption1>
-                      </>
-                    )}
-                  </div>
+                  {/* IVA por ítem. En Monitoreos se configura en Programación, por fila. */}
+                  {!isMonitoreo && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <Checkbox
+                        label="¿IVA?"
+                        checked={ivaGlobalActivo}
+                        onChange={(_, d) => setIvaGlobalActivo(!!d.checked)}
+                      />
+                      {ivaGlobalActivo && (
+                        <>
+                          <Input
+                            type="number"
+                            size="small"
+                            value={String(ivaGlobalPorcentaje || '')}
+                            placeholder="%"
+                            onChange={(_, d) => setIvaGlobalPorcentaje(Number(d.value) || 0)}
+                            style={{ width: '70px' }}
+                          />
+                          <Caption1 style={{ color: tokens.colorNeutralForeground3 }}>%</Caption1>
+                        </>
+                      )}
+                    </div>
+                  )}
                 </div>
+
+                {catalogWarning && (
+                  <div style={{
+                    marginTop: '10px',
+                    marginBottom: '8px',
+                    padding: '10px 12px',
+                    borderRadius: '10px',
+                    background: 'rgba(250, 173, 20, 0.12)',
+                    color: '#7a4b00',
+                    fontSize: '12px',
+                    fontWeight: 600,
+                  }}>
+                    {catalogWarning}
+                  </div>
+                )}
 
                 {loading ? (
                   <div className={styles.spinnerWrap}><Spinner label="Cargando..." /></div>
@@ -3189,6 +3293,49 @@ export const PlaneacionWizard: React.FC<Props> = ({
                   )}
                 </Caption1>
 
+                {isMonitoreo && (
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    marginBottom: '12px',
+                    padding: '10px 12px',
+                    borderRadius: '10px',
+                    background: 'rgba(0, 176, 80, 0.08)',
+                    color: CENIT_COLORS.green,
+                    fontSize: '12px',
+                    fontWeight: 700,
+                  }}>
+                    <span>IVA por ítem/parámetro en programación</span>
+                    <Input
+                      type="number"
+                      size="small"
+                      value={String(ivaGlobalPorcentaje || '')}
+                      placeholder="%"
+                      onChange={(_, d) => {
+                        setIvaGlobalPorcentaje(Number(d.value) || 0);
+                        if (Number(d.value) > 0) setIvaGlobalActivo(true);
+                      }}
+                      style={{ width: '72px' }}
+                    />
+                    <span>%</span>
+                  </div>
+                )}
+
+                {catalogWarning && (
+                  <div style={{
+                    marginBottom: '12px',
+                    padding: '10px 12px',
+                    borderRadius: '10px',
+                    background: 'rgba(250, 173, 20, 0.12)',
+                    color: '#7a4b00',
+                    fontSize: '12px',
+                    fontWeight: 600,
+                  }}>
+                    {catalogWarning}
+                  </div>
+                )}
+
                 {/* Indicador de progreso multi-año — solo Compensaciones con aniosAPlanear > 1 */}
                 {isCompensaciones && aniosAPlanear > 1 && (
                   <div style={{ display: 'flex', gap: '4px', marginBottom: '12px', borderBottom: '2px solid rgba(0,0,0,0.06)' }}>
@@ -3348,10 +3495,11 @@ export const PlaneacionWizard: React.FC<Props> = ({
                                   value={item.precio > 0 ? String(item.precio) : ''}
                                   placeholder="0"
                                   onChange={(_, d) => updateItemPrice(item.key, Number(d.value) || 0)}
+                                  onBlur={() => { void persistCatalogPrice(item.key); }}
                                   style={{ width: '90px' }}
                                 />
                               </div>
-                              {ivaGlobalActivo && ivaGlobalPorcentaje > 0 && (
+                              {(isMonitoreo || ivaGlobalActivo) && ivaGlobalPorcentaje > 0 && (
                                 <div style={{ marginTop: '4px' }}>
                                   <Checkbox
                                     label={`IVA +${ivaGlobalPorcentaje}%`}
