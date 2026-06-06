@@ -118,7 +118,7 @@ export const ItemsLineaService = {
     }
 
     if (linea === 'Servicios E') {
-      return getItemsServiciosEPorZona(zona, servicioEComplejidad);
+      return getItemsServiciosEPorZona(zona);
     }
 
     if (LINEAS_MANUALES.includes(linea)) {

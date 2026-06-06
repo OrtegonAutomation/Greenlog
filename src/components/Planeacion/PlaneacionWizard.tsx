@@ -25,7 +25,7 @@ import { MonitoreosMatrizService, MonitoreoRow } from '../../services/Monitoreos
 import { ItemsLineaService, ItemLinea, ITEMS_LOGISTICA } from '../../services/ItemsLineaService';
 import { CatalogoItemsGlobalService } from '../../services/CatalogoItemsGlobalService';
 import { DEPARTAMENTOS_MUNICIPIOS, DEPARTAMENTOS_LIST } from '../../data/jurisdiccionesCompensaciones';
-import { SERVICIO_E_COMPLEJIDADES, type ServicioEComplejidad } from '../../data/itemsServiciosE';
+import type { ServicioEComplejidad } from '../../data/itemsServiciosE';
 import { CENIT_COLORS } from '../../theme/cenitTheme';
 import {
   DatosAuxiliaresPresupuestales,
@@ -1061,8 +1061,6 @@ export const PlaneacionWizard: React.FC<Props> = ({
   const [availableEstaciones, setAvailableEstaciones] = useState<string[]>([]);
   const [selectedEstacion, setSelectedEstacion] = useState<string | null>(null);
   const [pk, setPk] = useState('');
-  const [servicioEComplejidad, setServicioEComplejidad] = useState<ServicioEComplejidad>('Muy Alta');
-
   // Step 4: Parámetros / Ítems
   const [availableMatrices, setAvailableMatrices] = useState<string[]>([]);
   const [selectedMatrices, setSelectedMatrices] = useState<Set<string>>(new Set());
@@ -1201,7 +1199,6 @@ export const PlaneacionWizard: React.FC<Props> = ({
       setTipoLugar(safeTipoLugar);
       setSelectedEstacion(safeTipoLugar === 'Estación' ? initialData.estacion ?? null : null);
       setPk(initialData.pk ?? '');
-      setServicioEComplejidad(initialData.servicioEComplejidad ?? 'Muy Alta');
       setFuentePresupuesto(initialData.fuentePresupuesto ?? 'OPEX');
       setTipoPlaneacion(initialData.tipoPlaneacion ?? 'Plan');
       setAnioPlaneacion(initialData.anioPlaneacion ?? new Date().getFullYear() + 1);
@@ -1267,7 +1264,6 @@ export const PlaneacionWizard: React.FC<Props> = ({
       setTipoLugar('Estación');
       setSelectedEstacion(null);
       setPk('');
-      setServicioEComplejidad('Muy Alta');
       setAvailableEstaciones([]);
       setAvailableMatrices([]);
       setAvailableParams([]);
@@ -1392,7 +1388,7 @@ export const PlaneacionWizard: React.FC<Props> = ({
         selectedLinea.value,
         estacionParaTarifa,
         selectedZona ?? undefined,
-        isServiciosE ? servicioEComplejidad : undefined,
+        undefined,
       );
       const custom = customItemsMap[selectedLinea.value] ?? [];
       let globalItems: ItemLinea[] = [];
@@ -1422,7 +1418,7 @@ export const PlaneacionWizard: React.FC<Props> = ({
     })();
 
     return () => { cancelled = true; };
-  }, [step, isMonitoreo, selectedLinea, customItemsMap, isCompensaciones, selectedZona, contratoSeleccionado, isServiciosE, servicioEComplejidad]);
+  }, [step, isMonitoreo, selectedLinea, customItemsMap, isCompensaciones, selectedZona, contratoSeleccionado]);
 
   // ── Build monthly data when entering Programación step ──
   useEffect(() => {
@@ -2084,7 +2080,6 @@ export const PlaneacionWizard: React.FC<Props> = ({
           : [],
         pagosDiferidosActivo: isPagosDiferidosDisponible ? pagosDiferidosActivo : false,
         pagosDiferidosItems: isPagosDiferidosDisponible ? pagosDiferidosItems : undefined,
-        ...(isServiciosE && { servicioEComplejidad }),
         ...(isCompensaciones && {
           sistema: selectedSistema || undefined,
           sector: selectedSector || undefined,
@@ -2155,7 +2150,6 @@ export const PlaneacionWizard: React.FC<Props> = ({
     // Reset downstream
     setSelectedEstacion(null);
     setPk('');
-    if (cfg.value === 'Servicios E') setServicioEComplejidad('Muy Alta');
     setSelectedParams(new Set());
     setSelectedItems(new Set());
     setSelectedMatrices(new Set());
@@ -3029,7 +3023,9 @@ export const PlaneacionWizard: React.FC<Props> = ({
                                 className={mergeClasses(styles.paramTr, sel && styles.paramTrSelected)}
                                 onClick={() => toggleParam(r)}
                               >
-                                <td className={styles.paramTd}><Checkbox checked={sel} onChange={() => toggleParam(r)} /></td>
+                                <td className={styles.paramTd} onClick={e => e.stopPropagation()}>
+                                  <Checkbox checked={sel} onChange={() => toggleParam(r)} />
+                                </td>
                                 {tipoLugar === 'Zona' && <td className={styles.paramTd} style={{ fontWeight: '600' }}>{r.estacion}</td>}
                                 <td className={styles.paramTd} style={{ fontWeight: '600', maxWidth: '180px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                                   {r.parametro}
@@ -3192,33 +3188,15 @@ export const PlaneacionWizard: React.FC<Props> = ({
                               className={mergeClasses(styles.paramTr, sel && styles.paramTrSelected)}
                               onClick={() => toggleItem(it)}
                             >
-                              <td className={styles.paramTd}><Checkbox checked={sel} onChange={() => toggleItem(it)} /></td>
+                              <td className={styles.paramTd} onClick={e => e.stopPropagation()}>
+                                <Checkbox checked={sel} onChange={() => toggleItem(it)} />
+                              </td>
                               <td className={styles.paramTd} style={{ fontWeight: '600' }}>{it.item}</td>
                               {!isIcas && (
                                 <td className={styles.paramTd} style={{ maxWidth: '260px' }}>
                                   <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                                     {it.descripcion}
                                   </div>
-                                  {it.requiereComplejidad && (
-                                    <div
-                                      style={{ marginTop: '6px', display: 'flex', alignItems: 'center', gap: '6px' }}
-                                      onClick={e => e.stopPropagation()}
-                                    >
-                                      <Caption1 style={{ color: tokens.colorNeutralForeground3 }}>Complejidad</Caption1>
-                                      <select
-                                        value={servicioEComplejidad}
-                                        onChange={e => {
-                                          setServicioEComplejidad(e.target.value as ServicioEComplejidad);
-                                          setMonthlyData([]);
-                                        }}
-                                        style={{ padding: '4px 8px', borderRadius: '6px', border: '1px solid #ccc', fontSize: '12px' }}
-                                      >
-                                        {SERVICIO_E_COMPLEJIDADES.map(complejidad => (
-                                          <option key={complejidad} value={complejidad}>{complejidad}</option>
-                                        ))}
-                                      </select>
-                                    </div>
-                                  )}
                                 </td>
                               )}
                               <td className={styles.paramTd}>{it.unidad}</td>

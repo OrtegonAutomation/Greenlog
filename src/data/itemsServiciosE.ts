@@ -1,15 +1,15 @@
 import type { ItemLinea } from '../services/ItemsLineaService';
 
-export type ServicioEComplejidad = 'Muy Alta' | 'Alta' | 'Moderada';
+export type ServicioEComplejidad = 'Alto' | 'Moderado' | 'Bajo';
 
-export const SERVICIO_E_COMPLEJIDADES: ServicioEComplejidad[] = ['Muy Alta', 'Alta', 'Moderada'];
+export const SERVICIO_E_COMPLEJIDADES: ServicioEComplejidad[] = ['Alto', 'Moderado', 'Bajo'];
 
 const IPC_2026 = 1.038;
 
 const SERVICIO_PRECIOS: Record<ServicioEComplejidad, { eneroFebrero: number; marzoDiciembre: number }> = {
-  'Muy Alta': { eneroFebrero: 20353275, marzoDiciembre: 21065640 },
-  Alta: { eneroFebrero: 17944843, marzoDiciembre: 17944843 },
-  Moderada: { eneroFebrero: 12061241, marzoDiciembre: 12483384 },
+  Alto: { eneroFebrero: 20353275, marzoDiciembre: 21065640 },
+  Moderado: { eneroFebrero: 17944843, marzoDiciembre: 17944843 },
+  Bajo: { eneroFebrero: 12061241, marzoDiciembre: 12483384 },
 };
 
 const SERVICIOS_E_ZONAS = ['NORTE', 'CENTRO', 'OCCIDENTE', 'LLANOS', 'ORIENTE', 'CLC', 'TRANSVERSAL'] as const;
@@ -103,17 +103,15 @@ function itemBase(
 
 export function getItemsServiciosEPorZona(
   zona?: string,
-  complejidad: ServicioEComplejidad = 'Muy Alta',
 ): ItemLinea[] {
   const zonaKey = normalizeZonaServicioE(zona);
-  const servicioPrecio = SERVICIO_PRECIOS[complejidad] ?? SERVICIO_PRECIOS['Muy Alta'];
-  const servicioPrecios = preciosMensuales(servicioPrecio.eneroFebrero, servicioPrecio.marzoDiciembre);
-
-  return [
-    {
-      id: 'SERVE-SERVICIO',
-      lineaOperativa: 'Servicios E',
-      item: 'Servicio',
+  const serviciosPorComplejidad = SERVICIO_E_COMPLEJIDADES.map(complejidad => {
+    const servicioPrecio = SERVICIO_PRECIOS[complejidad];
+    const servicioPrecios = preciosMensuales(servicioPrecio.eneroFebrero, servicioPrecio.marzoDiciembre);
+    return {
+      id: `SERVE-SERVICIO-${complejidad.toUpperCase()}`,
+      lineaOperativa: 'Servicios E' as const,
+      item: `Servicio ${complejidad}`,
       descripcion: `Servicio APPLUS - complejidad ${complejidad}`,
       unidad: 'Mes',
       precioReferencia: servicioPrecios[0],
@@ -121,8 +119,11 @@ export function getItemsServiciosEPorZona(
       servicioEZona: zonaKey,
       servicioEBase: 'APPLUS',
       servicioEComplejidad: complejidad,
-      requiereComplejidad: true,
-    },
+    };
+  });
+
+  return [
+    ...serviciosPorComplejidad,
     itemBase(
       'SERVE-BOLSA-CONSUMO',
       'Bolsa de Consumo',
