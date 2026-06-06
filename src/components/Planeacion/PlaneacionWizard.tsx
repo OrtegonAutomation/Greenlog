@@ -647,29 +647,41 @@ const useStyles = makeStyles({
 
   // ── Matrix filter bar ──
   matrizFilterBar: {
-    display: 'flex',
-    flexWrap: 'wrap',
-    ...shorthands.gap('8px'),
-    marginBottom: '12px',
-    ...shorthands.padding('10px', '14px'),
-    borderRadius: '12px',
-    background: 'rgba(0,48,87,0.03)',
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
+    ...shorthands.gap('12px'),
+    marginTop: '14px',
+    marginBottom: '14px',
+    ...shorthands.padding('16px'),
+    borderRadius: '20px',
+    background: 'linear-gradient(135deg, rgba(0,51,160,0.05), rgba(0,176,80,0.04))',
+    ...shorthands.border('1px', 'solid', 'rgba(0,51,160,0.08)'),
   },
   matrizChip: {
-    ...shorthands.padding('4px', '12px'),
-    borderRadius: '20px',
-    fontSize: '12px',
-    fontWeight: '600',
+    ...shorthands.padding('16px', '18px'),
+    borderRadius: '18px',
+    fontSize: '15px',
+    fontWeight: '700',
     cursor: 'pointer',
-    ...shorthands.border('1px', 'solid', 'rgba(0,0,0,0.1)'),
-    background: '#fff',
-    transition: 'all 0.15s ease',
-    ':hover': { ...shorthands.border('1px', 'solid', CENIT_COLORS.blueBrand) },
+    ...shorthands.border('2px', 'solid', 'rgba(0,51,160,0.12)'),
+    background: 'rgba(255,255,255,0.92)',
+    boxShadow: '0 8px 24px rgba(0,0,0,0.04)',
+    transition: 'all 0.22s cubic-bezier(0.16,1,0.3,1)',
+    display: 'flex',
+    flexDirection: 'column',
+    ...shorthands.gap('6px'),
+    minHeight: '96px',
+    ':hover': {
+      ...shorthands.border('2px', 'solid', CENIT_COLORS.blueBrand),
+      transform: 'translateY(-2px)',
+      boxShadow: '0 14px 30px rgba(0,51,160,0.12)',
+    },
   },
   matrizChipActive: {
-    background: CENIT_COLORS.blueBrand,
+    background: `linear-gradient(135deg, ${CENIT_COLORS.blueBrand}, #1f4fb8)`,
     color: '#fff',
-    ...shorthands.border('1px', 'solid', CENIT_COLORS.blueBrand),
+    ...shorthands.border('2px', 'solid', CENIT_COLORS.blueBrand),
+    boxShadow: '0 16px 34px rgba(0,51,160,0.22)',
   },
 
   // ── Params / Items table ──
@@ -1179,6 +1191,20 @@ export const PlaneacionWizard: React.FC<Props> = ({
     [canSelectLinea],
   );
 
+  // ── Param key helper ──
+  const paramKey = useCallback((r: MonitoreoRow) => [
+    r.zona,
+    r.estacion,
+    r.parametro,
+    r.matriz,
+    r.norma,
+    r.permiso,
+    r.receptor,
+    r.requerimiento,
+    r.item ?? '',
+    r.sistema ?? '',
+  ].join('|'), []);
+
   const zonasDisponiblesPaso = useMemo(() => {
     const zonasBase = isCompensaciones ? ZONAS_COMPENSACIONES : ZONAS;
     const zonasFiltradas = !selectedLinea || !canSelectZona
@@ -1380,9 +1406,20 @@ export const PlaneacionWizard: React.FC<Props> = ({
 
       setAvailableMatrices(mats);
       setAvailableParams(rows);
+      if (selectedMatrices.size > 0) {
+        const validKeys = new Set(rows.map(r => paramKey(r)));
+        const hasValidSelection = [...selectedParams].some(key => validKeys.has(key));
+        if (!hasValidSelection) {
+          setSelectedParams(new Set(
+            rows
+              .filter(r => selectedMatrices.has(r.matriz))
+              .map(r => paramKey(r))
+          ));
+        }
+      }
       setLoading(false);
     })();
-  }, [step, isMonitoreo, selectedZona, selectedEstacion, tipoLugar, customMonitoreoRows]);
+  }, [step, isMonitoreo, selectedZona, selectedEstacion, tipoLugar, customMonitoreoRows, paramKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Load items when entering Parámetros step (non-monitoreos) ──
   useEffect(() => {
@@ -1517,9 +1554,6 @@ export const PlaneacionWizard: React.FC<Props> = ({
       });
     });
   }, [step, paramTipoMuestra, paramCantCompuestos]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // ── Param key helper ──
-  const paramKey = useCallback((r: MonitoreoRow) => `${r.estacion}|${r.parametro}|${r.matriz}|${r.norma}`, []);
 
   // ── Filtered params (monitoreos) ──
   const filteredParams = useMemo(() => {
@@ -2965,9 +2999,6 @@ export const PlaneacionWizard: React.FC<Props> = ({
                 {isMonitoreo && matrixSummaries.length > 0 && (
                   <>
                     <div className={styles.matrizFilterBar}>
-                      <Caption1 style={{ fontWeight: '700', color: '#003057', alignSelf: 'center', marginRight: '4px' }}>
-                        Matrices:
-                      </Caption1>
                       {matrixSummaries.map(m => (
                         <span
                           key={m.matriz}
@@ -2975,13 +3006,19 @@ export const PlaneacionWizard: React.FC<Props> = ({
                           onClick={() => toggleMatriz(m.matriz)}
                           title={`${m.params} parámetros · ${m.estaciones.size} estación(es)`}
                         >
-                          {m.matriz} · {m.selected}/{m.params}
+                          <span style={{ fontSize: '18px', lineHeight: 1.1 }}>{m.matriz}</span>
+                          <span style={{ fontSize: '12px', fontWeight: 600, opacity: selectedMatrices.has(m.matriz) ? 0.92 : 0.68 }}>
+                            {m.selected}/{m.params} parámetros
+                          </span>
+                          <span style={{ fontSize: '11px', fontWeight: 500, opacity: selectedMatrices.has(m.matriz) ? 0.82 : 0.58 }}>
+                            {m.estaciones.size} estación{m.estaciones.size === 1 ? '' : 'es'}
+                          </span>
                         </span>
                       ))}
                       {selectedMatrices.size > 0 && (
                         <span
                           className={styles.matrizChip}
-                          style={{ fontStyle: 'italic' }}
+                          style={{ fontStyle: 'italic', justifyContent: 'center', alignItems: 'center', minHeight: '96px' }}
                           onClick={clearMatrices}
                         >
                           Limpiar selección

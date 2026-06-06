@@ -96,12 +96,27 @@ const normalizeMatrizName = (value: unknown) => {
 const normalizeParamKey = (value: string) => {
   const parts = String(value ?? '').split('|');
   if (parts.length < 4) return value;
+  if (parts.length >= 10) {
+    parts[3] = normalizeMatrizName(parts[3]);
+    return parts.join('|');
+  }
   parts[2] = normalizeMatrizName(parts[2]);
   return parts.join('|');
 };
 
 const getParamKeyFromRow = (row: any) =>
-  `${row?.estacion ?? ''}|${row?.parametro ?? ''}|${normalizeMatrizName(row?.matriz)}|${row?.norma ?? ''}`;
+  [
+    row?.zona ?? '',
+    row?.estacion ?? '',
+    row?.parametro ?? '',
+    normalizeMatrizName(row?.matriz),
+    row?.norma ?? '',
+    row?.permiso ?? '',
+    row?.receptor ?? '',
+    row?.requerimiento ?? '',
+    row?.item ?? '',
+    row?.sistema ?? '',
+  ].join('|');
 
 const normalizeProgramacion = (
   meses: any[] = [],
