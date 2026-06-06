@@ -195,6 +195,37 @@ const parseCOPInput = (value: string) => {
   return digits ? Number(digits) : 0;
 };
 
+const shouldIgnoreWizardEnter = (event: React.KeyboardEvent<HTMLElement>) => {
+  if (
+    event.defaultPrevented ||
+    event.key !== 'Enter' ||
+    event.shiftKey ||
+    event.ctrlKey ||
+    event.altKey ||
+    event.metaKey ||
+    (event.nativeEvent as KeyboardEvent).isComposing
+  ) {
+    return true;
+  }
+
+  const target = event.target as HTMLElement | null;
+  if (!target || target.isContentEditable) return true;
+
+  if (
+    target.closest(
+      'textarea, select, button, a, [role="button"], [role="combobox"], [role="listbox"], [role="option"], [data-enter-ignore="true"]',
+    )
+  ) {
+    return true;
+  }
+
+  const input = target.closest('input') as HTMLInputElement | null;
+  if (!input) return false;
+
+  const type = (input.getAttribute('type') ?? 'text').toLowerCase();
+  return ['button', 'checkbox', 'color', 'date', 'datetime-local', 'file', 'radio', 'reset', 'submit', 'time'].includes(type);
+};
+
 const CATEGORIAS_ORDEN: string[] = ['Gestión Ambiental', 'Iniciativas Tecnológicas', 'Servicios HSE'];
 const LINEAS_COMPENSACIONES: LineaOperativa[] = [
   'Compensaciones estaciones',
@@ -1799,6 +1830,8 @@ export const PlaneacionWizard: React.FC<Props> = ({
     : setSelectedItems;
 
   const handleNext = () => {
+    if (!canNext()) return;
+
     // Caso especial: en STEP_PARAMETROS planeando Año 2/3 → saltar Clasificación e ir directo a Programación
     if (step === STEP_PARAMETROS && isCompensaciones && itemsCambianPorAnio && tabAnio > 1) {
       setStep(STEP_PROGRAMACION);
@@ -1915,6 +1948,12 @@ export const PlaneacionWizard: React.FC<Props> = ({
       return;
     }
     if (step > 0) setStep(step - 1);
+  };
+
+  const handleWizardKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (addingItemStep3 || addingParamStep3 || shouldIgnoreWizardEnter(event)) return;
+    event.preventDefault();
+    handleNext();
   };
 
   // ── Selection handlers with reset cascade ──
@@ -2102,7 +2141,7 @@ export const PlaneacionWizard: React.FC<Props> = ({
   return (
     <Portal>
       <div className={styles.overlay} onClick={onClose}>
-        <div className={styles.wizard} onClick={e => e.stopPropagation()}>
+        <div className={styles.wizard} onClick={e => e.stopPropagation()} onKeyDown={handleWizardKeyDown}>
           {/* Header */}
           <div className={styles.wizardHeader}>
             <div className={styles.headerLeft}>
