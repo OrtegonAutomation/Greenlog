@@ -185,6 +185,16 @@ export const EQUIPO_AMBIENTAL: EquipoAmbientalUser[] = [
     planeador: [scope(TODAS_LINEAS_AMBIENTALES, ['*'], true)],
     revisor: [scope(TODAS_LINEAS_AMBIENTALES, ['*'], true)],
   },
+  {
+    nombre: 'Jefatura Ambiental',
+    email: 'jefatura-ambiental@cenit-transporte.com',
+    alcance: 'Jefatura Ambiental',
+    baseTrabajo: 'Bogotá',
+    zonaBase: 'Transversal',
+    admin: true,
+    planeador: [scope(TODAS_LINEAS_AMBIENTALES, ['*'], true)],
+    revisor: [scope(TODAS_LINEAS_AMBIENTALES, ['*'], true)],
+  },
 ];
 
 export const normalizeEmail = (email: string) => email.trim().toLowerCase();
