@@ -172,10 +172,21 @@ const buildDetalleProgramacion = (actividad: ActividadAmbiental) => {
   };
 };
 
+// La descripción autogenerada de Monitoreos empieza con "Parámetros: <lista
+// enorme>". Para el correo la omitimos (las matrices ya se muestran aparte) y
+// solo dejamos otras partes (ej. "Ítems: ...").
+const descripcionParaCorreo = (actividad: ActividadAmbiental) => {
+  const desc = actividad.descripcion ?? '';
+  if (!desc) return null;
+  const partes = desc.split(' | ').filter(part => !/^par[áa]metros\s*:/i.test(part.trim()));
+  const limpia = partes.join(' | ').trim();
+  return limpia || null;
+};
+
 const buildActividadPayload = (actividad: ActividadAmbiental) => ({
   id: actividad.id,
   tarea: actividad.tarea,
-  descripcion: actividad.descripcion ?? null,
+  descripcion: descripcionParaCorreo(actividad),
   lineaOperativa: actividad.lineaOperativa,
   zona: actividad.zona,
   estacion: actividad.estacion ?? null,
