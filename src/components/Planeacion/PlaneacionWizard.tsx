@@ -4,7 +4,7 @@
 // Steps: Línea → Zona → Lugar → Clasificación → Datos auxiliares → Ítems/Parámetros → Programación
 // Replaces the old MonitoreosWizard + ServicioOpexWizard split.
 // ============================================================
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import {
   makeStyles, shorthands, tokens, mergeClasses,
   Title2, Title3, Body1, Body2, Caption1,
@@ -893,9 +893,16 @@ const useStyles = makeStyles({
   },
 
   // ── Programming matrix (Step 5) ──
-  progMatrixWrap: {
+  progTopScroll: {
     marginTop: '14px',
     overflowX: 'auto',
+    overflowY: 'hidden',
+    // Barra de scroll horizontal superior, sincronizada con la tabla.
+  },
+  progMatrixWrap: {
+    marginTop: '6px',
+    overflow: 'auto',
+    maxHeight: '52vh',
     borderRadius: '12px',
     ...shorthands.border('1px', 'solid', 'rgba(0,0,0,0.08)'),
   },
@@ -915,7 +922,8 @@ const useStyles = makeStyles({
     minWidth: '200px',
     position: 'sticky',
     left: '0',
-    zIndex: '2',
+    top: '0',
+    zIndex: '4',
     whiteSpace: 'nowrap',
   },
   progMatrixMonthTh: {
@@ -926,6 +934,9 @@ const useStyles = makeStyles({
     background: '#003057',
     fontSize: '11px',
     minWidth: '78px',
+    position: 'sticky',
+    top: '0',
+    zIndex: '3',
   },
   progMatrixTotalTh: {
     ...shorthands.padding('10px', '12px'),
@@ -935,6 +946,9 @@ const useStyles = makeStyles({
     background: '#003057',
     fontSize: '11px',
     minWidth: '110px',
+    position: 'sticky',
+    top: '0',
+    zIndex: '3',
   },
   progMatrixItemTd: {
     ...shorthands.padding('10px', '12px'),
@@ -961,6 +975,31 @@ const useStyles = makeStyles({
     background: 'rgba(0,51,160,0.03)',
     fontSize: '12px',
     verticalAlign: 'middle',
+  },
+  progMatrixIpcTh: {
+    ...shorthands.padding('8px', '4px'),
+    textAlign: 'center',
+    fontWeight: '700',
+    color: '#fff',
+    background: CENIT_COLORS.blueBrand,
+    fontSize: '11px',
+    position: 'sticky',
+    top: '37px',
+    zIndex: '3',
+  },
+  progMatrixIpcThItem: {
+    ...shorthands.padding('8px', '12px'),
+    textAlign: 'right',
+    fontWeight: '700',
+    color: '#fff',
+    background: CENIT_COLORS.blueBrand,
+    fontSize: '11px',
+    minWidth: '200px',
+    position: 'sticky',
+    left: '0',
+    top: '37px',
+    zIndex: '4',
+    whiteSpace: 'nowrap',
   },
   progMatrixRow: {
     ':hover': { background: 'rgba(0,51,160,0.015)' },
@@ -1113,6 +1152,25 @@ export const PlaneacionWizard: React.FC<Props> = ({
   const [step, setStep] = useState(0);
   const [showExitConfirm, setShowExitConfirm] = useState(false);
 
+  // Scroll horizontal sincronizado (barra superior <-> tabla de programación)
+  const progScrollRef = useRef<HTMLDivElement>(null);
+  const topScrollRef = useRef<HTMLDivElement>(null);
+  const [progScrollWidth, setProgScrollWidth] = useState(0);
+  const syncingScroll = useRef(false);
+  const syncScroll = useCallback((from: 'top' | 'table') => {
+    if (syncingScroll.current) { syncingScroll.current = false; return; }
+    const top = topScrollRef.current;
+    const table = progScrollRef.current;
+    if (!top || !table) return;
+    syncingScroll.current = true;
+    if (from === 'top') table.scrollLeft = top.scrollLeft;
+    else top.scrollLeft = table.scrollLeft;
+  }, []);
+  const measureProgScroll = useCallback(() => {
+    const el = progScrollRef.current;
+    if (el) setProgScrollWidth(el.scrollWidth);
+  }, []);
+
   // Step 0: Línea
   const [selectedLinea, setSelectedLinea] = useState<LineaPlaneacionConfig | null>(null);
 
@@ -1257,6 +1315,14 @@ export const PlaneacionWizard: React.FC<Props> = ({
 
   const STEPS = useMemo(() => getStepLabels(isMonitoreo, isCompensaciones), [isMonitoreo, isCompensaciones]);
   const isEditMode = !!initialData;
+
+  // Medir el ancho real de la tabla para dimensionar la barra de scroll superior.
+  useEffect(() => {
+    if (step !== STEP_PROGRAMACION) return;
+    measureProgScroll();
+    window.addEventListener('resize', measureProgScroll);
+    return () => window.removeEventListener('resize', measureProgScroll);
+  }, [step, STEP_PROGRAMACION, monthlyData, measureProgScroll]);
 
   const lineasPlaneacionVisibles = useMemo(
     () => LINEAS_PLANEACION.filter(linea => !canSelectLinea || canSelectLinea(linea.value)),
@@ -4021,7 +4087,19 @@ export const PlaneacionWizard: React.FC<Props> = ({
 
                 {/* Año 1 / no-Compensaciones — tabla mensualizada (la existente) */}
                 {(!isCompensaciones || tabAnio === 1) && (
-                <div className={styles.progMatrixWrap}>
+                <>
+                <div
+                  ref={topScrollRef}
+                  className={styles.progTopScroll}
+                  onScroll={() => syncScroll('top')}
+                >
+                  <div style={{ width: progScrollWidth || '100%', height: '1px' }} />
+                </div>
+                <div
+                  ref={progScrollRef}
+                  className={styles.progMatrixWrap}
+                  onScroll={() => syncScroll('table')}
+                >
                   <table className={styles.progMatrixTable}>
                     <thead>
                       <tr>
@@ -4033,19 +4111,19 @@ export const PlaneacionWizard: React.FC<Props> = ({
                       </tr>
                       {/* IPC per-month toggle row — solo visible si IPC global está activo */}
                       {ipcGlobalActivo && ipcGlobalPorcentaje > 0 && selectedLinea?.value !== 'Hojas de Ruta Sostenibilidad Ambiental' && (
-                        <tr style={{ background: CENIT_COLORS.blueBrand }}>
-                          <th className={styles.progMatrixItemTh} style={{ fontSize: '11px', fontWeight: '700', color: '#ffffff', textAlign: 'right' }} title={`Marca los meses donde aplicar +${ipcGlobalPorcentaje}% de IPC`}>
-                            Aplicar IPC (+{ipcGlobalPorcentaje}%) →
+                        <tr>
+                          <th className={styles.progMatrixIpcThItem} title={`Marca los meses donde aplicar +${ipcGlobalPorcentaje}% de IPC`}>
+                            📈 Aplicar IPC (+{ipcGlobalPorcentaje}%) →
                           </th>
                           {MESES_SHORT.map((_, i) => (
-                            <th key={i} className={styles.progMatrixMonthTh} style={{ textAlign: 'center' }}>
+                            <th key={i} className={styles.progMatrixIpcTh}>
                               <Checkbox
                                 checked={ipcMeses.has(i)}
                                 onChange={() => { const s = new Set(ipcMeses); s.has(i) ? s.delete(i) : s.add(i); setIpcMeses(s); }}
                               />
                             </th>
                           ))}
-                          <th className={styles.progMatrixTotalTh}></th>
+                          <th className={styles.progMatrixIpcTh}></th>
                         </tr>
                       )}
                     </thead>
@@ -4223,6 +4301,7 @@ export const PlaneacionWizard: React.FC<Props> = ({
                     </tbody>
                   </table>
                 </div>
+                </>
                 )}
               </div>
             )}
