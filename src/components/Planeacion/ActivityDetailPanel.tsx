@@ -12,7 +12,7 @@ import {
   CalendarLtrRegular, PersonRegular, LocationRegular,
   DocumentRegular, MoneyRegular, ShieldCheckmarkRegular,
   ClipboardTaskListLtrRegular, ArrowTrendingRegular,
-  BuildingRegular, TagRegular, InfoRegular,
+  BuildingRegular, TagRegular,
 } from '@fluentui/react-icons';
 import { ActividadAmbiental, MATRICES_AMBIENTALES, LINEAS_OPERATIVAS } from '../../types';
 import { StatusBadge, PrioridadBadge } from '../shared/StatusBadge';
@@ -174,6 +174,56 @@ const useStyles = makeStyles({
     color: CENIT_COLORS.blueBrand,
   },
 
+  // ── Acordeón de matrices (monitoreos) ─────────────────────
+  matrizAcc: {
+    border: '1px solid rgba(0,0,0,0.08)',
+    borderRadius: '10px',
+    marginBottom: '8px',
+    overflow: 'hidden',
+    background: '#fff',
+  },
+  matrizSummary: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '10px',
+    padding: '12px 14px',
+    cursor: 'pointer',
+    listStyle: 'none',
+    userSelect: 'none',
+    background: 'rgba(0,51,160,0.03)',
+    ':hover': { background: 'rgba(0,51,160,0.06)' },
+  },
+  matrizIcon: {
+    width: '30px', height: '30px', borderRadius: '8px',
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    fontSize: '16px', flexShrink: 0,
+  },
+  matrizNombre: {
+    fontWeight: 700, fontSize: '13px', color: '#003057',
+  },
+  matrizMeta: {
+    fontSize: '11px', color: tokens.colorNeutralForeground3,
+  },
+  matrizTotal: {
+    marginLeft: 'auto', fontWeight: 700, fontSize: '13px',
+    color: CENIT_COLORS.greenDark, whiteSpace: 'nowrap',
+  },
+  paramTable: {
+    width: '100%', borderCollapse: 'collapse', fontSize: '12px',
+  },
+  paramTh: {
+    textAlign: 'left', padding: '7px 14px', fontSize: '10px',
+    textTransform: 'uppercase', letterSpacing: '0.4px',
+    color: tokens.colorNeutralForeground3, fontWeight: 700,
+    borderBottom: '1px solid rgba(0,0,0,0.06)',
+    background: '#fafbfc',
+  },
+  paramTd: {
+    padding: '7px 14px',
+    borderBottom: '1px solid rgba(0,0,0,0.04)',
+    color: '#374151',
+  },
+
   // ── Grid mensual ─────────────────────────────────────────
   mesesGrid: {
     display: 'grid',
@@ -304,6 +354,44 @@ export const ActivityDetailPanel: React.FC<ActivityDetailPanelProps> = ({
 
   const esMonitoreo = actividad?.lineaOperativa === 'Monitoreos';
   const tienePagosDiferidos = !!opx?.pagosDiferidosActivo;
+  const tipoLugar = actividad?.tipoLugar;
+
+  // Agrupar los parámetros seleccionados por matriz (monitoreos), con su precio
+  // y nº de compuestos, para mostrarlos en acordeón en vez de un párrafo largo.
+  const matricesDetalle = useMemo(() => {
+    if (!esMonitoreo) return [];
+    const seleccion: any[] = Array.isArray(opx?.parametrosSeleccionados) ? opx.parametrosSeleccionados : [];
+    const map = new Map<string, { matriz: string; estaciones: Set<string>; params: any[]; total: number }>();
+    for (const r of seleccion) {
+      const matriz = String(r?.matriz ?? 'Sin matriz').trim() || 'Sin matriz';
+      const precio = Number(r?.chemilab) || 0;
+      const compuestos = Number(r?.compuesto) > 1 ? Number(r.compuesto) : 1;
+      const subtotal = precio * compuestos;
+      const grupo = map.get(matriz) ?? { matriz, estaciones: new Set<string>(), params: [], total: 0 };
+      grupo.params.push({
+        parametro: String(r?.parametro ?? '—'),
+        estacion: r?.estacion ?? '',
+        precio,
+        compuestos,
+        subtotal,
+      });
+      if (r?.estacion) grupo.estaciones.add(String(r.estacion));
+      grupo.total += subtotal;
+      map.set(matriz, grupo);
+    }
+    return [...map.values()].sort((a, b) => b.total - a.total);
+  }, [esMonitoreo, opx]);
+
+  const matrizVisual = (nombre: string) => {
+    const n = nombre.toLowerCase();
+    if (n.includes('aire')) return { icon: '🌬️', bg: '#eef2ff', fg: '#4f46e5' };
+    if (n.includes('subterr')) return { icon: '🪨', bg: '#f5f3ff', fg: '#7c3aed' };
+    if (n.includes('agua') || n.includes('superf') || n.includes('residual') || n.includes('vertimiento')) return { icon: '💧', bg: '#ecfeff', fg: '#0891b2' };
+    if (n.includes('suelo')) return { icon: '🟫', bg: '#fef3c7', fg: '#b45309' };
+    if (n.includes('ruido')) return { icon: '🔊', bg: '#fae8ff', fg: '#a21caf' };
+    if (n.includes('biot') || n.includes('hidrobio') || n.includes('fauna') || n.includes('flora')) return { icon: '🌿', bg: '#ecfdf5', fg: '#059669' };
+    return { icon: '🧪', bg: '#f1f5f9', fg: '#475569' };
+  };
 
   if (!actividad) return null;
 
@@ -467,13 +555,52 @@ export const ActivityDetailPanel: React.FC<ActivityDetailPanelProps> = ({
                 )}
               </div>
 
-              {/* Chips de info si es monitoreo */}
-              {esMonitoreo && actividad.descripcion && (
-                <div className={styles.opexInfoRow}>
-                  <span className={styles.opexChip}>
-                    <InfoRegular style={{ fontSize: '12px' }} />
-                    {actividad.descripcion}
-                  </span>
+              {/* Monitoreos: acordeón de matrices con sus parámetros y precios */}
+              {esMonitoreo && matricesDetalle.length > 0 && (
+                <div style={{ marginBottom: '14px' }}>
+                  <div style={{ fontSize: '11px', fontWeight: 700, color: tokens.colorNeutralForeground3, textTransform: 'uppercase', letterSpacing: '0.4px', marginBottom: '8px' }}>
+                    Matrices programadas ({matricesDetalle.length})
+                  </div>
+                  {matricesDetalle.map((g) => {
+                    const v = matrizVisual(g.matriz);
+                    return (
+                      <details key={g.matriz} className={styles.matrizAcc}>
+                        <summary className={styles.matrizSummary}>
+                          <span className={styles.matrizIcon} style={{ background: v.bg, color: v.fg }}>{v.icon}</span>
+                          <span style={{ display: 'flex', flexDirection: 'column' }}>
+                            <span className={styles.matrizNombre}>{g.matriz}</span>
+                            <span className={styles.matrizMeta}>
+                              {g.params.length} parámetro{g.params.length !== 1 ? 's' : ''}
+                              {g.estaciones.size > 0 ? ` · ${g.estaciones.size} estación${g.estaciones.size !== 1 ? 'es' : ''}` : ''}
+                            </span>
+                          </span>
+                          <span className={styles.matrizTotal}>{fmtCOP(g.total)}</span>
+                        </summary>
+                        <table className={styles.paramTable}>
+                          <thead>
+                            <tr>
+                              <th className={styles.paramTh}>Parámetro</th>
+                              {tipoLugar === 'Zona' && <th className={styles.paramTh}>Estación</th>}
+                              <th className={styles.paramTh} style={{ textAlign: 'right' }}>Precio U.</th>
+                              <th className={styles.paramTh} style={{ textAlign: 'center' }}>Comp.</th>
+                              <th className={styles.paramTh} style={{ textAlign: 'right' }}>Subtotal</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {g.params.map((pr: any, idx: number) => (
+                              <tr key={pr.parametro + idx}>
+                                <td className={styles.paramTd} style={{ fontWeight: 600, color: '#111827' }}>{pr.parametro}</td>
+                                {tipoLugar === 'Zona' && <td className={styles.paramTd}>{pr.estacion || '—'}</td>}
+                                <td className={styles.paramTd} style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>{pr.precio > 0 ? fmtCOP(pr.precio) : '—'}</td>
+                                <td className={styles.paramTd} style={{ textAlign: 'center' }}>{pr.compuestos > 1 ? `×${pr.compuestos}` : '—'}</td>
+                                <td className={styles.paramTd} style={{ textAlign: 'right', fontWeight: 600, color: CENIT_COLORS.blueBrand, whiteSpace: 'nowrap' }}>{pr.subtotal > 0 ? fmtCOP(pr.subtotal) : '—'}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </details>
+                    );
+                  })}
                 </div>
               )}
 
