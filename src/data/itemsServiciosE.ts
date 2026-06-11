@@ -4,12 +4,10 @@ export type ServicioEComplejidad = 'Alto' | 'Moderado' | 'Bajo';
 
 export const SERVICIO_E_COMPLEJIDADES: ServicioEComplejidad[] = ['Alto', 'Moderado', 'Bajo'];
 
-const IPC_2026 = 1.038;
-
-const SERVICIO_PRECIOS: Record<ServicioEComplejidad, { eneroFebrero: number; marzoDiciembre: number }> = {
-  Alto: { eneroFebrero: 20353275, marzoDiciembre: 21065640 },
-  Moderado: { eneroFebrero: 17944843, marzoDiciembre: 17944843 },
-  Bajo: { eneroFebrero: 12061241, marzoDiciembre: 12483384 },
+const SERVICIO_PRECIOS: Record<ServicioEComplejidad, number> = {
+  Alto: 21065640,
+  Moderado: 17944843,
+  Bajo: 12483384,
 };
 
 const SERVICIOS_E_ZONAS = ['NORTE', 'CENTRO', 'OCCIDENTE', 'LLANOS', 'ORIENTE', 'CLC', 'TRANSVERSAL'] as const;
@@ -49,11 +47,11 @@ function roundMoney(value: number): number {
   return Math.round(value * 100) / 100;
 }
 
-function preciosMensuales(eneroFebrero: number, marzoDiciembre: number): Record<number, number> {
+function preciosMensuales(precio: number): Record<number, number> {
   return Object.fromEntries(
     Array.from({ length: 12 }, (_, index) => [
       index,
-      roundMoney(index < 2 ? eneroFebrero : marzoDiciembre),
+      roundMoney(precio),
     ]),
   );
 }
@@ -87,7 +85,7 @@ function itemBase(
   base: string,
   precioBase2025: number,
 ): ItemLinea {
-  const precios = preciosMensuales(precioBase2025, precioBase2025 * IPC_2026);
+  const precios = preciosMensuales(precioBase2025);
   return {
     id,
     lineaOperativa: 'Servicios E',
@@ -107,7 +105,7 @@ export function getItemsServiciosEPorZona(
   const zonaKey = normalizeZonaServicioE(zona);
   const serviciosPorComplejidad = SERVICIO_E_COMPLEJIDADES.map(complejidad => {
     const servicioPrecio = SERVICIO_PRECIOS[complejidad];
-    const servicioPrecios = preciosMensuales(servicioPrecio.eneroFebrero, servicioPrecio.marzoDiciembre);
+    const servicioPrecios = preciosMensuales(servicioPrecio);
     return {
       id: `SERVE-SERVICIO-${complejidad.toUpperCase()}`,
       lineaOperativa: 'Servicios E' as const,
