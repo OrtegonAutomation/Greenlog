@@ -12,6 +12,15 @@
     <style>
       *, *::before, *::after { box-sizing: border-box; }
       html, body, #root { margin: 0; height: 100%; overflow: hidden; }
+      html.greenlog-login-scroll,
+      html:has(body.greenlog-login-scroll),
+      body.greenlog-login-scroll,
+      body.greenlog-login-scroll #root {
+        min-height: 100%;
+        height: auto;
+        overflow-y: auto;
+        overflow-x: hidden;
+      }
       body {
         font-family: 'Plus Jakarta Sans', 'Segoe UI', system-ui, sans-serif;
         /* Fondo global con gradiente suave verde-teal-blanco */

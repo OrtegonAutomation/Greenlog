@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   makeStyles,
   shorthands,
@@ -19,11 +19,11 @@ import GreenLogBlanco from '../../assets/GreenLog Blanco.png';
 
 const useStyles = makeStyles({
   root: {
-    height: '100dvh',
+    minHeight: '100svh',
     display: 'grid',
     placeItems: 'center',
     ...shorthands.padding('32px'),
-    overflowY: 'auto',
+    overflowY: 'visible',
     overflowX: 'hidden',
     WebkitOverflowScrolling: 'touch',
     background: `
@@ -196,6 +196,15 @@ export const LoginGate: React.FC<LoginGateProps> = ({ onLoginSuccess, loadingOnl
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    document.documentElement.classList.add('greenlog-login-scroll');
+    document.body.classList.add('greenlog-login-scroll');
+    return () => {
+      document.documentElement.classList.remove('greenlog-login-scroll');
+      document.body.classList.remove('greenlog-login-scroll');
+    };
+  }, []);
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
