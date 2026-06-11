@@ -1612,7 +1612,13 @@ export const PlaneacionWizard: React.FC<Props> = ({
         // Logística — solo en Monitoreos (no aplica para Compensaciones u otras líneas)
         if (isMonitoreo) {
           for (const log of ITEMS_LOGISTICA.filter(l => selectedLogistica.has(l.id))) {
-            list.push(buildEntry(log.id, log.item, ItemsLineaService.getPrecioEfectivo(log, i), i, existing, 1));
+            // Logística solo usa cantidad (sin compuesto): frecuencia fija en 1.
+            const logEntry = buildEntry(log.id, log.item, ItemsLineaService.getPrecioEfectivo(log, i), i, existing, 1);
+            if (logEntry.frecuencia !== 1) {
+              logEntry.frecuencia = 1;
+              logEntry.total = calculateEntryTotal(logEntry, i);
+            }
+            list.push(logEntry);
           }
         }
 
@@ -4169,7 +4175,7 @@ export const PlaneacionWizard: React.FC<Props> = ({
                                       style={{ width: '100%', minWidth: 0 }}
                                     />
                                   )}
-                                  {isMonitoreo && !item.key.startsWith('MATRIZ|') && (
+                                  {isMonitoreo && !isLog && !item.key.startsWith('MATRIZ|') && (
                                     <Input
                                       type="number"
                                       size="small"
