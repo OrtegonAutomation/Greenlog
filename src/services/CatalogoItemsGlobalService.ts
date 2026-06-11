@@ -39,21 +39,32 @@ const normalizePreciosMensuales = (value?: Record<number, number>) => {
   return entries.length > 0 ? Object.fromEntries(entries) : null;
 };
 
-const mapRowToItem = (row: CatalogoItemRow): ItemLinea => ({
-  id: row.item_key,
-  lineaOperativa: row.linea_operativa as LineaOperativa,
-  item: row.item,
-  descripcion: row.descripcion || row.item,
-  unidad: row.unidad || 'Global',
-  precioReferencia: Number(row.precio_referencia ?? 0),
-  preciosMensuales: row.precios_mensuales
+const flatPreciosMensuales = (precio: number): Record<number, number> =>
+  Object.fromEntries(Array.from({ length: MESES_COUNT }, (_, index) => [index, precio]));
+
+const mapRowToItem = (row: CatalogoItemRow): ItemLinea => {
+  const lineaOperativa = row.linea_operativa as LineaOperativa;
+  const precioReferencia = Number(row.precio_referencia ?? 0);
+  const preciosMensuales = row.precios_mensuales
     ? Object.fromEntries(Object.entries(row.precios_mensuales).map(([key, value]) => [Number(key), Number(value)]))
-    : undefined,
-  catalogoGlobalId: row.id,
-  catalogSource: 'global',
-  zonaCatalogo: row.zona_scope || '*',
-  ...(row.metadata ?? {}),
-});
+    : undefined;
+
+  return {
+    id: row.item_key,
+    lineaOperativa,
+    item: row.item,
+    descripcion: row.descripcion || row.item,
+    unidad: row.unidad || 'Global',
+    precioReferencia,
+    preciosMensuales: lineaOperativa === 'Servicios E'
+      ? flatPreciosMensuales(precioReferencia)
+      : preciosMensuales,
+    catalogoGlobalId: row.id,
+    catalogSource: 'global',
+    zonaCatalogo: row.zona_scope || '*',
+    ...(row.metadata ?? {}),
+  };
+};
 
 export const CatalogoItemsGlobalService = {
   async getItems(linea: LineaOperativa, zona?: string): Promise<ItemLinea[]> {
@@ -93,6 +104,10 @@ export const CatalogoItemsGlobalService = {
       requiereComplejidad: item.requiereComplejidad,
     };
 
+    const preciosMensuales = item.lineaOperativa === 'Servicios E'
+      ? flatPreciosMensuales(item.precioReferencia || 0)
+      : item.preciosMensuales;
+
     const row = {
       item_key: item.id,
       linea_operativa: item.lineaOperativa,
@@ -100,7 +115,7 @@ export const CatalogoItemsGlobalService = {
       descripcion: item.descripcion || item.item,
       unidad: item.unidad || 'Global',
       precio_referencia: item.precioReferencia || 0,
-      precios_mensuales: normalizePreciosMensuales(item.preciosMensuales),
+      precios_mensuales: normalizePreciosMensuales(preciosMensuales),
       zona_scope: zonaScope,
       estacion: context.estacion ?? null,
       metadata: Object.fromEntries(Object.entries(metadata).filter(([, value]) => value !== undefined)),
