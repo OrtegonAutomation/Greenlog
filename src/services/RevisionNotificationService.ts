@@ -104,6 +104,24 @@ const buildDetalleProgramacion = (actividad: ActividadAmbiental) => {
     .filter(it => it.totalAnual > 0 || it.cantidadTotal > 0)
     .sort((a, b) => b.totalAnual - a.totalAnual);
 
+  // Monitoreos: cada entrada es una MATRIZ (key = "MATRIZ|<nombre>", nombre =
+  // "<matriz> (N params)"). Resumimos por matriz con total y nº de parámetros.
+  const esMonitoreo = actividad.lineaOperativa === 'Monitoreos';
+  const matrices = esMonitoreo
+    ? items
+        .filter(it => String(it.key).startsWith('MATRIZ|'))
+        .map(it => {
+          const nombreMatriz = String(it.key).replace(/^MATRIZ\|/, '').trim();
+          const m = /\((\d+)\s*params?\)/i.exec(String(it.nombre));
+          return {
+            matriz: nombreMatriz,
+            parametros: m ? Number(m[1]) : null,
+            totalAnual: it.totalAnual,
+          };
+        })
+        .sort((a, b) => b.totalAnual - a.totalAnual)
+    : [];
+
   const mesesResumen = meses.map((m: any) => ({
     mes: m?.mes,
     total: num(m?.total),
@@ -112,6 +130,8 @@ const buildDetalleProgramacion = (actividad: ActividadAmbiental) => {
   }));
 
   return {
+    esMonitoreo,
+    matrices,
     items,
     meses: mesesResumen,
     totalAnual,
