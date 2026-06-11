@@ -21,6 +21,8 @@ import {
 import { exportOpexToExcel, exportDetalleInternoToExcel } from '../../utils/exportOpex';
 import { useAuth } from '../../auth/AuthContext';
 import { RevisionNotificationService } from '../../services/RevisionNotificationService';
+import { NotificacionesService } from '../../services/NotificacionesService';
+import { useNotificaciones } from '../../context/NotificacionesContext';
 import { ItemLinea, ItemsLineaService } from '../../services/ItemsLineaService';
 import { LineaOperativa } from '../../types';
 
@@ -326,6 +328,7 @@ export const PlaneacionModule: React.FC = () => {
 
   const { actividades, cargando, errorCarga, guardando, recargar, crear, actualizar, eliminar } = useActividades();
   const { currentUser, isAdmin, canPlan, canReview, canEditActividad, canViewActividad } = useAuth();
+  const { actividadIdParaAbrir, limpiarAbrirActividad } = useNotificaciones();
   const canPlanAny = canPlan();
   const actividadesVisibles = useMemo(
     () => actividades.filter(a => canViewActividad(a)),
@@ -389,6 +392,10 @@ export const PlaneacionModule: React.FC = () => {
 
   const sendRevisionRequested = useCallback((actividad: ActividadAmbiental, action: 'created' | 'updated' | 'resent') => {
     if (!currentUser || actividad.estadoAprobacion !== 'Pendiente') return;
+    // Notificación in-app para los revisores (además del email).
+    void NotificacionesService
+      .crearParaRevisores(actividad, currentUser.nombre, currentUser.email, action)
+      .catch(() => { /* la campana no debe romper el guardado */ });
     void RevisionNotificationService
       .notifyRevisionRequested(actividad, currentUser, action)
       .then(result => handleNotificationResult(result, 'La actividad se guardó, pero no se pudo enviar la solicitud de revisión'))
@@ -400,6 +407,10 @@ export const PlaneacionModule: React.FC = () => {
 
   const sendRevisionResolved = useCallback((actividad: ActividadAmbiental, estadoAprobacion: 'Aprobado' | 'Rechazado') => {
     if (!currentUser) return;
+    // Notificación in-app para el solicitante (además del email).
+    void NotificacionesService
+      .crearParaSolicitante(actividad, estadoAprobacion, currentUser.nombre)
+      .catch(() => { /* la campana no debe romper la revisión */ });
     void RevisionNotificationService
       .notifyRevisionResolved(actividad, currentUser, estadoAprobacion)
       .then(result => handleNotificationResult(result, 'La revisión se registró, pero no se pudo enviar la notificación al solicitante'))
@@ -444,6 +455,17 @@ export const PlaneacionModule: React.FC = () => {
     setDetalleItem(item);
     setDetalleAbierto(true);
   }, []);
+
+  // Abrir el detalle de una actividad cuando la campana de notificaciones lo solicita.
+  useEffect(() => {
+    if (!actividadIdParaAbrir) return;
+    const item = actividades.find(a => a.id === actividadIdParaAbrir);
+    if (item) {
+      setDetalleItem(item);
+      setDetalleAbierto(true);
+    }
+    limpiarAbrirActividad();
+  }, [actividadIdParaAbrir, actividades, limpiarAbrirActividad]);
 
   const handleDetailClose = useCallback(() => {
     setDetalleAbierto(false);

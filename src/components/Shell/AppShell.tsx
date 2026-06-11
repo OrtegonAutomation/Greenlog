@@ -7,6 +7,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   makeStyles, shorthands, tokens, mergeClasses,
   Body1Strong, Caption1, Tooltip, Avatar, Button,
+  Popover, PopoverTrigger, PopoverSurface,
 } from '@fluentui/react-components';
 import {
   GridRegular,
@@ -18,6 +19,9 @@ import {
   AlertRegular,
   QuestionCircleRegular,
   ArrowLeftRegular,
+  CheckmarkCircleRegular,
+  DismissCircleRegular,
+  ClipboardTaskRegular,
 } from '@fluentui/react-icons';
 import { SeccionApp } from '../../types';
 import { Dashboard } from '../Dashboard/Dashboard';
@@ -28,6 +32,8 @@ import { CENIT_COLORS } from '../../theme/cenitTheme';
 import { startTour, maybeAutoStartTour } from '../Tour/TourGuide';
 import GreenLogBlanco from '../../assets/GreenLog Blanco.png';
 import { useAuth } from '../../auth/AuthContext';
+import { useNotificaciones } from '../../context/NotificacionesContext';
+import { Notificacion } from '../../types';
 import { getSectionFromPath, getSectionPath, normalizePath } from '../../utils/appRoutes';
 
 // ... (existing code)
@@ -276,6 +282,80 @@ const useStyles = makeStyles({
     },
     ':active': { transform: 'scale(0.94)' },
   },
+  notifWrap: {
+    position: 'relative',
+    display: 'inline-flex',
+  },
+  notifBadge: {
+    position: 'absolute',
+    top: '2px',
+    right: '2px',
+    minWidth: '16px',
+    height: '16px',
+    ...shorthands.padding('0', '4px'),
+    borderRadius: '999px',
+    background: '#e81123',
+    color: '#fff',
+    fontSize: '10px',
+    fontWeight: '700',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    lineHeight: 1,
+    boxShadow: '0 0 0 2px #fff',
+    pointerEvents: 'none',
+  },
+  notifPanel: {
+    width: '360px',
+    maxWidth: '92vw',
+    ...shorthands.padding('0'),
+  },
+  notifHeader: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    ...shorthands.padding('12px', '16px'),
+    ...shorthands.borderBottom('1px', 'solid', 'rgba(0,0,0,0.08)'),
+  },
+  notifList: {
+    maxHeight: '420px',
+    overflowY: 'auto',
+  },
+  notifItem: {
+    display: 'flex',
+    ...shorthands.gap('10px'),
+    ...shorthands.padding('12px', '16px'),
+    ...shorthands.borderBottom('1px', 'solid', 'rgba(0,0,0,0.05)'),
+    cursor: 'pointer',
+    transition: 'background 0.12s ease',
+    ':hover': { background: 'rgba(0,51,160,0.04)' },
+  },
+  notifItemUnread: {
+    background: 'rgba(0,51,160,0.06)',
+  },
+  notifIcon: {
+    flexShrink: 0,
+    width: '28px',
+    height: '28px',
+    borderRadius: '8px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    fontSize: '16px',
+  },
+  notifEmpty: {
+    ...shorthands.padding('32px', '16px'),
+    textAlign: 'center',
+    color: tokens.colorNeutralForeground3,
+  },
+  notifDot: {
+    flexShrink: 0,
+    width: '8px',
+    height: '8px',
+    borderRadius: '50%',
+    background: CENIT_COLORS.blueBrand,
+    marginTop: '6px',
+  },
 
   content: {
     flex: 1,
@@ -360,6 +440,107 @@ const BREADCRUMBS: Record<SeccionApp, string> = {
   reportes: 'Reportes e Indicadores',
 };
 
+// ── Campana de notificaciones ─────────────────────────────────
+const fmtFechaRelativa = (iso: string) => {
+  const d = new Date(iso);
+  const diff = Date.now() - d.getTime();
+  const min = Math.floor(diff / 60000);
+  if (min < 1) return 'ahora';
+  if (min < 60) return `hace ${min} min`;
+  const h = Math.floor(min / 60);
+  if (h < 24) return `hace ${h} h`;
+  const dias = Math.floor(h / 24);
+  if (dias < 7) return `hace ${dias} d`;
+  return d.toLocaleDateString('es-CO');
+};
+
+const NotifVisual: React.FC<{ tipo: Notificacion['tipo'] }> = ({ tipo }) => {
+  if (tipo === 'revision_aprobada') {
+    return <div style={{ background: 'rgba(0,176,80,0.14)', color: '#00803b', width: 28, height: 28, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><CheckmarkCircleRegular /></div>;
+  }
+  if (tipo === 'revision_rechazada') {
+    return <div style={{ background: 'rgba(232,17,35,0.12)', color: '#c50f1f', width: 28, height: 28, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><DismissCircleRegular /></div>;
+  }
+  return <div style={{ background: 'rgba(0,51,160,0.10)', color: CENIT_COLORS.blueBrand, width: 28, height: 28, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><ClipboardTaskRegular /></div>;
+};
+
+const NotificacionesBell: React.FC<{
+  styles: ReturnType<typeof useStyles>;
+  dashboardBg?: string;
+  onNavigateActividad: (actividadId?: string) => void;
+}> = ({ styles, dashboardBg, onNavigateActividad }) => {
+  const { notificaciones, unreadCount, marcarLeida, marcarTodasLeidas } = useNotificaciones();
+  const [open, setOpen] = useState(false);
+
+  const handleClick = (n: Notificacion) => {
+    if (!n.leida) void marcarLeida(n.id);
+    setOpen(false);
+    onNavigateActividad(n.actividadId);
+  };
+
+  return (
+    <Popover open={open} onOpenChange={(_, d) => setOpen(d.open)} positioning="below-end" withArrow>
+      <PopoverTrigger disableButtonEnhancement>
+        <Tooltip content="Notificaciones" relationship="label">
+          <div
+            className={styles.notifWrap}
+            role="button"
+            tabIndex={0}
+            aria-label="Notificaciones"
+          >
+            <div className={styles.iconBtn} style={{ backgroundColor: dashboardBg }}>
+              <AlertRegular />
+            </div>
+            {unreadCount > 0 && (
+              <span className={styles.notifBadge}>{unreadCount > 9 ? '9+' : unreadCount}</span>
+            )}
+          </div>
+        </Tooltip>
+      </PopoverTrigger>
+      <PopoverSurface className={styles.notifPanel}>
+        <div className={styles.notifHeader}>
+          <Body1Strong>Notificaciones</Body1Strong>
+          {unreadCount > 0 && (
+            <Button appearance="transparent" size="small" onClick={() => void marcarTodasLeidas()}>
+              Marcar todas como leídas
+            </Button>
+          )}
+        </div>
+        <div className={styles.notifList}>
+          {notificaciones.length === 0 ? (
+            <div className={styles.notifEmpty}>
+              <Caption1>No tienes notificaciones.</Caption1>
+            </div>
+          ) : (
+            notificaciones.map(n => (
+              <div
+                key={n.id}
+                className={mergeClasses(styles.notifItem, !n.leida && styles.notifItemUnread)}
+                onClick={() => handleClick(n)}
+                role="button"
+                tabIndex={0}
+              >
+                <NotifVisual tipo={n.tipo} />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <Body1Strong style={{ display: 'block', fontSize: '13px' }}>{n.titulo}</Body1Strong>
+                  <Caption1 style={{ display: 'block', color: tokens.colorNeutralForeground2 }}>{n.mensaje}</Caption1>
+                  {n.actividadTarea && (
+                    <Caption1 style={{ display: 'block', color: tokens.colorNeutralForeground3, fontStyle: 'italic', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {n.actividadTarea}
+                    </Caption1>
+                  )}
+                  <Caption1 style={{ color: tokens.colorNeutralForeground4 }}>{fmtFechaRelativa(n.creadoEn)}</Caption1>
+                </div>
+                {!n.leida && <div className={styles.notifDot} />}
+              </div>
+            ))
+          )}
+        </div>
+      </PopoverSurface>
+    </Popover>
+  );
+};
+
 // ── Componente ────────────────────────────────────────────────
 interface AppShellProps {
   onBack?: () => void;
@@ -368,6 +549,7 @@ interface AppShellProps {
 export const AppShell: React.FC<AppShellProps> = ({ onBack }) => {
   const styles = useStyles();
   const { currentUser, isAdmin, logout } = useAuth();
+  const { pedirAbrirActividad } = useNotificaciones();
   const [seccion, setSeccion] = useState<SeccionApp>(() => getSectionFromPath() ?? 'dashboard');
   const [collapsed, setCollapsed] = useState(true);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -534,17 +716,14 @@ export const AppShell: React.FC<AppShellProps> = ({ onBack }) => {
                 <QuestionCircleRegular />
               </div>
             </Tooltip>
-            <Tooltip content="Notificaciones" relationship="label">
-              <div
-                className={styles.iconBtn}
-                role="button"
-                tabIndex={0}
-                aria-label="Notificaciones"
-                style={{ backgroundColor: seccion === 'dashboard' ? 'rgba(255,255,255,0.5)' : undefined }}
-              >
-                <AlertRegular />
-              </div>
-            </Tooltip>
+            <NotificacionesBell
+              styles={styles}
+              dashboardBg={seccion === 'dashboard' ? 'rgba(255,255,255,0.5)' : undefined}
+              onNavigateActividad={(actividadId) => {
+                navigateSection('planeacion');
+                if (actividadId) pedirAbrirActividad(actividadId);
+              }}
+            />
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
               <Avatar name={currentUser?.nombre ?? 'Usuario GreenLog'} color="colorful" size={32} />
               <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.15 }}>

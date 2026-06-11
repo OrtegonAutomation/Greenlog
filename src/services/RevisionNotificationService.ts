@@ -6,7 +6,7 @@ import {
 } from '../data/equipoAmbiental';
 
 export const REVISION_NOTIFICATIONS_ENABLED = true;
-export const REVISION_NOTIFICATIONS_TEST_MODE = true;
+export const REVISION_NOTIFICATIONS_TEST_MODE = false;
 export const REVISION_NOTIFICATIONS_TEST_EMAIL = 'camilo.ortegonc@outlook.com';
 export const REVISION_WEBHOOK_URL = 'https://n8n.srv1253947.hstgr.cloud/webhook/872ac679-540e-43a0-be83-e49777633e88';
 

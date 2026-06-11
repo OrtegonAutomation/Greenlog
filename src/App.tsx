@@ -5,6 +5,7 @@ import { AuthProvider } from './auth/AuthContext';
 import { useAuth } from './auth/AuthContext';
 import { LoginGate } from './components/Auth/LoginGate';
 import { AppShell } from './components/Shell/AppShell';
+import { NotificacionesProvider } from './context/NotificacionesContext';
 import { getLoginPath, getSectionPath, isLoginPath } from './utils/appRoutes';
 
 const AppContent: React.FC = () => {
@@ -37,7 +38,11 @@ const AppContent: React.FC = () => {
     return <LoginGate onLoginSuccess={goHome} />;
   }
 
-  return <AppShell />;
+  return (
+    <NotificacionesProvider>
+      <AppShell />
+    </NotificacionesProvider>
+  );
 };
 
 // App raíz - CENIT (GREENLOG) - Sistema de Control Ambiental

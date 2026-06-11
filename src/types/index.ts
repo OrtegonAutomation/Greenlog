@@ -55,6 +55,27 @@ export type RecursoReceptor = 'Suelo' | 'Agua' | 'Aire' | 'Ruido';
 // ── Interfaces principales ──────────────────────────────────
 
 /** Actividad ambiental - entidad central de planeación */
+// ── Notificaciones in-app (campana) ─────────────────────────
+export type TipoNotificacion =
+  | 'revision_solicitada'
+  | 'revision_aprobada'
+  | 'revision_rechazada';
+
+export interface Notificacion {
+  id: string;
+  destinatarioEmail: string;
+  tipo: TipoNotificacion;
+  titulo?: string;
+  mensaje?: string;
+  actividadId?: string;
+  actividadTarea?: string;
+  lineaOperativa?: string;
+  zona?: string;
+  actorNombre?: string;
+  leida: boolean;
+  creadoEn: string;
+}
+
 export interface ActividadAmbiental {
   id: string;
   tarea: string;
