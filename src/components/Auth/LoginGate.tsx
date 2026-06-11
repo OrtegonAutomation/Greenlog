@@ -19,16 +19,23 @@ import GreenLogBlanco from '../../assets/GreenLog Blanco.png';
 
 const useStyles = makeStyles({
   root: {
-    minHeight: '100vh',
+    height: '100dvh',
     display: 'grid',
     placeItems: 'center',
     ...shorthands.padding('32px'),
+    overflowY: 'auto',
+    overflowX: 'hidden',
+    WebkitOverflowScrolling: 'touch',
     background: `
       radial-gradient(circle at 18% 18%, rgba(140,198,63,0.22) 0, transparent 28%),
       radial-gradient(circle at 78% 18%, rgba(0,86,210,0.25) 0, transparent 30%),
       linear-gradient(135deg, #001a5c 0%, #003057 52%, #0b3b2f 100%)
     `,
     color: '#fff',
+    '@media (max-width: 820px)': {
+      placeItems: 'start center',
+      ...shorthands.padding('18px'),
+    },
   },
   card: {
     width: 'min(960px, 100%)',
@@ -43,6 +50,8 @@ const useStyles = makeStyles({
     boxShadow: '0 24px 80px rgba(0,0,0,0.32)',
     '@media (max-width: 820px)': {
       gridTemplateColumns: '1fr',
+      maxWidth: '560px',
+      marginBottom: '18px',
     },
   },
   brandPanel: {
@@ -55,8 +64,8 @@ const useStyles = makeStyles({
     background: `linear-gradient(145deg, rgba(0,48,87,0.95) 0%, rgba(0,51,160,0.74) 100%),
       url('https://cenit-transporte.com/wp-content/uploads/2025/10/geodesicos1.jpg') center/cover`,
     '@media (max-width: 620px)': {
-      minHeight: '320px',
-      ...shorthands.padding('28px'),
+      minHeight: '260px',
+      ...shorthands.padding('24px'),
     },
   },
   logoRow: {
@@ -68,12 +77,19 @@ const useStyles = makeStyles({
   cenitLogo: {
     height: '46px',
     objectFit: 'contain',
+    '@media (max-width: 620px)': {
+      height: '34px',
+    },
   },
   greenlogLogo: {
     width: '66px',
     height: '66px',
     objectFit: 'contain',
     filter: 'drop-shadow(0 10px 24px rgba(0,0,0,0.24))',
+    '@media (max-width: 620px)': {
+      width: '48px',
+      height: '48px',
+    },
   },
   brandCopy: {
     maxWidth: '520px',
@@ -100,7 +116,7 @@ const useStyles = makeStyles({
     letterSpacing: '-0.04em',
     color: '#fff',
     '@media (max-width: 620px)': {
-      fontSize: '34px',
+      fontSize: '32px',
     },
   },
   subtitle: {
@@ -108,6 +124,10 @@ const useStyles = makeStyles({
     color: 'rgba(255,255,255,0.84)',
     fontSize: '16px',
     lineHeight: 1.6,
+    '@media (max-width: 620px)': {
+      fontSize: '14px',
+      lineHeight: 1.45,
+    },
   },
   formPanel: {
     display: 'flex',
@@ -119,7 +139,7 @@ const useStyles = makeStyles({
     color: tokens.colorNeutralForeground1,
     minWidth: 0,
     '@media (max-width: 620px)': {
-      ...shorthands.padding('28px'),
+      ...shorthands.padding('24px'),
     },
   },
   formHeader: {
