@@ -44,3 +44,19 @@ export const getSectionFromPath = (path = typeof window === 'undefined' ? '/' : 
 
 export const isLoginPath = (path = typeof window === 'undefined' ? '/' : window.location.pathname) =>
   normalizePath(path) === normalizePath(getLoginPath());
+
+/** Lee el id de actividad de la URL (?actividad=<id>), usado por el deep-link de los correos. */
+export const getActividadParam = () => {
+  if (typeof window === 'undefined') return null;
+  const value = new URLSearchParams(window.location.search).get('actividad');
+  return value && value.trim() ? value.trim() : null;
+};
+
+/** Elimina ?actividad= de la URL sin recargar (tras consumirlo). */
+export const clearActividadParam = () => {
+  if (typeof window === 'undefined') return;
+  const url = new URL(window.location.href);
+  if (!url.searchParams.has('actividad')) return;
+  url.searchParams.delete('actividad');
+  window.history.replaceState(null, '', url.pathname + url.search + url.hash);
+};

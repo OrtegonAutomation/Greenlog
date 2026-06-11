@@ -456,16 +456,20 @@ export const PlaneacionModule: React.FC = () => {
     setDetalleAbierto(true);
   }, []);
 
-  // Abrir el detalle de una actividad cuando la campana de notificaciones lo solicita.
+  // Abrir el detalle de una actividad cuando la campana o un deep-link lo solicitan.
+  // Espera a que terminen de cargar las actividades antes de descartar el id.
   useEffect(() => {
     if (!actividadIdParaAbrir) return;
     const item = actividades.find(a => a.id === actividadIdParaAbrir);
     if (item) {
       setDetalleItem(item);
       setDetalleAbierto(true);
+      limpiarAbrirActividad();
+    } else if (!cargando) {
+      // Ya cargó y no existe (o sin permiso para verla): descartar.
+      limpiarAbrirActividad();
     }
-    limpiarAbrirActividad();
-  }, [actividadIdParaAbrir, actividades, limpiarAbrirActividad]);
+  }, [actividadIdParaAbrir, actividades, cargando, limpiarAbrirActividad]);
 
   const handleDetailClose = useCallback(() => {
     setDetalleAbierto(false);

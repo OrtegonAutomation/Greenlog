@@ -34,7 +34,7 @@ import GreenLogBlanco from '../../assets/GreenLog Blanco.png';
 import { useAuth } from '../../auth/AuthContext';
 import { useNotificaciones } from '../../context/NotificacionesContext';
 import { Notificacion } from '../../types';
-import { getSectionFromPath, getSectionPath, normalizePath } from '../../utils/appRoutes';
+import { getSectionFromPath, getSectionPath, normalizePath, getActividadParam, clearActividadParam } from '../../utils/appRoutes';
 
 // ... (existing code)
 
@@ -581,6 +581,15 @@ export const AppShell: React.FC<AppShellProps> = ({ onBack }) => {
     maybeAutoStartTour(navigateSection);
     return () => window.removeEventListener('popstate', onPopState);
   }, [navigateSection]);
+
+  // Deep-link desde correos (?actividad=<id>): ir a Planeación y abrir el detalle.
+  useEffect(() => {
+    const actividadId = getActividadParam();
+    if (!actividadId) return;
+    navigateSection('planeacion');
+    pedirAbrirActividad(actividadId);
+    clearActividadParam();
+  }, [navigateSection, pedirAbrirActividad]);
 
   const renderContent = () => {
     switch (seccion) {
