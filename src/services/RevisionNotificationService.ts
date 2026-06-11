@@ -104,23 +104,41 @@ const buildDetalleProgramacion = (actividad: ActividadAmbiental) => {
     .filter(it => it.totalAnual > 0 || it.cantidadTotal > 0)
     .sort((a, b) => b.totalAnual - a.totalAnual);
 
-  // Monitoreos: cada entrada es una MATRIZ (key = "MATRIZ|<nombre>", nombre =
-  // "<matriz> (N params)"). Resumimos por matriz con total y nº de parámetros.
+  // Monitoreos: resumimos por MATRIZ (no por parámetro). Combinamos dos fuentes
+  // para ser robustos: (1) las entradas mensuales con key "MATRIZ|<nombre>" dan
+  // el total; (2) parametrosSeleccionados da el conteo de parámetros por matriz.
   const esMonitoreo = actividad.lineaOperativa === 'Monitoreos';
-  const matrices = esMonitoreo
-    ? items
-        .filter(it => String(it.key).startsWith('MATRIZ|'))
-        .map(it => {
-          const nombreMatriz = String(it.key).replace(/^MATRIZ\|/, '').trim();
-          const m = /\((\d+)\s*params?\)/i.exec(String(it.nombre));
-          return {
-            matriz: nombreMatriz,
-            parametros: m ? Number(m[1]) : null,
-            totalAnual: it.totalAnual,
-          };
-        })
-        .sort((a, b) => b.totalAnual - a.totalAnual)
-    : [];
+  let matrices: any[] = [];
+  if (esMonitoreo) {
+    const matrizMap = new Map<string, { matriz: string; parametros: number | null; totalAnual: number }>();
+
+    // Totales desde las entradas "MATRIZ|..." de la programación.
+    for (const it of items) {
+      if (!String(it.key).startsWith('MATRIZ|')) continue;
+      const nombreMatriz = String(it.key).replace(/^MATRIZ\|/, '').trim();
+      const m = /\((\d+)\s*params?\)/i.exec(String(it.nombre));
+      const prev = matrizMap.get(nombreMatriz) ?? { matriz: nombreMatriz, parametros: null, totalAnual: 0 };
+      prev.totalAnual += it.totalAnual;
+      if (m) prev.parametros = Number(m[1]);
+      matrizMap.set(nombreMatriz, prev);
+    }
+
+    // Conteo de parámetros (y matrices que no aparezcan arriba) desde la selección.
+    const seleccion = Array.isArray(opx.parametrosSeleccionados) ? opx.parametrosSeleccionados : [];
+    const conteo = new Map<string, number>();
+    for (const r of seleccion) {
+      const mat = String(r?.matriz ?? '').trim();
+      if (!mat) continue;
+      conteo.set(mat, (conteo.get(mat) ?? 0) + 1);
+    }
+    for (const [mat, n] of conteo) {
+      const prev = matrizMap.get(mat) ?? { matriz: mat, parametros: null, totalAnual: 0 };
+      if (prev.parametros == null) prev.parametros = n;
+      matrizMap.set(mat, prev);
+    }
+
+    matrices = [...matrizMap.values()].sort((a, b) => b.totalAnual - a.totalAnual);
+  }
 
   const mesesResumen = meses.map((m: any) => ({
     mes: m?.mes,
@@ -132,7 +150,9 @@ const buildDetalleProgramacion = (actividad: ActividadAmbiental) => {
   return {
     esMonitoreo,
     matrices,
-    items,
+    // En Monitoreos no enviamos la lista de parámetros (son cientos): el correo
+    // muestra solo las matrices. En otras líneas sí van los ítems.
+    items: esMonitoreo ? [] : items,
     meses: mesesResumen,
     totalAnual,
     mesesActivos,
