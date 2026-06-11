@@ -6,7 +6,7 @@ import {
 } from '../data/equipoAmbiental';
 
 export const REVISION_NOTIFICATIONS_ENABLED = true;
-export const REVISION_NOTIFICATIONS_TEST_MODE = false;
+export const REVISION_NOTIFICATIONS_TEST_MODE = true;
 export const REVISION_NOTIFICATIONS_TEST_EMAIL = 'camilo.ortegonc@outlook.com';
 // Correos que SIEMPRE reciben copia (además de los destinatarios reales), de
 // forma temporal para supervisión. Vaciar este arreglo para desactivar la copia.
@@ -61,20 +61,104 @@ const getSolicitante = (actividad: ActividadAmbiental, fallback?: EquipoAmbienta
   };
 };
 
+const num = (v: unknown) => (typeof v === 'number' ? v : Number(v) || 0);
+
+// Resumen detallado de la programación a partir del opexDataRaw, para que el
+// correo muestre TODA la planeación (ítems/parámetros, meses, totales).
+const buildDetalleProgramacion = (actividad: ActividadAmbiental) => {
+  const opx = parseOpex(actividad.opexDataRaw);
+  if (!opx) return null;
+
+  const meses: any[] = Array.isArray(opx.meses) ? opx.meses : [];
+
+  // Agregar cada ítem/parámetro sumando sus 12 meses → total anual por ítem.
+  const itemsMap = new Map<string, any>();
+  let mesesActivos = 0;
+  let totalAnual = 0;
+
+  for (const mes of meses) {
+    const totalMes = num(mes?.total);
+    if (totalMes > 0) mesesActivos += 1;
+    totalAnual += totalMes;
+    for (const pi of (Array.isArray(mes?.preciosIndividuales) ? mes.preciosIndividuales : [])) {
+      const key = String(pi?.key ?? pi?.nombre ?? '');
+      if (!key) continue;
+      const prev = itemsMap.get(key) ?? {
+        key,
+        nombre: pi?.nombre ?? key,
+        esLogistica: String(pi?.key ?? '').startsWith('LOG-'),
+        aplicaIva: !!pi?.aplicaIva,
+        precio: num(pi?.precio),
+        cantidadTotal: 0,
+        totalAnual: 0,
+      };
+      prev.cantidadTotal += num(pi?.cantidad);
+      prev.totalAnual += num(pi?.total);
+      if (num(pi?.precio) > 0) prev.precio = num(pi?.precio);
+      if (pi?.aplicaIva) prev.aplicaIva = true;
+      itemsMap.set(key, prev);
+    }
+  }
+
+  const items = [...itemsMap.values()]
+    .filter(it => it.totalAnual > 0 || it.cantidadTotal > 0)
+    .sort((a, b) => b.totalAnual - a.totalAnual);
+
+  const mesesResumen = meses.map((m: any) => ({
+    mes: m?.mes,
+    total: num(m?.total),
+    cantidad: num(m?.cantidad),
+    activo: num(m?.total) > 0,
+  }));
+
+  return {
+    items,
+    meses: mesesResumen,
+    totalAnual,
+    mesesActivos,
+    ipcActivo: !!opx.ipcGlobalActivo,
+    ipcPorcentaje: num(opx.ipcGlobalPorcentaje),
+    ivaActivo: !!opx.ivaGlobalActivo,
+    ivaPorcentaje: num(opx.ivaGlobalPorcentaje),
+    pagosDiferidosActivo: !!opx.pagosDiferidosActivo,
+    contrato: {
+      proveedor: opx.proveedor ?? null,
+      numero: opx.contrato ?? actividad.contrato ?? null,
+      administrador: opx.administrador ?? actividad.responsable ?? null,
+      objeto: opx.objeto ?? null,
+      descripcionNecesidad: opx.descripcionNecesidad ?? null,
+      unidadMedida: opx.unidadMedida ?? null,
+    },
+  };
+};
+
 const buildActividadPayload = (actividad: ActividadAmbiental) => ({
   id: actividad.id,
   tarea: actividad.tarea,
+  descripcion: actividad.descripcion ?? null,
   lineaOperativa: actividad.lineaOperativa,
   zona: actividad.zona,
-  estacion: actividad.estacion,
-  tipoLugar: actividad.tipoLugar,
+  estacion: actividad.estacion ?? null,
+  tipoLugar: actividad.tipoLugar ?? null,
+  pk: actividad.pk ?? null,
+  contrato: actividad.contrato ?? null,
+  responsable: actividad.responsable ?? null,
   fuentePresupuesto: actividad.fuentePresupuesto,
   tipoPlaneacion: actividad.tipoPlaneacion,
   anioPlaneacion: actividad.anioPlaneacion,
+  cuenta: actividad.cuenta ?? null,
+  prioridad: actividad.prioridad ?? null,
+  estado: actividad.estado ?? null,
+  mes: actividad.mes ?? null,
+  fechaInicio: actividad.fechaInicio ?? null,
+  fechaFin: actividad.fechaFin ?? null,
+  cumplimientoNormativo: actividad.cumplimientoNormativo ?? null,
   presupuestoPlan: actividad.presupuestoPlan,
+  matricesAplicables: actividad.matricesAplicables ?? [],
   estadoAprobacion: actividad.estadoAprobacion,
   aprobadoPor: actividad.aprobadoPor,
   fechaAprobacion: actividad.fechaAprobacion,
+  detalle: buildDetalleProgramacion(actividad),
 });
 
 const postWebhook = async (payload: Record<string, unknown>): Promise<RevisionNotificationResult> => {
