@@ -1562,6 +1562,28 @@ export const PlaneacionWizard: React.FC<Props> = ({
 
       setAvailableMatrices(mats);
       setAvailableParams(rows);
+
+      // Sembrar tipo de muestra / nº de compuestos desde la matriz (Excel de referencia).
+      // Solo para claves que aún no tenga el usuario, para no pisar ediciones manuales.
+      setParamTipoMuestra(prev => {
+        const next = new Map(prev);
+        for (const r of rows) {
+          const key = paramKey(r);
+          if (next.has(key)) continue;
+          if ((r.compuesto ?? 0) > 1) next.set(key, 'compuesto');
+        }
+        return next;
+      });
+      setParamCantCompuestos(prev => {
+        const next = new Map(prev);
+        for (const r of rows) {
+          const key = paramKey(r);
+          if (next.has(key)) continue;
+          if ((r.compuesto ?? 0) > 1) next.set(key, r.compuesto);
+        }
+        return next;
+      });
+
       if (selectedMatrices.size > 0) {
         const validKeys = new Set(rows.map(r => paramKey(r)));
         const hasValidSelection = [...selectedParams].some(key => validKeys.has(key));
