@@ -64,6 +64,7 @@ const scope = (lineas: LineaOperativa[], zonas: string[], global = false): Ambit
 });
 
 const serviciosEGlobal = () => scope(['Servicios E'], ZONAS, true);
+const serviciosE = (zonas: string[]) => scope(['Servicios E'], zonas, false);
 
 export const EQUIPO_AMBIENTAL: EquipoAmbientalUser[] = [
   {
@@ -82,8 +83,8 @@ export const EQUIPO_AMBIENTAL: EquipoAmbientalUser[] = [
     alcance: 'Especialista HSE-Ambiental CENIT',
     baseTrabajo: 'Santa Marta',
     zonaBase: 'Norte-Coveñas',
-    planeador: [scope(LINEAS_GESTION_AMBIENTAL, ['Norte', 'Coveñas']), serviciosEGlobal()],
-    revisor: [serviciosEGlobal()],
+    planeador: [scope(LINEAS_GESTION_AMBIENTAL, ['Norte', 'Coveñas']), serviciosE(['Norte', 'Coveñas'])],
+    revisor: [serviciosE(['Norte', 'Coveñas'])],
   },
   {
     nombre: 'Eliana Cortes',
@@ -91,8 +92,8 @@ export const EQUIPO_AMBIENTAL: EquipoAmbientalUser[] = [
     alcance: 'Especialista HSE-Ambiental CENIT',
     baseTrabajo: 'Bogotá',
     zonaBase: 'Oriente',
-    planeador: [scope(LINEAS_GESTION_AMBIENTAL, ['Oriente']), serviciosEGlobal()],
-    revisor: [scope(['Monitoreos'], ['Oriente']), serviciosEGlobal()],
+    planeador: [scope(LINEAS_GESTION_AMBIENTAL, ['Oriente']), serviciosE(['Oriente'])],
+    revisor: [scope(['Monitoreos'], ['Oriente']), serviciosE(['Oriente'])],
   },
   {
     nombre: 'Luis Alberto Pelaez',
@@ -100,8 +101,8 @@ export const EQUIPO_AMBIENTAL: EquipoAmbientalUser[] = [
     alcance: 'Especialista HSE-Ambiental CENIT',
     baseTrabajo: 'Cali',
     zonaBase: 'Occidente-Sur',
-    planeador: [scope(LINEAS_GESTION_AMBIENTAL, ['Occidente']), serviciosEGlobal()],
-    revisor: [serviciosEGlobal()],
+    planeador: [scope(LINEAS_GESTION_AMBIENTAL, ['Occidente']), serviciosE(['Occidente'])],
+    revisor: [serviciosE(['Occidente'])],
   },
   {
     nombre: 'Javier Hernandez',
@@ -109,8 +110,8 @@ export const EQUIPO_AMBIENTAL: EquipoAmbientalUser[] = [
     alcance: 'Especialista HSE-Ambiental CENIT',
     baseTrabajo: 'Cúcuta',
     zonaBase: 'CLC',
-    planeador: [scope(LINEAS_GESTION_AMBIENTAL, ['CLC']), serviciosEGlobal()],
-    revisor: [serviciosEGlobal()],
+    planeador: [scope(LINEAS_GESTION_AMBIENTAL, ['CLC']), serviciosE(['CLC'])],
+    revisor: [serviciosE(['CLC'])],
   },
   {
     nombre: 'Maria Ximena Puerto',
@@ -118,8 +119,8 @@ export const EQUIPO_AMBIENTAL: EquipoAmbientalUser[] = [
     alcance: 'Especialista HSE-Ambiental CENIT',
     baseTrabajo: 'Barrancabermeja',
     zonaBase: 'Centro',
-    planeador: [scope(LINEAS_GESTION_AMBIENTAL, ['Centro']), serviciosEGlobal()],
-    revisor: [scope(['Residuos peligrosos'], ['Centro']), serviciosEGlobal()],
+    planeador: [scope(LINEAS_GESTION_AMBIENTAL, ['Centro']), serviciosE(['Centro'])],
+    revisor: [scope(['Residuos peligrosos'], ['Centro']), serviciosE(['Centro'])],
   },
   {
     nombre: 'Paola Ferreira',
@@ -127,8 +128,8 @@ export const EQUIPO_AMBIENTAL: EquipoAmbientalUser[] = [
     alcance: 'Especialista HSE-Ambiental CENIT',
     baseTrabajo: 'Villavicencio',
     zonaBase: 'Llanos',
-    planeador: [scope(LINEAS_GESTION_AMBIENTAL, ['Llanos']), serviciosEGlobal()],
-    revisor: [serviciosEGlobal()],
+    planeador: [scope(LINEAS_GESTION_AMBIENTAL, ['Llanos']), serviciosE(['Llanos'])],
+    revisor: [serviciosE(['Llanos'])],
   },
   {
     nombre: 'Carmen Rosero',
@@ -136,8 +137,8 @@ export const EQUIPO_AMBIENTAL: EquipoAmbientalUser[] = [
     alcance: 'Especialista HSE-Ambiental CENIT',
     baseTrabajo: 'Pereira',
     zonaBase: 'Occidente-Norte',
-    planeador: [scope(LINEAS_GESTION_AMBIENTAL, ['Occidente']), serviciosEGlobal()],
-    revisor: [serviciosEGlobal()],
+    planeador: [scope(LINEAS_GESTION_AMBIENTAL, ['Occidente']), serviciosE(['Occidente'])],
+    revisor: [serviciosE(['Occidente'])],
   },
   {
     nombre: 'Viviana Buitrago',

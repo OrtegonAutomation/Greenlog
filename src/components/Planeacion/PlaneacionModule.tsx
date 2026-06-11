@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   makeStyles, shorthands, tokens,
   Title2, Body1, Button, MessageBar, MessageBarBody, MessageBarTitle, Divider,
@@ -325,8 +325,12 @@ export const PlaneacionModule: React.FC = () => {
   const styles = useStyles();
 
   const { actividades, cargando, errorCarga, guardando, recargar, crear, actualizar, eliminar } = useActividades();
-  const { currentUser, isAdmin, canPlan, canReview, canEditActividad } = useAuth();
+  const { currentUser, isAdmin, canPlan, canReview, canEditActividad, canViewActividad } = useAuth();
   const canPlanAny = canPlan();
+  const actividadesVisibles = useMemo(
+    () => actividades.filter(a => canViewActividad(a)),
+    [actividades, canViewActividad],
+  );
 
   // Panel states
   const [drawerAbierto, setDrawerAbierto]       = useState(false);
@@ -828,7 +832,7 @@ export const PlaneacionModule: React.FC = () => {
       {/* Tabla */}
       <div id="planeacion-table">
         <ActivityTable
-          actividades={actividades}
+          actividades={actividadesVisibles}
           cargando={cargando}
           onNueva={canPlanAny ? () => setWizardAbierto(true) : undefined}
           onItemClick={handleItemClick}

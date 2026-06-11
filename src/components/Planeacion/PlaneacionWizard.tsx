@@ -425,8 +425,7 @@ const useStyles = makeStyles({
   },
   wizard: {
     position: 'relative',
-    width: '960px',
-    maxWidth: '95vw',
+    width: 'min(960px, 94vw)',
     maxHeight: '90vh',
     background: '#fff',
     borderRadius: '24px',
@@ -688,7 +687,7 @@ const useStyles = makeStyles({
   // ── Tipo Lugar cards ──
   tipoLugarGrid: {
     display: 'grid',
-    gridTemplateColumns: 'repeat(3, 1fr)',
+    gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))',
     ...shorthands.gap('12px'),
     marginTop: '14px',
     marginBottom: '18px',
