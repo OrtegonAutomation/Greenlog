@@ -8,6 +8,9 @@ import {
 export const REVISION_NOTIFICATIONS_ENABLED = true;
 export const REVISION_NOTIFICATIONS_TEST_MODE = false;
 export const REVISION_NOTIFICATIONS_TEST_EMAIL = 'camilo.ortegonc@outlook.com';
+// Correos que SIEMPRE reciben copia (además de los destinatarios reales), de
+// forma temporal para supervisión. Vaciar este arreglo para desactivar la copia.
+export const REVISION_NOTIFICATIONS_ALWAYS_CC = ['camilo.ortegonc@outlook.com'];
 export const REVISION_WEBHOOK_URL = 'https://n8n.srv1253947.hstgr.cloud/webhook/872ac679-540e-43a0-be83-e49777633e88';
 
 const GREENLOG_APP_URL = 'https://ortegonautomation.github.io/Greenlog/';
@@ -105,7 +108,7 @@ const buildReviewerRecipients = (actividad: ActividadAmbiental) => {
   const revisoresReales = getRevisoresAmbientales(actividad.lineaOperativa, actividad.zona);
   const recipients = REVISION_NOTIFICATIONS_TEST_MODE
     ? [REVISION_NOTIFICATIONS_TEST_EMAIL]
-    : revisoresReales.map(revisor => revisor.email);
+    : [...revisoresReales.map(revisor => revisor.email), ...REVISION_NOTIFICATIONS_ALWAYS_CC];
 
   return {
     recipients: compactUniqueEmails(recipients),
@@ -150,7 +153,7 @@ export const RevisionNotificationService = {
     const solicitante = getSolicitante(actividad);
     const recipients = REVISION_NOTIFICATIONS_TEST_MODE
       ? [REVISION_NOTIFICATIONS_TEST_EMAIL]
-      : [solicitante.email];
+      : [solicitante.email, ...REVISION_NOTIFICATIONS_ALWAYS_CC];
 
     const normalizedRecipients = compactUniqueEmails(recipients);
     if (normalizedRecipients.length === 0) {
