@@ -3432,11 +3432,11 @@ export const PlaneacionWizard: React.FC<Props> = ({
                                 <td className={styles.paramTd}>{r.matriz}</td>
                                 <td className={styles.paramTd} onClick={e => e.stopPropagation()}>
                                   <Input
-                                    type="number"
+                                    inputMode="numeric"
                                     size="small"
-                                    value={String(r.chemilab || '')}
+                                    value={r.chemilab ? r.chemilab.toLocaleString('es-CO') : ''}
                                     placeholder="0"
-                                    onChange={(_, d) => updateParamPrice(r, Number(d.value) || 0)}
+                                    onChange={(_, d) => updateParamPrice(r, parseCOPInput(d.value))}
                                     style={{ width: '96px' }}
                                   />
                                 </td>
@@ -3810,10 +3810,10 @@ export const PlaneacionWizard: React.FC<Props> = ({
                           <div style={{ marginLeft: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
                             <Caption1 style={{ fontWeight: '600' }}>Saldo disponible (COP):</Caption1>
                             <Input
-                              type="number"
-                              value={String(saldoDisponible || '')}
+                              inputMode="numeric"
+                              value={saldoDisponible ? saldoDisponible.toLocaleString('es-CO') : ''}
                               placeholder="0"
-                              onChange={(_, d) => setSaldoDisponible(Number(d.value) || 0)}
+                              onChange={(_, d) => setSaldoDisponible(parseCOPInput(d.value))}
                               style={{ width: '180px' }}
                             />
                           </div>
@@ -4088,11 +4088,11 @@ export const PlaneacionWizard: React.FC<Props> = ({
                             </td>
                             <td className={styles.progMatrixMonthTd}>
                               <Input
-                                type="number"
+                                inputMode="numeric"
                                 size="small"
-                                value={it.precio > 0 ? String(it.precio) : ''}
+                                value={it.precio > 0 ? it.precio.toLocaleString('es-CO') : ''}
                                 placeholder="0"
-                                onChange={(_, d) => updateProgYItem(tabAnio as 2 | 3, it.key, 'precio', Number(d.value) || 0)}
+                                onChange={(_, d) => updateProgYItem(tabAnio as 2 | 3, it.key, 'precio', parseCOPInput(d.value))}
                                 style={{ width: '100%' }}
                               />
                             </td>
@@ -4193,11 +4193,11 @@ export const PlaneacionWizard: React.FC<Props> = ({
                               <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                                 <Caption1 style={{ color: tokens.colorNeutralForeground3, fontSize: '10px', whiteSpace: 'nowrap' }}>$/u:</Caption1>
                                 <Input
-                                  type="number"
+                                  inputMode="numeric"
                                   size="small"
-                                  value={item.precio > 0 ? String(item.precio) : ''}
+                                  value={item.precio > 0 ? item.precio.toLocaleString('es-CO') : ''}
                                   placeholder="0"
-                                  onChange={(_, d) => updateItemPrice(item.key, Number(d.value) || 0)}
+                                  onChange={(_, d) => updateItemPrice(item.key, parseCOPInput(d.value))}
                                   onBlur={() => { void persistCatalogPrice(item.key); }}
                                   style={{ width: '90px' }}
                                 />
