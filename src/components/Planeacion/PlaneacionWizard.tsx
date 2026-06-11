@@ -893,6 +893,23 @@ const useStyles = makeStyles({
   },
 
   // ── Programming matrix (Step 5) ──
+  ajustesPanel: {
+    display: 'flex',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    ...shorthands.gap('20px'),
+    marginTop: '12px',
+    marginBottom: '4px',
+    ...shorthands.padding('12px', '16px'),
+    borderRadius: '12px',
+    background: 'rgba(0,51,160,0.04)',
+    ...shorthands.border('1px', 'solid', 'rgba(0,51,160,0.12)'),
+  },
+  ajustesGroup: {
+    display: 'flex',
+    alignItems: 'center',
+    ...shorthands.gap('8px'),
+  },
   progTopScroll: {
     marginTop: '14px',
     overflowX: 'auto',
@@ -3192,6 +3209,52 @@ export const PlaneacionWizard: React.FC<Props> = ({
                   </div>
                 )}
 
+                {/* Panel destacado de ajustes: IPC e IVA — visible en la parte superior */}
+                <div className={styles.ajustesPanel}>
+                  {selectedLinea?.value !== 'Hojas de Ruta Sostenibilidad Ambiental' && (
+                    <div className={styles.ajustesGroup}>
+                      <Checkbox
+                        label="📈 Aplicar IPC"
+                        checked={ipcGlobalActivo}
+                        onChange={(_, d) => setIpcGlobalActivo(!!d.checked)}
+                      />
+                      {ipcGlobalActivo && (
+                        <>
+                          <Input
+                            type="number"
+                            size="small"
+                            value={String(ipcGlobalPorcentaje || '')}
+                            placeholder="%"
+                            onChange={(_, d) => setIpcGlobalPorcentaje(Number(d.value) || 0)}
+                            style={{ width: '70px' }}
+                          />
+                          <Caption1 style={{ color: tokens.colorNeutralForeground3 }}>% (se marcan los meses en Programación)</Caption1>
+                        </>
+                      )}
+                    </div>
+                  )}
+                  <div className={styles.ajustesGroup}>
+                    <Checkbox
+                      label="🧾 Aplicar IVA"
+                      checked={ivaGlobalActivo}
+                      onChange={(_, d) => setIvaGlobalActivo(!!d.checked)}
+                    />
+                    {ivaGlobalActivo && (
+                      <>
+                        <Input
+                          type="number"
+                          size="small"
+                          value={String(ivaGlobalPorcentaje || '')}
+                          placeholder="%"
+                          onChange={(_, d) => setIvaGlobalPorcentaje(Number(d.value) || 0)}
+                          style={{ width: '70px' }}
+                        />
+                        <Caption1 style={{ color: tokens.colorNeutralForeground3 }}>% (se marca por ítem en Programación)</Caption1>
+                      </>
+                    )}
+                  </div>
+                </div>
+
                 {/* Matrix selection (monitoreos only) */}
                 {isMonitoreo && matrixSummaries.length > 0 && (
                   <>
@@ -3255,57 +3318,11 @@ export const PlaneacionWizard: React.FC<Props> = ({
                     onChange={(_, d) => setParamSearch(d.value)}
                     style={{ flex: 1, maxWidth: '400px' }}
                   />
-                  <span className={styles.selectedCount}>
+                  <span className={styles.selectedCount} style={{ marginLeft: 'auto' }}>
                     {isMonitoreo
                       ? `${selectedMatrices.size} matrices · ${selectedParams.size} parámetros`
                       : `${totalSelectedCount} seleccionados`}
                   </span>
-                  {/* IPC global */}
-                  {selectedLinea?.value !== 'Hojas de Ruta Sostenibilidad Ambiental' && (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginLeft: 'auto' }}>
-                      <Checkbox
-                        label="¿IPC?"
-                        checked={ipcGlobalActivo}
-                        onChange={(_, d) => setIpcGlobalActivo(!!d.checked)}
-                      />
-                      {ipcGlobalActivo && (
-                        <>
-                          <Input
-                            type="number"
-                            size="small"
-                            value={String(ipcGlobalPorcentaje || '')}
-                            placeholder="%"
-                            onChange={(_, d) => setIpcGlobalPorcentaje(Number(d.value) || 0)}
-                            style={{ width: '70px' }}
-                          />
-                          <Caption1 style={{ color: tokens.colorNeutralForeground3 }}>%</Caption1>
-                        </>
-                      )}
-                    </div>
-                  )}
-                  {/* IVA por ítem. En Monitoreos se configura en Programación, por fila. */}
-                  {!isMonitoreo && (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <Checkbox
-                        label="¿IVA?"
-                        checked={ivaGlobalActivo}
-                        onChange={(_, d) => setIvaGlobalActivo(!!d.checked)}
-                      />
-                      {ivaGlobalActivo && (
-                        <>
-                          <Input
-                            type="number"
-                            size="small"
-                            value={String(ivaGlobalPorcentaje || '')}
-                            placeholder="%"
-                            onChange={(_, d) => setIvaGlobalPorcentaje(Number(d.value) || 0)}
-                            style={{ width: '70px' }}
-                          />
-                          <Caption1 style={{ color: tokens.colorNeutralForeground3 }}>%</Caption1>
-                        </>
-                      )}
-                    </div>
-                  )}
                 </div>
 
                 {catalogWarning && (
@@ -3903,7 +3920,7 @@ export const PlaneacionWizard: React.FC<Props> = ({
                   )}
                 </Caption1>
 
-                {isMonitoreo && (
+                {isMonitoreo && ivaGlobalActivo && (
                   <div style={{
                     display: 'flex',
                     alignItems: 'center',
@@ -4207,7 +4224,7 @@ export const PlaneacionWizard: React.FC<Props> = ({
                                   </Caption1>
                                 </div>
                               )}
-                              {(isMonitoreo || ivaGlobalActivo) && ivaGlobalPorcentaje > 0 && (
+                              {ivaGlobalActivo && ivaGlobalPorcentaje > 0 && (
                                 <div style={{ marginTop: '4px' }}>
                                   <Checkbox
                                     label={`IVA +${ivaGlobalPorcentaje}%`}
