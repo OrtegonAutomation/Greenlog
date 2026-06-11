@@ -34,7 +34,7 @@ const NotificacionesContext = createContext<NotificacionesContextValue>({
 });
 
 export const NotificacionesProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { currentUser } = useAuth();
+  const { currentUser, isAdmin } = useAuth();
   const email = currentUser?.email ?? '';
 
   const [notificaciones, setNotificaciones] = useState<Notificacion[]>([]);
@@ -42,13 +42,14 @@ export const NotificacionesProvider: React.FC<{ children: React.ReactNode }> = (
   const [actividadIdParaAbrir, setActividadIdParaAbrir] = useState<string | null>(null);
 
   const recargar = useCallback(async () => {
-    if (!email) {
+    if (!email && !isAdmin) {
       setNotificaciones([]);
       return;
     }
     setCargando(true);
     try {
-      const lista = await NotificacionesService.listForUser(email);
+      // El admin ve todas las notificaciones del sistema; el resto, solo las suyas.
+      const lista = await NotificacionesService.listForUser(email, isAdmin);
       setNotificaciones(lista);
     } catch {
       // Silencioso: la campana no debe romper la app si falla la BD.
@@ -56,7 +57,7 @@ export const NotificacionesProvider: React.FC<{ children: React.ReactNode }> = (
     } finally {
       setCargando(false);
     }
-  }, [email]);
+  }, [email, isAdmin]);
 
   useEffect(() => {
     void recargar();

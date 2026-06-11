@@ -45,16 +45,19 @@ const tareaCorta = (actividad: ActividadAmbiental) =>
   actividad.tarea?.length > 80 ? `${actividad.tarea.slice(0, 77)}…` : actividad.tarea;
 
 export const NotificacionesService = {
-  /** Lista las notificaciones del usuario (más recientes primero). */
-  async listForUser(email: string): Promise<Notificacion[]> {
-    if (!isSupabaseEnabled() || !email) return [];
+  /**
+   * Lista las notificaciones del usuario (más recientes primero).
+   * Si `verTodas` es true (admin), trae todas las notificaciones — la RLS de
+   * Supabase debe permitirlo (ver notificaciones_admin.sql).
+   */
+  async listForUser(email: string, verTodas = false): Promise<Notificacion[]> {
+    if (!isSupabaseEnabled() || (!email && !verTodas)) return [];
     const supabase = getSupabaseClient();
-    const { data, error } = await supabase
-      .from(TABLE)
-      .select('*')
-      .eq('destinatario_email', normalizeEmail(email))
+    let query = supabase.from(TABLE).select('*');
+    if (!verTodas) query = query.eq('destinatario_email', normalizeEmail(email));
+    const { data, error } = await query
       .order('creado_en', { ascending: false })
-      .limit(50);
+      .limit(verTodas ? 100 : 50);
 
     if (error) throw error;
     return (data ?? []).map(row => mapRow(row as NotificacionRow));
