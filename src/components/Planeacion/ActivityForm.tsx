@@ -12,6 +12,7 @@ import {
   Spinner, Badge,
 } from '@fluentui/react-components';
 import { DismissRegular, SaveRegular } from '@fluentui/react-icons';
+import { MEDIA, useResponsive } from '../../hooks/useResponsive';
 import {
   NuevaActividadPayload, FORM_INICIAL, ESTADOS_ACTIVIDAD,
   PRIORIDADES, LINEAS_OPERATIVAS, ZONAS, ZONAS_ESTACIONES,
@@ -43,11 +44,13 @@ const useStyles = makeStyles({
     display: 'grid',
     gridTemplateColumns: '1fr 1fr',
     ...shorthands.gap(tokens.spacingVerticalM, tokens.spacingHorizontalM),
+    [MEDIA.mobile]: { gridTemplateColumns: '1fr' },
   },
   grid3: {
     display: 'grid',
     gridTemplateColumns: '1fr 1fr 1fr',
     ...shorthands.gap(tokens.spacingVerticalM, tokens.spacingHorizontalM),
+    [MEDIA.mobile]: { gridTemplateColumns: '1fr' },
   },
   sliderRow: {
     display: 'flex',
@@ -65,6 +68,7 @@ const useStyles = makeStyles({
     display: 'grid',
     gridTemplateColumns: '1fr 1fr',
     ...shorthands.gap('4px', tokens.spacingHorizontalM),
+    [MEDIA.mobile]: { gridTemplateColumns: '1fr' },
   },
   matricesBadges: {
     display: 'flex',
@@ -116,6 +120,7 @@ export const ActivityForm: React.FC<ActivityFormProps> = ({
   open, onClose, onGuardar, guardando, errorGuardar, actividadInicial,
 }) => {
   const styles = useStyles();
+  const { isMobile } = useResponsive();
   const modoEdicion = !!actividadInicial;
 
   const formInicial = useMemo<NuevaActividadPayload>(() => {
@@ -187,7 +192,7 @@ export const ActivityForm: React.FC<ActivityFormProps> = ({
   return (
     <OverlayDrawer
       position="end"
-      size="large"
+      size={isMobile ? 'full' : 'large'}
       open={open}
       onOpenChange={(_, s) => { if (!s.open) handleCerrar(); }}
     >

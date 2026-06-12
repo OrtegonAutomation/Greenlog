@@ -7,6 +7,7 @@ import {
 import { AddRegular, ArrowUploadRegular, DocumentArrowDownRegular } from '@fluentui/react-icons';
 import { ActividadAmbiental, NuevaActividadPayload } from '../../types';
 import { useActividades } from '../../hooks/useActividades';
+import { MEDIA } from '../../hooks/useResponsive';
 import { ActivityTable } from './ActivityTable';
 import { ActivityForm } from './ActivityForm';
 import { ActivityDetailPanel } from './ActivityDetailPanel';
@@ -52,6 +53,10 @@ const useStyles = makeStyles({
     boxShadow: '0 4px 20px rgba(0,0,0,0.03)',
     marginBottom: tokens.spacingVerticalL,
     border: '1px solid rgba(255,255,255,0.5)',
+    [MEDIA.mobile]: {
+      ...shorthands.padding('16px'),
+      marginBottom: '0px',
+    },
   },
   headerLeft: {
     display: 'flex',

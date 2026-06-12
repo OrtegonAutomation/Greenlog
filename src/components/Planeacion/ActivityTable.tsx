@@ -15,6 +15,7 @@ import { ActividadAmbiental, EstadoActividad } from '../../types';
 import { StatusBadge } from '../shared/StatusBadge';
 import { SkeletonTable } from '../shared/SkeletonLoader';
 import { EmptyState } from '../shared/EmptyState';
+import { useResponsive } from '../../hooks/useResponsive';
 
 // ── Estilos ───────────────────────────────────────────────────
 const useStyles = makeStyles({
@@ -85,6 +86,69 @@ const useStyles = makeStyles({
     letterSpacing: '0.5px',
     textTransform: 'uppercase',
   },
+
+  // ── Vista móvil: lista de tarjetas ──
+  cardList: {
+    display: 'flex',
+    flexDirection: 'column',
+    ...shorthands.gap('12px'),
+  },
+  mobileCard: {
+    display: 'flex',
+    flexDirection: 'column',
+    ...shorthands.gap('8px'),
+    ...shorthands.padding('14px'),
+    borderRadius: '14px',
+    border: '1px solid rgba(255,255,255,0.7)',
+    background: 'rgba(255,255,255,0.75)',
+    backdropFilter: 'blur(12px)',
+    boxShadow: '0 2px 12px rgba(0,0,0,0.05)',
+    cursor: 'pointer',
+    WebkitTapHighlightColor: 'transparent',
+    ':active': { transform: 'scale(0.985)' },
+  },
+  mobileCardTop: {
+    display: 'flex',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    ...shorthands.gap('8px'),
+  },
+  mobileCardTitle: {
+    fontWeight: '700',
+    fontSize: '14px',
+    lineHeight: '1.3',
+    color: '#003057',
+    flex: 1,
+    minWidth: 0,
+  },
+  mobileCardDesc: {
+    fontSize: '12px',
+    color: tokens.colorNeutralForeground3,
+    display: '-webkit-box',
+    WebkitLineClamp: 2,
+    WebkitBoxOrient: 'vertical',
+    overflow: 'hidden',
+  },
+  mobileCardMeta: {
+    display: 'flex',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    ...shorthands.gap('4px', '14px'),
+    fontSize: '12px',
+    color: tokens.colorNeutralForeground2,
+  },
+  mobileCardMetaItem: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    ...shorthands.gap('5px'),
+    minWidth: 0,
+  },
+  mobileCardMoney: {
+    fontWeight: '700',
+    color: '#003057',
+    fontSize: '13px',
+    whiteSpace: 'nowrap',
+  },
 });
 
 // ── Filtros de estado ─────────────────────────────────────────
@@ -145,6 +209,7 @@ interface ActivityTableProps {
 
 export const ActivityTable: React.FC<ActivityTableProps> = ({ actividades, cargando, onNueva, onItemClick }) => {
   const styles = useStyles();
+  const { isMobile } = useResponsive();
   const [search, setSearch] = useState('');
   const [filtroEstado, setFiltroEstado] = useState<EstadoActividad | 'Todos'>('Todos');
   const [filtroAnio, setFiltroAnio] = useState<number | null>(null);
@@ -260,6 +325,51 @@ export const ActivityTable: React.FC<ActivityTableProps> = ({ actividades, carga
             actionLabel={!search && filtroEstado === 'Todos' && onNueva ? 'Nueva planeación' : undefined}
             onAction={!search && filtroEstado === 'Todos' && onNueva ? onNueva : undefined}
           />
+        ) : isMobile ? (
+          <div className={styles.cardList} style={{ padding: '12px' }}>
+            {filtradas.map((item) => {
+              const opx = parseOpex(item.opexDataRaw);
+              const description = opx?.objeto || item.lineaOperativa || '';
+              const mesesActivos = opx?.meses
+                ? opx.meses.filter((m: any) => m.total > 0).map((m: any) => m.mes.substring(0, 3))
+                : [];
+              const mesesTexto = mesesActivos.length === 0 ? '—'
+                : mesesActivos.length === 12 ? '12 Meses'
+                : mesesActivos.join(', ');
+
+              return (
+                <div
+                  key={item.id}
+                  className={styles.mobileCard}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => onItemClick?.(item)}
+                >
+                  <div className={styles.mobileCardTop}>
+                    <span className={styles.mobileCardTitle}>{item.tarea}</span>
+                    <StatusBadge estado={item.estado} />
+                  </div>
+                  {description && <span className={styles.mobileCardDesc}>{description}</span>}
+                  <div className={styles.mobileCardMeta}>
+                    <span className={styles.mobileCardMetaItem}>
+                      <LocationRegular style={{ fontSize: '14px' }} />
+                      {item.zona}{item.estacion ? ` · ${item.estacion}` : ''}
+                    </span>
+                    <span className={styles.mobileCardMetaItem}>
+                      <OrganizationRegular style={{ fontSize: '14px' }} />
+                      {opx?.proveedor || 'No asignado'}
+                    </span>
+                  </div>
+                  <div className={styles.mobileCardMeta}>
+                    <span className={styles.mobileCardMoney}>
+                      {item.presupuestoPlan ? formatter.format(item.presupuestoPlan) : 'Sin presupuesto'}
+                    </span>
+                    <span style={{ marginLeft: 'auto' }}>{mesesTexto}</span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         ) : (
           <table style={{ width: '100%', tableLayout: 'fixed', borderCollapse: 'collapse' }}>
             <colgroup>

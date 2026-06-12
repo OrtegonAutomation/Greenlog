@@ -12,6 +12,7 @@ import { CENIT_COLORS } from '../../theme/cenitTheme';
 import { StatCard } from '../common/StatCard';
 import { FeatureCard } from '../common/FeatureCard';
 import { SeccionApp, PRESUPUESTO_RESUMEN, PRESUPUESTO_ZONAS } from '../../types';
+import { MEDIA } from '../../hooks/useResponsive';
 
 // ── Estilos ───────────────────────────────────────────────────
 const useStyles = makeStyles({
@@ -19,6 +20,7 @@ const useStyles = makeStyles({
     display: 'flex',
     flexDirection: 'column',
     ...shorthands.gap('40px'),
+    [MEDIA.mobile]: { ...shorthands.gap('24px') },
     animationName: {
       from: { opacity: '0' },
       to: { opacity: '1' },
@@ -40,6 +42,11 @@ const useStyles = makeStyles({
     color: 'white',
     background: CENIT_COLORS.heroGradient,
     boxShadow: '0 20px 40px -10px rgba(0, 51, 160, 0.3)',
+    [MEDIA.mobile]: {
+      ...shorthands.padding('24px', '20px'),
+      minHeight: '240px',
+      borderRadius: '18px',
+    },
   },
   heroContent: {
     position: 'relative',
@@ -55,9 +62,11 @@ const useStyles = makeStyles({
     lineHeight: '1.1',
     letterSpacing: '-1px',
     fontFamily: '"Plus Jakarta Sans", sans-serif',
+    [MEDIA.mobile]: { fontSize: '26px', letterSpacing: '-0.5px' },
   },
   heroSubtitle: {
     fontSize: '18px',
+    [MEDIA.mobile]: { fontSize: '14px' },
     opacity: 0.9,
     lineHeight: '1.5',
     fontWeight: '500',
@@ -92,6 +101,10 @@ const useStyles = makeStyles({
     display: 'grid',
     gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
     gap: '24px',
+    [MEDIA.mobile]: {
+      gridTemplateColumns: 'repeat(2, 1fr)',
+      gap: '12px',
+    },
   },
 
   // Modules Section
@@ -105,11 +118,13 @@ const useStyles = makeStyles({
     fontWeight: '700',
     color: CENIT_COLORS.blueBrand,
     marginBottom: '8px',
+    [MEDIA.mobile]: { fontSize: '19px', marginBottom: '0px' },
   },
   modulesGrid: {
     display: 'grid',
     gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
     gap: '24px',
+    [MEDIA.mobile]: { gridTemplateColumns: '1fr', gap: '14px' },
   },
 
   // Footer / Certifications

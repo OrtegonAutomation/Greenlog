@@ -35,6 +35,8 @@ import { useAuth } from '../../auth/AuthContext';
 import { useNotificaciones } from '../../context/NotificacionesContext';
 import { Notificacion } from '../../types';
 import { getSectionFromPath, getSectionPath, normalizePath, getActividadParam, clearActividadParam } from '../../utils/appRoutes';
+import { useResponsive } from '../../hooks/useResponsive';
+import { BottomTabBar, BOTTOM_TAB_BAR_HEIGHT } from './BottomTabBar';
 
 // ... (existing code)
 
@@ -362,6 +364,43 @@ const useStyles = makeStyles({
     overflowY: 'auto',
     ...shorthands.padding('28px'),
   },
+  contentMobile: {
+    ...shorthands.padding('16px'),
+    paddingBottom: `${BOTTOM_TAB_BAR_HEIGHT + 20}px`,
+    WebkitOverflowScrolling: 'touch',
+  },
+
+  // ── Header móvil ──
+  headerMobile: {
+    minHeight: '56px',
+    ...shorthands.padding('0', '14px'),
+  },
+  mobileLogoWrap: {
+    display: 'flex',
+    alignItems: 'center',
+    ...shorthands.gap('8px'),
+    minWidth: 0,
+  },
+  mobileLogo: {
+    width: '36px',
+    height: '36px',
+    flexShrink: 0,
+    background: CENIT_COLORS.sidebarGradient,
+    borderRadius: '10px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...shorthands.padding('3px'),
+  },
+  mobileTitle: {
+    fontSize: '16px',
+    fontWeight: '800',
+    color: tokens.colorNeutralForeground1,
+    letterSpacing: '-0.2px',
+    whiteSpace: 'nowrap',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+  },
 
   // ── Branding & Footer ──
   sidebarFooter: {
@@ -548,6 +587,7 @@ interface AppShellProps {
 
 export const AppShell: React.FC<AppShellProps> = ({ onBack }) => {
   const styles = useStyles();
+  const { isMobile } = useResponsive();
   const { currentUser, isAdmin, logout } = useAuth();
   const { pedirAbrirActividad } = useNotificaciones();
   const [seccion, setSeccion] = useState<SeccionApp>(() => getSectionFromPath() ?? 'dashboard');
@@ -610,6 +650,40 @@ export const AppShell: React.FC<AppShellProps> = ({ onBack }) => {
       );
     }
   };
+
+  if (isMobile) {
+    return (
+      <div className={styles.shell}>
+        <main className={styles.main}>
+          <header className={mergeClasses(styles.header, styles.headerMobile)}>
+            <div className={styles.mobileLogoWrap} onClick={onBack} role={onBack ? 'button' : undefined}>
+              <div className={styles.mobileLogo}>
+                <img src={GreenLogBlanco} alt="GreenLog" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+              </div>
+              <span className={styles.mobileTitle}>
+                {seccion === 'dashboard' ? 'GreenLog' : BREADCRUMBS[seccion]}
+              </span>
+            </div>
+            <div className={styles.headerRight}>
+              <NotificacionesBell
+                styles={styles}
+                onNavigateActividad={(actividadId) => {
+                  navigateSection('planeacion');
+                  if (actividadId) pedirAbrirActividad(actividadId);
+                }}
+              />
+              <Avatar name={currentUser?.nombre ?? 'Usuario GreenLog'} color="colorful" size={32} />
+              <Button appearance="subtle" size="small" onClick={logout}>
+                Salir
+              </Button>
+            </div>
+          </header>
+          <div className={mergeClasses(styles.content, styles.contentMobile)}>{renderContent()}</div>
+        </main>
+        <BottomTabBar seccion={seccion} onNavigate={navigateSection} />
+      </div>
+    );
+  }
 
   return (
     <div className={styles.shell}>

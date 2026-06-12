@@ -15,6 +15,7 @@ import {
 import { useActividades } from '../../hooks/useActividades';
 import { ActividadAmbiental } from '../../types';
 import { CENIT_COLORS } from '../../theme/cenitTheme';
+import { MEDIA } from '../../hooks/useResponsive';
 
 const useStyles = makeStyles({
     root: {
@@ -41,6 +42,10 @@ const useStyles = makeStyles({
         boxShadow: '0 4px 20px rgba(0,0,0,0.03)',
         marginBottom: tokens.spacingVerticalL,
         border: '1px solid rgba(255,255,255,0.5)',
+        [MEDIA.mobile]: {
+            ...shorthands.padding('16px'),
+            marginBottom: '0px',
+        },
     },
     headerLeft: {
         display: 'flex',
@@ -53,6 +58,10 @@ const useStyles = makeStyles({
         display: 'grid',
         gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
         ...shorthands.gap(tokens.spacingHorizontalL, tokens.spacingVerticalL),
+        [MEDIA.mobile]: {
+            gridTemplateColumns: '1fr',
+            ...shorthands.gap('14px'),
+        },
     },
 
     // Card Styles

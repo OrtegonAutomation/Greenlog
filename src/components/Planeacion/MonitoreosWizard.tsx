@@ -25,6 +25,7 @@ import {
 } from '@fluentui/react-icons';
 import { MonitoreosMatrizService, MonitoreoRow } from '../../services/MonitoreosMatrizService';
 import { CENIT_COLORS } from '../../theme/cenitTheme';
+import { MEDIA } from '../../hooks/useResponsive';
 
 // ── Types ──
 export interface MonitoreoMensualParams {
@@ -203,6 +204,7 @@ const useStyles = makeStyles({
   tipoGrid: {
     display: 'grid',
     gridTemplateColumns: '1fr 1fr',
+    [MEDIA.mobile]: { gridTemplateColumns: '1fr' },
     ...shorthands.gap('20px'),
     maxWidth: '600px',
     marginLeft: 'auto',
@@ -356,6 +358,7 @@ const useStyles = makeStyles({
     display: 'grid',
     gridTemplateColumns: '1fr 1fr 1fr',
     ...shorthands.gap('8px'),
+    [MEDIA.mobile]: { gridTemplateColumns: '1fr' },
   },
   fieldGroup: {
     display: 'flex',

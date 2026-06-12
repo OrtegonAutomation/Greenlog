@@ -12,6 +12,7 @@ import {
 } from '@fluentui/react-icons';
 import { useActividades } from '../../hooks/useActividades';
 import { CENIT_COLORS } from '../../theme/cenitTheme';
+import { MEDIA } from '../../hooks/useResponsive';
 
 const useStyles = makeStyles({
     root: {
@@ -38,6 +39,10 @@ const useStyles = makeStyles({
         boxShadow: '0 4px 20px rgba(0,0,0,0.03)',
         marginBottom: tokens.spacingVerticalL,
         border: '1px solid rgba(255,255,255,0.5)',
+        [MEDIA.mobile]: {
+            ...shorthands.padding('16px'),
+            marginBottom: '0px',
+        },
     },
     headerLeft: {
         display: 'flex',
@@ -53,6 +58,10 @@ const useStyles = makeStyles({
         display: 'grid',
         gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
         ...shorthands.gap(tokens.spacingHorizontalL),
+        [MEDIA.mobile]: {
+            gridTemplateColumns: 'repeat(2, 1fr)',
+            ...shorthands.gap('12px'),
+        },
     },
     kpiCard: {
         ...shorthands.padding(tokens.spacingVerticalL),
@@ -82,6 +91,7 @@ const useStyles = makeStyles({
     },
     kpiValue: {
         fontSize: '36px',
+        [MEDIA.mobile]: { fontSize: '26px' },
         fontWeight: '800',
         color: '#003057',
         lineHeight: '1',
@@ -99,6 +109,10 @@ const useStyles = makeStyles({
         gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))',
         ...shorthands.gap(tokens.spacingHorizontalL),
         marginTop: tokens.spacingVerticalL,
+        [MEDIA.mobile]: {
+            gridTemplateColumns: '1fr',
+            ...shorthands.gap('14px'),
+        },
     },
     chartCard: {
         ...shorthands.padding('24px'),

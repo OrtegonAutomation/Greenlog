@@ -27,6 +27,7 @@ import { CatalogoItemsGlobalService } from '../../services/CatalogoItemsGlobalSe
 import { DEPARTAMENTOS_MUNICIPIOS, DEPARTAMENTOS_LIST } from '../../data/jurisdiccionesCompensaciones';
 import type { ServicioEComplejidad } from '../../data/itemsServiciosE';
 import { CENIT_COLORS } from '../../theme/cenitTheme';
+import { MEDIA } from '../../hooks/useResponsive';
 import {
   DatosAuxiliaresPresupuestales,
   DatosAuxiliaresPresupuestalesForm,
@@ -872,11 +873,13 @@ const useStyles = makeStyles({
     display: 'grid',
     gridTemplateColumns: '1fr 1fr 1fr',
     ...shorthands.gap('8px'),
+    [MEDIA.mobile]: { gridTemplateColumns: '1fr' },
   },
   monthFieldsTwo: {
     display: 'grid',
     gridTemplateColumns: '1fr 1fr',
     ...shorthands.gap('8px'),
+    [MEDIA.mobile]: { gridTemplateColumns: '1fr' },
   },
   fieldGroup: {
     display: 'flex',
@@ -2904,7 +2907,7 @@ export const PlaneacionWizard: React.FC<Props> = ({
                     <Caption1 style={{ color: tokens.colorNeutralForeground3, display: 'block', marginBottom: '16px' }}>
                       Indica el sistema (oleoducto/poliducto) y el sector/proyecto donde aplica la compensación.
                     </Caption1>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', maxWidth: '560px' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px', maxWidth: '560px' }}>
                       <div>
                         <Caption1 style={{ display: 'block', fontWeight: '600', color: '#003057', marginBottom: '4px' }}>Sistema</Caption1>
                         <select
@@ -3017,7 +3020,7 @@ export const PlaneacionWizard: React.FC<Props> = ({
                   Registra los datos del acto administrativo y la compensación ambiental asociada.
                 </Caption1>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px 24px', maxWidth: '720px', margin: '0 auto' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '16px 24px', maxWidth: '720px', margin: '0 auto' }}>
                   {/* ID obligación */}
                   <div>
                     <Caption1 style={{ display: 'block', fontWeight: '700', color: '#003057', marginBottom: '4px' }}>
@@ -3111,7 +3114,7 @@ export const PlaneacionWizard: React.FC<Props> = ({
                     <Caption1 style={{ display: 'block', fontWeight: '700', color: '#003057', marginBottom: '8px' }}>
                       Jurisdicción (donde se ejecuta la compensación)
                     </Caption1>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px' }}>
                       <div>
                         <Caption1 style={{ display: 'block', fontWeight: '600', marginBottom: '4px' }}>Corporación</Caption1>
                         <select

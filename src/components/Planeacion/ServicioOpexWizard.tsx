@@ -12,6 +12,7 @@ const STEPS = [
 ];
 import { MonitoreosMatrizService } from '../../services/MonitoreosMatrizService';
 import { CENIT_COLORS } from '../../theme/cenitTheme';
+import { MEDIA } from '../../hooks/useResponsive';
 
 export interface ServicioMensual {
   mes: string;
@@ -186,6 +187,7 @@ const useStyles = makeStyles({
     display: 'grid',
     gridTemplateColumns: '1fr 1fr',
     ...shorthands.gap('8px'),
+    [MEDIA.mobile]: { gridTemplateColumns: '1fr' },
   },
   fieldGroup: {
     display: 'flex',

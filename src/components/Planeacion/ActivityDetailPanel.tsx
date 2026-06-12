@@ -17,10 +17,14 @@ import {
 import { ActividadAmbiental, MATRICES_AMBIENTALES, LINEAS_OPERATIVAS } from '../../types';
 import { StatusBadge, PrioridadBadge } from '../shared/StatusBadge';
 import { CENIT_COLORS } from '../../theme/cenitTheme';
+import { MEDIA, useResponsive } from '../../hooks/useResponsive';
 
 // ── Estilos ───────────────────────────────────────────────────
 const useStyles = makeStyles({
-  drawer: { '--drawer-size': '560px' } as any,
+  drawer: {
+    '--drawer-size': '560px',
+    [MEDIA.mobile]: { '--drawer-size': '100vw' },
+  } as any,
 
   body: {
     display: 'flex',
@@ -120,10 +124,12 @@ const useStyles = makeStyles({
   grid2: {
     display: 'grid', gridTemplateColumns: '1fr 1fr',
     gap: '12px 20px',
+    [MEDIA.mobile]: { gridTemplateColumns: '1fr' },
   },
   grid3: {
     display: 'grid', gridTemplateColumns: '1fr 1fr 1fr',
     gap: '12px 16px',
+    [MEDIA.mobile]: { gridTemplateColumns: '1fr 1fr' },
   },
   grid1: { display: 'flex', flexDirection: 'column', gap: '10px' },
 
@@ -146,6 +152,7 @@ const useStyles = makeStyles({
   budgetGrid: {
     display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px',
     marginBottom: '12px',
+    [MEDIA.mobile]: { gridTemplateColumns: '1fr', gap: '8px' },
   },
   budgetCard: {
     background: 'linear-gradient(135deg, rgba(0,51,160,0.04) 0%, rgba(0,86,210,0.02) 100%)',
@@ -229,6 +236,7 @@ const useStyles = makeStyles({
     display: 'grid',
     gridTemplateColumns: 'repeat(4, 1fr)',
     gap: '6px',
+    [MEDIA.mobile]: { gridTemplateColumns: 'repeat(3, 1fr)' },
   },
   mesCard: {
     borderRadius: '8px', padding: '9px 8px',
@@ -338,6 +346,7 @@ export const ActivityDetailPanel: React.FC<ActivityDetailPanelProps> = ({
   onResendReviewRequest,
 }) => {
   const styles = useStyles();
+  const { isMobile } = useResponsive();
 
   const opx = useMemo(() => parseOpex(actividad?.opexDataRaw), [actividad?.opexDataRaw]);
 
@@ -409,7 +418,7 @@ export const ActivityDetailPanel: React.FC<ActivityDetailPanelProps> = ({
   return (
     <OverlayDrawer
       position="end"
-      size="large"
+      size={isMobile ? 'full' : 'large'}
       open={open}
       onOpenChange={(_, s) => { if (!s.open) onClose(); }}
       className={styles.drawer}
