@@ -15,7 +15,7 @@ import { ActividadAmbiental, EstadoActividad } from '../../types';
 import { StatusBadge } from '../shared/StatusBadge';
 import { SkeletonTable } from '../shared/SkeletonLoader';
 import { EmptyState } from '../shared/EmptyState';
-import { useResponsive } from '../../hooks/useResponsive';
+import { MEDIA, useResponsive } from '../../hooks/useResponsive';
 
 // ── Estilos ───────────────────────────────────────────────────
 const useStyles = makeStyles({
@@ -31,7 +31,11 @@ const useStyles = makeStyles({
     flexWrap: 'wrap',
     paddingBottom: '8px',
   },
-  searchWrap: { flex: '1 1 220px', maxWidth: '360px' },
+  searchWrap: {
+    flex: '1 1 220px',
+    maxWidth: '360px',
+    [MEDIA.mobile]: { maxWidth: '100%', flexBasis: '100%' },
+  },
   chips: {
     display: 'flex',
     ...shorthands.gap(tokens.spacingHorizontalS),
@@ -77,6 +81,7 @@ const useStyles = makeStyles({
     background: 'rgba(255,255,255,0.4)',
     backdropFilter: 'blur(20px) saturate(180%)',
     position: 'relative',
+    [MEDIA.mobile]: { overflowX: 'hidden' },
   },
   count: {
     color: tokens.colorNeutralForeground3,
@@ -147,7 +152,7 @@ const useStyles = makeStyles({
     fontWeight: '700',
     color: '#003057',
     fontSize: '13px',
-    whiteSpace: 'nowrap',
+    overflowWrap: 'anywhere',
   },
 });
 
@@ -364,7 +369,7 @@ export const ActivityTable: React.FC<ActivityTableProps> = ({ actividades, carga
                     <span className={styles.mobileCardMoney}>
                       {item.presupuestoPlan ? formatter.format(item.presupuestoPlan) : 'Sin presupuesto'}
                     </span>
-                    <span style={{ marginLeft: 'auto' }}>{mesesTexto}</span>
+                    <span style={{ marginLeft: 'auto', minWidth: 0, textAlign: 'right' }}>{mesesTexto}</span>
                   </div>
                 </div>
               );

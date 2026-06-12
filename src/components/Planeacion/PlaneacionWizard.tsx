@@ -922,6 +922,8 @@ const useStyles = makeStyles({
   progMatrixWrap: {
     marginTop: '6px',
     overflow: 'auto',
+    maxWidth: '100%',
+    WebkitOverflowScrolling: 'touch',
     maxHeight: '52vh',
     borderRadius: '12px',
     ...shorthands.border('1px', 'solid', 'rgba(0,0,0,0.08)'),

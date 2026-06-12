@@ -67,6 +67,11 @@ const useStyles = makeStyles({
     display: 'flex',
     ...shorthands.gap('10px'),
     alignItems: 'center',
+    [MEDIA.mobile]: {
+      width: '100%',
+      flexWrap: 'wrap',
+      ...shorthands.gap('8px'),
+    },
   },
   subtitle: { color: tokens.colorNeutralForeground2 },
 });

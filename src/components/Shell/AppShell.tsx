@@ -368,6 +368,7 @@ const useStyles = makeStyles({
     ...shorthands.padding('16px'),
     paddingBottom: `${BOTTOM_TAB_BAR_HEIGHT + 20}px`,
     WebkitOverflowScrolling: 'touch',
+    overflowX: 'hidden',
   },
 
   // ── Header móvil ──

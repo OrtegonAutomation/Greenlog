@@ -25,7 +25,7 @@ import {
 } from '@fluentui/react-icons';
 import { MonitoreosMatrizService, MonitoreoRow } from '../../services/MonitoreosMatrizService';
 import { CENIT_COLORS } from '../../theme/cenitTheme';
-import { MEDIA } from '../../hooks/useResponsive';
+import { MEDIA, useResponsive } from '../../hooks/useResponsive';
 
 // ── Types ──
 export interface MonitoreoMensualParams {
@@ -329,6 +329,39 @@ const useStyles = makeStyles({
     gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
     ...shorthands.gap('12px'),
     marginTop: '16px',
+    [MEDIA.mobile]: {
+      display: 'flex',
+      flexDirection: 'column',
+      ...shorthands.gap('8px'),
+    },
+  },
+  monthAcc: {
+    ...shorthands.border('1px', 'solid', 'rgba(0,0,0,0.08)'),
+    borderRadius: '10px',
+    background: '#fff',
+    overflow: 'hidden',
+  },
+  monthAccSummary: {
+    display: 'flex',
+    alignItems: 'center',
+    ...shorthands.gap('10px'),
+    ...shorthands.padding('12px', '14px'),
+    cursor: 'pointer',
+    listStyle: 'none',
+    userSelect: 'none',
+    WebkitTapHighlightColor: 'transparent',
+    background: 'rgba(0,51,160,0.03)',
+    '::-webkit-details-marker': { display: 'none' },
+    '::before': {
+      content: '"▸"',
+      fontSize: '11px',
+      color: 'rgba(0,51,160,0.45)',
+      transition: 'transform 0.15s ease',
+    },
+  },
+  monthAccBody: {
+    ...shorthands.padding('12px', '14px'),
+    borderTop: '1px solid rgba(0,0,0,0.06)',
   },
   monthCard: {
     ...shorthands.padding('16px', '20px'),
@@ -434,6 +467,7 @@ const STEPS = [
 
 export const MonitoreosWizard: React.FC<Props> = ({ open, onClose, onComplete, initialData }) => {
   const styles = useStyles();
+  const { isMobile } = useResponsive();
 
   // Wizard state
   const [step, setStep] = useState(0);
@@ -830,14 +864,8 @@ export const MonitoreosWizard: React.FC<Props> = ({ open, onClose, onComplete, i
               </Caption1>
 
               <div className={styles.monthGrid}>
-                {monthlyData.map((m, i) => (
-                  <div key={m.mes} className={styles.monthCard} style={m.total > 0 ? { borderColor: 'rgba(0,51,160,0.15)' } : {}}>
-                    <div className={styles.monthHeader}>
-                      <span className={styles.monthLabel}>{m.mes}</span>
-                      <span className={styles.monthTotal}>
-                        {m.total > 0 ? fmtCOP(m.total) : '—'}
-                      </span>
-                    </div>
+                {monthlyData.map((m, i) => {
+                  const fields = (
                     <div className={styles.monthFields}>
                       <div className={styles.fieldGroup}>
                         <span className={styles.fieldLabel}>Puntos/Q</span>
@@ -880,7 +908,7 @@ export const MonitoreosWizard: React.FC<Props> = ({ open, onClose, onComplete, i
                                 title="Editar precios individuales"
                               />
                             </PopoverTrigger>
-                            <PopoverSurface style={{ padding: '16px', minWidth: '280px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                            <PopoverSurface style={{ padding: '16px', minWidth: isMobile ? undefined : '280px', maxWidth: '92vw', display: 'flex', flexDirection: 'column', gap: '12px' }}>
                               <Title3 style={{ fontSize: '14px', color: '#003057' }}>Desglose - {m.mes}</Title3>
                               <div style={{ maxHeight: '200px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '8px', paddingRight: '4px' }}>
                                 {m.preciosIndividuales?.map(p => (
@@ -902,8 +930,37 @@ export const MonitoreosWizard: React.FC<Props> = ({ open, onClose, onComplete, i
                         </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  );
+
+                  if (isMobile) {
+                    return (
+                      <details key={m.mes} className={styles.monthAcc}>
+                        <summary className={styles.monthAccSummary}>
+                          <span className={styles.monthLabel}>{m.mes}</span>
+                          <span
+                            className={styles.monthTotal}
+                            style={{ marginLeft: 'auto', ...(m.total > 0 ? { color: CENIT_COLORS.greenDark } : { color: 'rgba(0,0,0,0.35)', fontWeight: 500 }) }}
+                          >
+                            {m.total > 0 ? fmtCOP(m.total) : '—'}
+                          </span>
+                        </summary>
+                        <div className={styles.monthAccBody}>{fields}</div>
+                      </details>
+                    );
+                  }
+
+                  return (
+                    <div key={m.mes} className={styles.monthCard} style={m.total > 0 ? { borderColor: 'rgba(0,51,160,0.15)' } : {}}>
+                      <div className={styles.monthHeader}>
+                        <span className={styles.monthLabel}>{m.mes}</span>
+                        <span className={styles.monthTotal}>
+                          {m.total > 0 ? fmtCOP(m.total) : '—'}
+                        </span>
+                      </div>
+                      {fields}
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}
