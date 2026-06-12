@@ -43,6 +43,7 @@ const useStyles = makeStyles({
     position: 'relative',
     overflow: 'hidden',
     flexShrink: 0,
+    [MEDIA.mobile]: { padding: '14px 16px 12px' },
   },
   heroAccent: {
     position: 'absolute', top: '-40px', right: '-40px',
@@ -64,6 +65,7 @@ const useStyles = makeStyles({
   heroTitle: {
     fontSize: '19px', fontWeight: 800, lineHeight: '1.3',
     position: 'relative', zIndex: 1, marginBottom: '14px',
+    [MEDIA.mobile]: { fontSize: '16px', marginBottom: '10px' },
   },
   heroBadges: {
     display: 'flex', gap: '8px', alignItems: 'center',
@@ -84,6 +86,7 @@ const useStyles = makeStyles({
     background: 'rgba(0,51,160,0.04)',
     borderBottom: '1px solid rgba(0,51,160,0.08)',
     padding: '12px 24px',
+    [MEDIA.mobile]: { padding: '10px 16px' },
     display: 'flex', alignItems: 'center', gap: '14px',
     flexShrink: 0,
   },
@@ -110,6 +113,7 @@ const useStyles = makeStyles({
   section: {
     padding: '18px 24px',
     borderBottom: '1px solid rgba(0,0,0,0.05)',
+    [MEDIA.mobile]: { padding: '14px 16px' },
   },
   sectionHeader: {
     display: 'flex', alignItems: 'center', gap: '7px',
@@ -261,6 +265,23 @@ const useStyles = makeStyles({
     borderTop: `1px solid ${tokens.colorNeutralStroke2}`,
     backgroundColor: tokens.colorNeutralBackground2,
     flexShrink: 0,
+    [MEDIA.mobile]: {
+      position: 'sticky',
+      bottom: 0,
+      zIndex: 5,
+      flexDirection: 'column-reverse',
+      alignItems: 'stretch',
+      gap: '8px',
+      padding: '10px 14px calc(10px + env(safe-area-inset-bottom))',
+      boxShadow: '0 -4px 16px rgba(0,0,0,0.08)',
+    },
+  },
+  footerActions: {
+    display: 'flex', gap: '8px',
+    [MEDIA.mobile]: {
+      flexWrap: 'wrap',
+      '& > button': { flex: '1 1 calc(50% - 4px)', minHeight: '44px' },
+    },
   },
 
   timestamps: {
@@ -778,7 +799,7 @@ export const ActivityDetailPanel: React.FC<ActivityDetailPanelProps> = ({
               Eliminar
             </Button>
           ) : <span />}
-          <div style={{ display: 'flex', gap: '8px' }}>
+          <div className={styles.footerActions}>
             <Button appearance="secondary" onClick={onClose}>Cerrar</Button>
             {canResendReviewRequest && (
               <Button appearance="secondary" onClick={() => onResendReviewRequest?.(actividad)}>

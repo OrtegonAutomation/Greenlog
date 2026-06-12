@@ -35,7 +35,7 @@ import { useAuth } from '../../auth/AuthContext';
 import { useNotificaciones } from '../../context/NotificacionesContext';
 import { Notificacion } from '../../types';
 import { getSectionFromPath, getSectionPath, normalizePath, getActividadParam, clearActividadParam } from '../../utils/appRoutes';
-import { useResponsive } from '../../hooks/useResponsive';
+import { MEDIA, useResponsive } from '../../hooks/useResponsive';
 import { BottomTabBar, BOTTOM_TAB_BAR_HEIGHT } from './BottomTabBar';
 
 // ... (existing code)
@@ -311,6 +311,11 @@ const useStyles = makeStyles({
     width: '360px',
     maxWidth: '92vw',
     ...shorthands.padding('0'),
+    [MEDIA.mobile]: {
+      width: 'calc(100vw - 16px)',
+      maxWidth: 'calc(100vw - 16px)',
+      borderRadius: '14px',
+    },
   },
   notifHeader: {
     display: 'flex',
@@ -322,6 +327,10 @@ const useStyles = makeStyles({
   notifList: {
     maxHeight: '420px',
     overflowY: 'auto',
+    [MEDIA.mobile]: {
+      maxHeight: '60vh',
+      WebkitOverflowScrolling: 'touch',
+    },
   },
   notifItem: {
     display: 'flex',

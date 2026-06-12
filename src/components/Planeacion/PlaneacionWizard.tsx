@@ -27,7 +27,7 @@ import { CatalogoItemsGlobalService } from '../../services/CatalogoItemsGlobalSe
 import { DEPARTAMENTOS_MUNICIPIOS, DEPARTAMENTOS_LIST } from '../../data/jurisdiccionesCompensaciones';
 import type { ServicioEComplejidad } from '../../data/itemsServiciosE';
 import { CENIT_COLORS } from '../../theme/cenitTheme';
-import { MEDIA } from '../../hooks/useResponsive';
+import { MEDIA, useResponsive } from '../../hooks/useResponsive';
 import {
   DatosAuxiliaresPresupuestales,
   DatosAuxiliaresPresupuestalesForm,
@@ -881,6 +881,88 @@ const useStyles = makeStyles({
     ...shorthands.gap('8px'),
     [MEDIA.mobile]: { gridTemplateColumns: '1fr' },
   },
+
+  // ── Matriz de programación: versión móvil (acordeón por ítem) ──
+  mobMatrixList: {
+    display: 'flex',
+    flexDirection: 'column',
+    ...shorthands.gap('8px'),
+    marginTop: '8px',
+  },
+  mobItemAcc: {
+    ...shorthands.border('1px', 'solid', 'rgba(0,0,0,0.08)'),
+    borderRadius: '10px',
+    background: '#fff',
+    overflow: 'hidden',
+  },
+  mobItemSummary: {
+    display: 'flex',
+    alignItems: 'center',
+    ...shorthands.gap('10px'),
+    ...shorthands.padding('12px', '14px'),
+    cursor: 'pointer',
+    listStyle: 'none',
+    userSelect: 'none',
+    WebkitTapHighlightColor: 'transparent',
+    background: 'rgba(0,51,160,0.03)',
+    '::-webkit-details-marker': { display: 'none' },
+    '::before': {
+      content: '"▸"',
+      fontSize: '11px',
+      color: 'rgba(0,51,160,0.45)',
+      flexShrink: 0,
+    },
+  },
+  mobItemName: {
+    fontWeight: 700,
+    fontSize: '13px',
+    color: '#003057',
+    flex: 1,
+    minWidth: 0,
+    lineHeight: '1.3',
+  },
+  mobItemTotal: {
+    fontWeight: 800,
+    fontSize: '13px',
+    whiteSpace: 'nowrap',
+    flexShrink: 0,
+  },
+  mobItemBody: {
+    ...shorthands.padding('12px', '14px'),
+    borderTop: '1px solid rgba(0,0,0,0.06)',
+    display: 'flex',
+    flexDirection: 'column',
+    ...shorthands.gap('10px'),
+  },
+  mobMonthRow: {
+    display: 'grid',
+    gridTemplateColumns: '40px 1fr auto',
+    alignItems: 'center',
+    ...shorthands.gap('8px'),
+    ...shorthands.padding('6px', '0'),
+    borderBottom: '1px solid rgba(0,0,0,0.04)',
+  },
+  mobMonthLabel: {
+    fontSize: '11px',
+    fontWeight: 700,
+    textTransform: 'uppercase',
+    color: tokens.colorNeutralForeground3,
+  },
+  mobMonthTotal: {
+    fontSize: '11px',
+    fontWeight: 700,
+    color: CENIT_COLORS.blueBrand,
+    whiteSpace: 'nowrap',
+    minWidth: '64px',
+    textAlign: 'right',
+  },
+  mobIpcGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(3, 1fr)',
+    ...shorthands.gap('4px'),
+    ...shorthands.padding('12px', '14px'),
+    borderTop: '1px solid rgba(0,0,0,0.06)',
+  },
   fieldGroup: {
     display: 'flex',
     flexDirection: 'column',
@@ -1169,6 +1251,7 @@ export const PlaneacionWizard: React.FC<Props> = ({
   allowCustomLineas = true,
 }) => {
   const styles = useStyles();
+  const { isMobile } = useResponsive();
 
   // ── State ──
   const [step, setStep] = useState(0);
@@ -4129,8 +4212,180 @@ export const PlaneacionWizard: React.FC<Props> = ({
                   </div>
                 )}
 
+                {/* Año 1 / no-Compensaciones — versión móvil: acordeón por ítem */}
+                {(!isCompensaciones || tabAnio === 1) && isMobile && (
+                  <div className={styles.mobMatrixList}>
+                    {ipcGlobalActivo && ipcGlobalPorcentaje > 0 && selectedLinea?.value !== 'Hojas de Ruta Sostenibilidad Ambiental' && (
+                      <details className={styles.mobItemAcc}>
+                        <summary className={styles.mobItemSummary}>
+                          <span className={styles.mobItemName}>📈 Aplicar IPC (+{ipcGlobalPorcentaje}%) por mes</span>
+                          <span className={styles.mobItemTotal} style={{ color: CENIT_COLORS.blueBrand }}>{ipcMeses.size}/12</span>
+                        </summary>
+                        <div className={styles.mobIpcGrid}>
+                          {MESES_SHORT.map((m, i) => (
+                            <Checkbox
+                              key={m}
+                              label={m}
+                              checked={ipcMeses.has(i)}
+                              onChange={() => { const s = new Set(ipcMeses); s.has(i) ? s.delete(i) : s.add(i); setIpcMeses(s); }}
+                            />
+                          ))}
+                        </div>
+                      </details>
+                    )}
+
+                    {(monthlyData[0]?.preciosIndividuales ?? []).map(item => {
+                      const isLog = item.key.startsWith('LOG-');
+                      const rowTotal = monthlyData.reduce((s, m) => {
+                        const e = m.preciosIndividuales.find(p => p.key === item.key);
+                        return s + (e?.total ?? 0);
+                      }, 0);
+                      const pagoDiferidoConfig = pagosDiferidosItems[item.key] ?? {
+                        porcentajeAsignado: 0,
+                        mesesSeleccionados: [],
+                        porcentajesMensuales: {},
+                      };
+                      const pagoDiferidoProgramado = getPagoDiferidoProgramado(item.key);
+                      const pagoDiferidoExcede = isPagosDiferidosDisponible
+                        && pagosDiferidosActivo
+                        && pagoDiferidoProgramado > pagoDiferidoConfig.porcentajeAsignado + 0.0001;
+
+                      return (
+                        <details key={item.key} className={styles.mobItemAcc}>
+                          <summary className={styles.mobItemSummary}>
+                            <span className={styles.mobItemName}>{isLog && '🚐 '}{item.nombre}</span>
+                            <span
+                              className={styles.mobItemTotal}
+                              style={rowTotal > 0 ? { color: CENIT_COLORS.greenDark } : { color: 'rgba(0,0,0,0.35)', fontWeight: 500 }}
+                            >
+                              {rowTotal > 0 ? fmtCOP(rowTotal) : '—'}
+                            </span>
+                          </summary>
+                          <div className={styles.mobItemBody}>
+                            {/* Precio unitario */}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              <Caption1 style={{ color: tokens.colorNeutralForeground3, fontSize: '11px', fontWeight: 700, flexShrink: 0 }}>
+                                Precio unitario
+                              </Caption1>
+                              <Input
+                                inputMode="numeric"
+                                size="small"
+                                value={item.precio > 0 ? item.precio.toLocaleString('es-CO') : ''}
+                                placeholder="0"
+                                onChange={(_, d) => updateItemPrice(item.key, parseCOPInput(d.value))}
+                                onBlur={() => { void persistCatalogPrice(item.key); }}
+                                style={{ flex: 1, minWidth: 0 }}
+                              />
+                            </div>
+
+                            {ivaGlobalActivo && ivaGlobalPorcentaje > 0 && (
+                              <Checkbox
+                                label={`IVA +${ivaGlobalPorcentaje}%`}
+                                checked={!!item.aplicaIva}
+                                onChange={(_, d) => updateItemIva(item.key, !!d.checked)}
+                              />
+                            )}
+
+                            {isPagosDiferidosDisponible && pagosDiferidosActivo && (
+                              <div style={{
+                                display: 'flex', flexDirection: 'column', gap: '6px',
+                                padding: '8px', borderRadius: '8px',
+                                background: pagoDiferidoExcede ? 'rgba(232,17,35,0.08)' : 'rgba(0,51,160,0.04)',
+                                border: pagoDiferidoExcede ? '1px solid rgba(232,17,35,0.22)' : '1px solid rgba(0,51,160,0.12)',
+                              }}>
+                                <Caption1 style={{ color: tokens.colorNeutralForeground3, fontSize: '10px', fontWeight: 700 }}>% asignado</Caption1>
+                                <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
+                                  <Input
+                                    type="number"
+                                    size="small"
+                                    min={0}
+                                    max={100}
+                                    value={pagoDiferidoConfig.porcentajeAsignado > 0 ? String(pagoDiferidoConfig.porcentajeAsignado) : ''}
+                                    placeholder="0"
+                                    onChange={(_, d) => updatePagoDiferidoAsignado(item.key, Number(d.value) || 0)}
+                                    style={{ width: '72px' }}
+                                  />
+                                  <span style={{ fontSize: '11px', color: tokens.colorNeutralForeground3 }}>%</span>
+                                  <Button size="small" appearance="secondary" onClick={() => distribuirPagoDiferido(item.key)} style={{ borderRadius: '8px' }}>
+                                    Diferir pagos
+                                  </Button>
+                                </div>
+                                <Caption1 style={{
+                                  fontSize: '10px',
+                                  color: pagoDiferidoExcede ? '#a4262c' : tokens.colorNeutralForeground3,
+                                  fontWeight: pagoDiferidoExcede ? 700 : 500,
+                                }}>
+                                  Programado {fmtPct(pagoDiferidoProgramado)} de {fmtPct(pagoDiferidoConfig.porcentajeAsignado)}
+                                </Caption1>
+                              </div>
+                            )}
+
+                            {/* Meses */}
+                            <div>
+                              {monthlyData.map((month, mi) => {
+                                const entry = month.preciosIndividuales.find(p => p.key === item.key);
+                                if (!entry) return null;
+                                const mesDiferidoSeleccionado = pagoDiferidoConfig.mesesSeleccionados.includes(mi)
+                                  || (entry.porcentajeDiferido ?? 0) > 0;
+                                return (
+                                  <div key={mi} className={styles.mobMonthRow}>
+                                    <span className={styles.mobMonthLabel}>{MESES_SHORT[mi]}</span>
+                                    <div style={{ display: 'flex', gap: '6px', alignItems: 'center', minWidth: 0 }}>
+                                      {isPagosDiferidosDisponible && pagosDiferidosActivo ? (
+                                        <>
+                                          <Checkbox
+                                            checked={mesDiferidoSeleccionado}
+                                            onChange={(_, d) => togglePagoDiferidoMes(item.key, mi, !!d.checked)}
+                                          />
+                                          <Input
+                                            type="number"
+                                            size="small"
+                                            min={0}
+                                            max={100}
+                                            value={(entry.porcentajeDiferido ?? 0) > 0 ? String(entry.porcentajeDiferido) : ''}
+                                            placeholder="%"
+                                            disabled={!mesDiferidoSeleccionado}
+                                            onChange={(_, d) => updatePagoDiferidoMes(item.key, mi, Number(d.value) || 0)}
+                                            style={{ flex: 1, minWidth: 0 }}
+                                          />
+                                        </>
+                                      ) : (
+                                        <Input
+                                          type="number"
+                                          size="small"
+                                          value={entry.cantidad > 0 ? String(entry.cantidad) : ''}
+                                          placeholder="0"
+                                          onChange={(_, d) => updateItemMonth(mi, item.key, 'cantidad', Number(d.value) || 0)}
+                                          style={{ flex: 1, minWidth: 0 }}
+                                        />
+                                      )}
+                                      {isMonitoreo && !isLog && !item.key.startsWith('MATRIZ|') && (
+                                        <Input
+                                          type="number"
+                                          size="small"
+                                          value={entry.frecuencia > 0 ? String(entry.frecuencia) : ''}
+                                          placeholder="Comp"
+                                          onChange={(_, d) => updateItemMonth(mi, item.key, 'frecuencia', Number(d.value) || 0)}
+                                          style={{ flex: 1, minWidth: 0 }}
+                                        />
+                                      )}
+                                    </div>
+                                    <span className={styles.mobMonthTotal}>
+                                      {entry.total > 0 ? fmtCOP(entry.total) : '—'}
+                                    </span>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        </details>
+                      );
+                    })}
+                  </div>
+                )}
+
                 {/* Año 1 / no-Compensaciones — tabla mensualizada (la existente) */}
-                {(!isCompensaciones || tabAnio === 1) && (
+                {(!isCompensaciones || tabAnio === 1) && !isMobile && (
                 <>
                 <div
                   ref={topScrollRef}
