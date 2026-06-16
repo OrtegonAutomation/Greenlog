@@ -1403,6 +1403,9 @@ export const PlaneacionWizard: React.FC<Props> = ({
   const isIcas = selectedLinea?.value === 'ICAs';
   const isEstudiosAmbientales = selectedLinea?.value === 'Estudios Ambientales';
   const isServiciosE = selectedLinea?.value === 'Servicios E';
+  // Pagos y Publicaciones: el usuario digita el precio directamente por mes
+  // (sin precio de referencia ni cantidad).
+  const isPagos = selectedLinea?.value === 'Pagos';
   const isPagosDiferidosDisponible = isIcas || isEstudiosAmbientales;
   const tiposLugarDisponibles = useMemo(
     () => isServiciosE
@@ -1753,7 +1756,8 @@ export const PlaneacionWizard: React.FC<Props> = ({
         ? (ex?.porcentajeDiferido ?? pagosDiferidosItems[key]?.porcentajesMensuales?.[mesIndex] ?? 0)
         : undefined;
       const precio    = (forcePrice || !ex) ? basePrice : ex.precio;
-      const cantidad  = ex?.cantidad  ?? 0;
+      // En Pagos el "total" del mes es el precio digitado: cantidad y frecuencia fijas en 1.
+      const cantidad  = ex?.cantidad  ?? (isPagos ? 1 : 0);
       const frecuencia = ex?.frecuencia ?? defaultFrec;
       const aplicaIva = ex?.aplicaIva ?? false;
       const entry: PlaneacionMensualParam = {
@@ -1798,7 +1802,9 @@ export const PlaneacionWizard: React.FC<Props> = ({
           }
         } else {
           for (const it of availableItems.filter(it => selectedItems.has(it.id))) {
-            list.push(buildEntry(it.id, it.item, ItemsLineaService.getPrecioEfectivo(it, i), i, existing, 1));
+            // En Pagos no hay precio de referencia: cada mes arranca en 0 y se digita.
+            const base = isPagos ? 0 : ItemsLineaService.getPrecioEfectivo(it, i);
+            list.push(buildEntry(it.id, it.item, base, i, existing, 1));
           }
         }
 
@@ -2046,6 +2052,25 @@ export const PlaneacionWizard: React.FC<Props> = ({
       const idx = list.findIndex(p => p.key === itemKey);
       if (idx >= 0) {
         const entry = { ...list[idx], [field]: value };
+        entry.total = calculateEntryTotal(entry, mesIndex);
+        list[idx] = entry;
+      }
+      month.preciosIndividuales = list;
+      month.total = list.reduce((s, p) => s + p.total, 0);
+      next[mesIndex] = month;
+      return next;
+    });
+  }, [calculateEntryTotal]);
+
+  // ── Precio digitado por mes (línea Pagos): edita solo el mes indicado ──
+  const updateItemMonthPrice = useCallback((mesIndex: number, itemKey: string, value: number) => {
+    setMonthlyData(prev => {
+      const next = [...prev];
+      const month = { ...next[mesIndex] };
+      const list = [...month.preciosIndividuales];
+      const idx = list.findIndex(p => p.key === itemKey);
+      if (idx >= 0) {
+        const entry = { ...list[idx], precio: value, cantidad: 1, frecuencia: 1 };
         entry.total = calculateEntryTotal(entry, mesIndex);
         list[idx] = entry;
       }
@@ -3668,7 +3693,7 @@ export const PlaneacionWizard: React.FC<Props> = ({
                           <th className={styles.paramTh}>Ítem</th>
                           {!isIcas && <th className={styles.paramTh}>Descripción</th>}
                           <th className={styles.paramTh}>Unidad</th>
-                          <th className={styles.paramTh}>Precio Ref.</th>
+                          {!isPagos && <th className={styles.paramTh}>Precio Ref.</th>}
                         </tr>
                       </thead>
                       <tbody>
@@ -3692,13 +3717,13 @@ export const PlaneacionWizard: React.FC<Props> = ({
                                 </td>
                               )}
                               <td className={styles.paramTd}>{it.unidad}</td>
-                              <td className={styles.paramTd} style={{ fontWeight: '600' }}>{fmtCOP(it.precioReferencia)}</td>
+                              {!isPagos && <td className={styles.paramTd} style={{ fontWeight: '600' }}>{fmtCOP(it.precioReferencia)}</td>}
                             </tr>
                           );
                         })}
                         {filteredItems.length === 0 && (
                           <tr>
-                            <td className={styles.paramTd} colSpan={isIcas ? 4 : 5} style={{ textAlign: 'center', padding: '32px', color: tokens.colorNeutralForeground3 }}>
+                            <td className={styles.paramTd} colSpan={(isIcas ? 4 : 5) - (isPagos ? 1 : 0)} style={{ textAlign: 'center', padding: '32px', color: tokens.colorNeutralForeground3 }}>
                               {isCompensacionesProvisiones
                                 ? 'Agrega ítems manualmente para esta provisión.'
                                 : `No se encontraron ítems para ${selectedLinea?.label}`}
@@ -3727,10 +3752,12 @@ export const PlaneacionWizard: React.FC<Props> = ({
                             {UNIDADES_CONTRATO.map(u => <option key={u} value={u}>{u}</option>)}
                           </select>
                         </div>
-                        <div style={{ minWidth: '140px' }}>
-                          <Caption1>Precio ref. (COP)</Caption1>
-                          <Input value={s3Precio} onChange={(_, d) => setS3Precio(formatCOPInput(d.value))} placeholder="0" style={{ width: '100%' }} />
-                        </div>
+                        {!isPagos && (
+                          <div style={{ minWidth: '140px' }}>
+                            <Caption1>Precio ref. (COP)</Caption1>
+                            <Input value={s3Precio} onChange={(_, d) => setS3Precio(formatCOPInput(d.value))} placeholder="0" style={{ width: '100%' }} />
+                          </div>
+                        )}
                       </div>
                       <div style={{ display: 'flex', gap: '8px' }}>
                         <Button appearance="primary" disabled={!s3Nombre.trim()} onClick={handleAddItemStep3}>Agregar</Button>
@@ -4262,21 +4289,23 @@ export const PlaneacionWizard: React.FC<Props> = ({
                             </span>
                           </summary>
                           <div className={styles.mobItemBody}>
-                            {/* Precio unitario */}
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                              <Caption1 style={{ color: tokens.colorNeutralForeground3, fontSize: '11px', fontWeight: 700, flexShrink: 0 }}>
-                                Precio unitario
-                              </Caption1>
-                              <Input
-                                inputMode="numeric"
-                                size="small"
-                                value={item.precio > 0 ? item.precio.toLocaleString('es-CO') : ''}
-                                placeholder="0"
-                                onChange={(_, d) => updateItemPrice(item.key, parseCOPInput(d.value))}
-                                onBlur={() => { void persistCatalogPrice(item.key); }}
-                                style={{ flex: 1, minWidth: 0 }}
-                              />
-                            </div>
+                            {/* Precio unitario (oculto en Pagos: el precio se digita por mes) */}
+                            {!isPagos && (
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <Caption1 style={{ color: tokens.colorNeutralForeground3, fontSize: '11px', fontWeight: 700, flexShrink: 0 }}>
+                                  Precio unitario
+                                </Caption1>
+                                <Input
+                                  inputMode="numeric"
+                                  size="small"
+                                  value={item.precio > 0 ? item.precio.toLocaleString('es-CO') : ''}
+                                  placeholder="0"
+                                  onChange={(_, d) => updateItemPrice(item.key, parseCOPInput(d.value))}
+                                  onBlur={() => { void persistCatalogPrice(item.key); }}
+                                  style={{ flex: 1, minWidth: 0 }}
+                                />
+                              </div>
+                            )}
 
                             {ivaGlobalActivo && ivaGlobalPorcentaje > 0 && (
                               <Checkbox
@@ -4349,6 +4378,15 @@ export const PlaneacionWizard: React.FC<Props> = ({
                                             style={{ flex: 1, minWidth: 0 }}
                                           />
                                         </>
+                                      ) : isPagos ? (
+                                        <Input
+                                          inputMode="numeric"
+                                          size="small"
+                                          value={entry.precio > 0 ? entry.precio.toLocaleString('es-CO') : ''}
+                                          placeholder="$ del mes"
+                                          onChange={(_, d) => updateItemMonthPrice(mi, item.key, parseCOPInput(d.value))}
+                                          style={{ flex: 1, minWidth: 0 }}
+                                        />
                                       ) : (
                                         <Input
                                           type="number"
@@ -4450,18 +4488,20 @@ export const PlaneacionWizard: React.FC<Props> = ({
                                 {isLog && <span style={{ marginRight: '4px', fontSize: '10px' }}>🚐</span>}
                                 {item.nombre}
                               </div>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                <Caption1 style={{ color: tokens.colorNeutralForeground3, fontSize: '10px', whiteSpace: 'nowrap' }}>$/u:</Caption1>
-                                <Input
-                                  inputMode="numeric"
-                                  size="small"
-                                  value={item.precio > 0 ? item.precio.toLocaleString('es-CO') : ''}
-                                  placeholder="0"
-                                  onChange={(_, d) => updateItemPrice(item.key, parseCOPInput(d.value))}
-                                  onBlur={() => { void persistCatalogPrice(item.key); }}
-                                  style={{ width: '90px' }}
-                                />
-                              </div>
+                              {!isPagos && (
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                  <Caption1 style={{ color: tokens.colorNeutralForeground3, fontSize: '10px', whiteSpace: 'nowrap' }}>$/u:</Caption1>
+                                  <Input
+                                    inputMode="numeric"
+                                    size="small"
+                                    value={item.precio > 0 ? item.precio.toLocaleString('es-CO') : ''}
+                                    placeholder="0"
+                                    onChange={(_, d) => updateItemPrice(item.key, parseCOPInput(d.value))}
+                                    onBlur={() => { void persistCatalogPrice(item.key); }}
+                                    style={{ width: '90px' }}
+                                  />
+                                </div>
+                              )}
                               {isPagosDiferidosDisponible && pagosDiferidosActivo && (
                                 <div style={{
                                   marginTop: '6px',
@@ -4542,6 +4582,15 @@ export const PlaneacionWizard: React.FC<Props> = ({
                                         style={{ width: '100%', minWidth: 0, marginTop: '2px' }}
                                       />
                                     </>
+                                  ) : isPagos ? (
+                                    <Input
+                                      inputMode="numeric"
+                                      size="small"
+                                      value={entry.precio > 0 ? entry.precio.toLocaleString('es-CO') : ''}
+                                      placeholder="$ mes"
+                                      onChange={(_, d) => updateItemMonthPrice(mi, item.key, parseCOPInput(d.value))}
+                                      style={{ width: '100%', minWidth: 0 }}
+                                    />
                                   ) : (
                                     <Input
                                       type="number"
