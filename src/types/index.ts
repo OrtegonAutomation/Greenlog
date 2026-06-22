@@ -340,7 +340,7 @@ export const CONTRATOS: string[] = [
 export const ZONAS_ESTACIONES: Record<string, string[]> = {
   'Occidente': [
     'Mariquita','Fresno','Herveo','Manizales','Pereira','Cisneros',
-    'Medellín','Cartago','Yumbo','Dagua','Buenaventura','Orito',
+    'Medellín','Cartago','Yumbo','Dagua','Buenaventura','Orito','Tumaco',
   ],
   'Centro': [
     'Chimita','Galán','Santa Rosa','Sebastopol','Vasconia',
@@ -351,7 +351,7 @@ export const ZONAS_ESTACIONES: Record<string, string[]> = {
     'Villa del Rosario',
   ],
   'Oriente': [
-    'Albán','Guaduero','Gualanday','Mansilla','Neiva','Puerto Salgar',
+    'Albán','Guaduero','Gualanday','Mansilla','Neiva','Puente Aranda',
     'Salgar','Villeta','Tocancipa','Sutamarchán',
   ],
   'Llanos': [
@@ -394,7 +394,7 @@ export const RESPONSABLES: { nombre: string; email: string; zona: string }[] = [
 
 /** Presupuesto 2026 por zona - según HR Base */
 export const PRESUPUESTO_ZONAS: CentroZona[] = [
-  { id: '1', nombre: 'Occidente',   totalEstaciones: 12, presupuestoAsignado: 107733333, presupuestoEjecutado: 0 },
+  { id: '1', nombre: 'Occidente',   totalEstaciones: 13, presupuestoAsignado: 107733333, presupuestoEjecutado: 0 },
   { id: '2', nombre: 'Oriente',     totalEstaciones: 10, presupuestoAsignado: 89777778,  presupuestoEjecutado: 0 },
   { id: '3', nombre: 'Centro',      totalEstaciones: 5,  presupuestoAsignado: 44888889,  presupuestoEjecutado: 0 },
   { id: '4', nombre: 'Llanos',      totalEstaciones: 5,  presupuestoAsignado: 44888889,  presupuestoEjecutado: 0 },
