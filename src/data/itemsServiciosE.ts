@@ -1,13 +1,15 @@
 import type { ItemLinea } from '../services/ItemsLineaService';
 
-export type ServicioEComplejidad = 'Alto' | 'Moderado' | 'Bajo';
+export type ServicioEComplejidad = 'Muy alto' | 'Alto' | 'Moderado';
 
-export const SERVICIO_E_COMPLEJIDADES: ServicioEComplejidad[] = ['Alto', 'Moderado', 'Bajo'];
+export const SERVICIO_E_COMPLEJIDADES: ServicioEComplejidad[] = ['Muy alto', 'Alto', 'Moderado'];
 
+// Los precios se mantienen por tramo; solo cambia la etiqueta mostrada
+// (antes: Alto / Moderado / Bajo).
 const SERVICIO_PRECIOS: Record<ServicioEComplejidad, number> = {
-  Alto: 21065640,
-  Moderado: 17944843,
-  Bajo: 12483384,
+  'Muy alto': 21065640,
+  Alto: 17944843,
+  Moderado: 12483384,
 };
 
 const SERVICIOS_E_ZONAS = ['NORTE', 'CENTRO', 'OCCIDENTE', 'LLANOS', 'ORIENTE', 'CLC', 'TRANSVERSAL'] as const;
@@ -107,7 +109,7 @@ export function getItemsServiciosEPorZona(
     const servicioPrecio = SERVICIO_PRECIOS[complejidad];
     const servicioPrecios = preciosMensuales(servicioPrecio);
     return {
-      id: `SERVE-SERVICIO-${complejidad.toUpperCase()}`,
+      id: `SERVE-SERVICIO-${complejidad.toUpperCase().replace(/\s+/g, '-')}`,
       lineaOperativa: 'Servicios E' as const,
       item: `Servicio ${complejidad}`,
       descripcion: `Servicio APPLUS - complejidad ${complejidad}`,
