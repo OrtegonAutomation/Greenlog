@@ -28,6 +28,7 @@ export const LINEAS_GESTION_AMBIENTAL: LineaOperativa[] = [
   'Pagos',
   'Servicios E',
   'Compensaciones provisiones',
+  'Hojas de Ruta Sostenibilidad Ambiental',
 ];
 
 export const LINEAS_COMPENSACIONES: LineaOperativa[] = [

@@ -86,6 +86,7 @@ export interface PlaneacionWizardResult {
   // Cambio 5: tipo muestra por param
   paramTipoMuestra?: Record<string, 'simple' | 'compuesto'>;
   paramCantCompuestos?: Record<string, number>;
+  paramPuntos?: Record<string, number>;
   // Cambio 4: IPC global
   ipcGlobalActivo?: boolean;
   ipcGlobalPorcentaje?: number;
@@ -165,6 +166,7 @@ export interface PlaneacionInitialData {
   customMonitoreoRows?: MonitoreoRow[];
   paramTipoMuestra?: Record<string, 'simple' | 'compuesto'>;
   paramCantCompuestos?: Record<string, number>;
+  paramPuntos?: Record<string, number>;
   ipcGlobalActivo?: boolean;
   ipcGlobalPorcentaje?: number;
   ipcMeses?: number[];
@@ -1317,6 +1319,8 @@ export const PlaneacionWizard: React.FC<Props> = ({
   // Cambio 5: Simple/Compuesto per parameter
   const [paramTipoMuestra, setParamTipoMuestra] = useState<Map<string, 'simple' | 'compuesto'>>(new Map());
   const [paramCantCompuestos, setParamCantCompuestos] = useState<Map<string, number>>(new Map());
+  // Puntos por parámetro: solo guarda overrides; el default es r.puntos (del Excel)
+  const [paramPuntos, setParamPuntos] = useState<Map<string, number>>(new Map());
   // Cambio 4: IPC global (uno solo para toda la planeación)
   const [ipcGlobalActivo, setIpcGlobalActivo] = useState<boolean>(false);
   const [ipcGlobalPorcentaje, setIpcGlobalPorcentaje] = useState<number>(0);
@@ -1504,6 +1508,9 @@ export const PlaneacionWizard: React.FC<Props> = ({
       setParamTipoMuestra(new Map(Object.entries(initialData.paramTipoMuestra ?? {})));
       setParamCantCompuestos(new Map(
         Object.entries(initialData.paramCantCompuestos ?? {}).map(([key, value]) => [key, Number(value) || 1])
+      ));
+      setParamPuntos(new Map(
+        Object.entries(initialData.paramPuntos ?? {}).map(([key, value]) => [key, Number(value) || 1])
       ));
       setMonthlyData(initialData.programacion ?? []);
       setIpcGlobalActivo(initialData.ipcGlobalActivo ?? false);
@@ -1791,14 +1798,16 @@ export const PlaneacionWizard: React.FC<Props> = ({
             matrizMap.set(r.matriz, arr);
           }
           for (const [matriz, rows] of matrizMap) {
-            // Precio matriz = Σ(precio_param × compuestos_param)
+            // Precio matriz = Σ(precio_param × compuestos_param × puntos_param)
             // compuestos_param = cantCompuestos si tipo=compuesto, sino 1 (simple)
+            // puntos_param = override del usuario o el valor del Excel (r.puntos)
             const matrizPrecio = rows.reduce((s, r) => {
               const key = paramKey(r);
               const precioParam = r.preciosMensuales?.[i] ?? r.chemilab;
               const compuestos = paramTipoMuestra.get(key) === 'compuesto'
                 ? (paramCantCompuestos.get(key) || 1) : 1;
-              return s + precioParam * compuestos;
+              const puntos = paramPuntos.get(key) ?? (r.puntos || 1);
+              return s + precioParam * compuestos * puntos;
             }, 0);
             list.push(buildEntry(`MATRIZ|${matriz}`, `${matriz} (${rows.length} params)`, matrizPrecio, i, existing, 1, true));
           }
@@ -1833,7 +1842,7 @@ export const PlaneacionWizard: React.FC<Props> = ({
         };
       });
     });
-  }, [step, paramTipoMuestra, paramCantCompuestos]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [step, paramTipoMuestra, paramCantCompuestos, paramPuntos]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Filtered params (monitoreos) ──
   const filteredParams = useMemo(() => {
@@ -2458,6 +2467,7 @@ export const PlaneacionWizard: React.FC<Props> = ({
         valorTotal,
         paramTipoMuestra: Object.fromEntries(paramTipoMuestra),
         paramCantCompuestos: Object.fromEntries(paramCantCompuestos),
+        paramPuntos: Object.fromEntries(paramPuntos),
         ipcGlobalActivo,
         ipcGlobalPorcentaje,
         ipcMeses: [...ipcMeses],
@@ -3515,6 +3525,7 @@ export const PlaneacionWizard: React.FC<Props> = ({
                             <th className={styles.paramTh}>Parámetro</th>
                             <th className={styles.paramTh}>Matriz</th>
                             <th className={styles.paramTh}>Precio</th>
+                            <th className={styles.paramTh}>Puntos</th>
                             <th className={styles.paramTh}>Tipo muestra</th>
                             <th className={styles.paramTh}>Compuestos</th>
                           </tr>
@@ -3556,6 +3567,16 @@ export const PlaneacionWizard: React.FC<Props> = ({
                                   />
                                 </td>
                                 <td className={styles.paramTd} onClick={e => e.stopPropagation()}>
+                                  <Input
+                                    type="number"
+                                    size="small"
+                                    min={1}
+                                    value={String(paramPuntos.get(key) ?? (r.puntos || 1))}
+                                    onChange={(_, d) => { const m = new Map(paramPuntos); m.set(key, Number(d.value) || 1); setParamPuntos(m); }}
+                                    style={{ width: '64px' }}
+                                  />
+                                </td>
+                                <td className={styles.paramTd} onClick={e => e.stopPropagation()}>
                                   <select
                                     value={paramTipoMuestra.get(key) || 'simple'}
                                     onChange={e => { const m = new Map(paramTipoMuestra); m.set(key, e.target.value as 'simple' | 'compuesto'); setParamTipoMuestra(m); }}
@@ -3582,7 +3603,7 @@ export const PlaneacionWizard: React.FC<Props> = ({
                           })}
                           {filteredParams.length === 0 && (
                             <tr>
-                              <td className={styles.paramTd} colSpan={tipoLugar === 'Zona' ? 7 : 6} style={{ textAlign: 'center', padding: '32px', color: tokens.colorNeutralForeground3 }}>
+                              <td className={styles.paramTd} colSpan={tipoLugar === 'Zona' ? 8 : 7} style={{ textAlign: 'center', padding: '32px', color: tokens.colorNeutralForeground3 }}>
                                 {selectedMatrices.size === 0
                                   ? 'Selecciona una o más matrices para ver y editar sus parámetros.'
                                   : 'No se encontraron parámetros para las matrices seleccionadas.'}
