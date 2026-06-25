@@ -215,11 +215,13 @@ const parseCOPInput = (value: string) => {
   const digits = value.replace(/\D/g, '');
   return digits ? Number(digits) : 0;
 };
+// Redondeo a 3 decimales para evitar artefactos de coma flotante en cantidades.
+const roundCant = (n: number) => Math.round((Number.isFinite(n) ? n : 0) * 1000) / 1000;
 // Cantidad con decimales: acepta coma o punto (ej. "0,08" o "0.08").
 const parseCantidad = (value: string) => {
   const clean = String(value).replace(/[^\d.,-]/g, '').replace(',', '.');
   const n = Number(clean);
-  return Number.isFinite(n) ? n : 0;
+  return Number.isFinite(n) ? roundCant(n) : 0;
 };
 
 // Input de cantidad que admite decimales con coma o punto sin pelear con el
@@ -229,10 +231,10 @@ const CantidadInput: React.FC<{
   onCommit: (n: number) => void;
   style?: React.CSSProperties;
 }> = ({ value, onCommit, style }) => {
-  const [txt, setTxt] = React.useState(value > 0 ? String(value) : '');
+  const [txt, setTxt] = React.useState(value > 0 ? String(roundCant(value)) : '');
   React.useEffect(() => {
     // Sincroniza solo cuando el cambio viene de afuera (no de lo que se está escribiendo).
-    if (parseCantidad(txt) !== value) setTxt(value > 0 ? String(value) : '');
+    if (parseCantidad(txt) !== roundCant(value)) setTxt(value > 0 ? String(roundCant(value)) : '');
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [value]);
   return (
@@ -1869,31 +1871,25 @@ export const PlaneacionWizard: React.FC<Props> = ({
             const base = isIcas ? (it.precioReferencia || TARIFA_ICAS) : (isPrecioPorMes ? 0 : ItemsLineaService.getPrecioEfectivo(it, i));
             if (isIcas && icasDesglosadoKeys.has(it.id)) {
               // ICAs desglosado: dos ítems programables (Consolidar 70% / Radicación 30%).
+              // Ambos arrancan en 0 (sin auto-distribución); el usuario digita cada mes.
               const pc = Math.max(0, Math.min(100, icasConsolidarPct)) / 100;
-              const prevSingle = existing?.preciosIndividuales?.find(p => p.key === it.id);
               const prevCons = existing?.preciosIndividuales?.find(p => p.key === `${it.id}::CONSOLIDAR`);
               const prevRad = existing?.preciosIndividuales?.find(p => p.key === `${it.id}::RADICACION`);
-              // Auto-distribución 1/12 SOLO en Consolidar (la primera vez que se desglosa).
-              // Radicación arranca en 0 para que el usuario la digite.
-              const primeraVez = !prevCons && !prevRad && !((prevSingle?.cantidad ?? 0) > 0);
-              const autoCant = Math.round((1 / 12) * 10000) / 10000; // 0.0833
               const eC = buildEntry(`${it.id}::CONSOLIDAR`, 'Consolidar información para ICAS', base * pc, i, existing, 1);
-              eC.cantidad = prevCons?.cantidad ?? (primeraVez ? autoCant : (prevSingle?.cantidad ?? 0));
+              eC.cantidad = prevCons?.cantidad ?? 0;
               eC.total = calculateEntryTotal(eC, i);
               const eR = buildEntry(`${it.id}::RADICACION`, 'Radicación información para ICAS', base * (1 - pc), i, existing, 1);
               eR.cantidad = prevRad?.cantidad ?? 0;
               eR.total = calculateEntryTotal(eR, i);
               list.push(eC, eR);
             } else {
-              // Al unir, el ítem único suma las proporciones de Consolidar y Radicación
-              // ponderadas por su % (para que el total mensual sea Consolidar + Radicación).
+              // Al unir, el ítem único SUMA las cantidades de Consolidar + Radicación (suma directa).
               const e = buildEntry(it.id, it.item, base, i, existing, 1);
               if (isIcas && !existing?.preciosIndividuales?.find(p => p.key === it.id)) {
                 const prevCons = existing?.preciosIndividuales?.find(p => p.key === `${it.id}::CONSOLIDAR`);
                 const prevRad = existing?.preciosIndividuales?.find(p => p.key === `${it.id}::RADICACION`);
                 if (prevCons || prevRad) {
-                  const pcU = Math.max(0, Math.min(100, icasConsolidarPct)) / 100;
-                  e.cantidad = pcU * (prevCons?.cantidad ?? 0) + (1 - pcU) * (prevRad?.cantidad ?? 0);
+                  e.cantidad = roundCant((prevCons?.cantidad ?? 0) + (prevRad?.cantidad ?? 0));
                   e.total = calculateEntryTotal(e, i);
                 }
               }
