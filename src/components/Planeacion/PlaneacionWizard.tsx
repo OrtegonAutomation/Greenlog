@@ -91,7 +91,7 @@ export interface PlaneacionWizardResult {
   paramCantCompuestos?: Record<string, number>;
   paramPuntos?: Record<string, number>;
   icasConsolidarPct?: number;
-  icasDesglosado?: boolean;
+  icasDesglosadoKeys?: string[];
   // Cambio 4: IPC global
   ipcGlobalActivo?: boolean;
   ipcGlobalPorcentaje?: number;
@@ -173,7 +173,7 @@ export interface PlaneacionInitialData {
   paramCantCompuestos?: Record<string, number>;
   paramPuntos?: Record<string, number>;
   icasConsolidarPct?: number;
-  icasDesglosado?: boolean;
+  icasDesglosadoKeys?: string[];
   ipcGlobalActivo?: boolean;
   ipcGlobalPorcentaje?: number;
   ipcMeses?: number[];
@@ -1363,7 +1363,8 @@ export const PlaneacionWizard: React.FC<Props> = ({
   // ICAs: desglose del ítem en Consolidar (%) y Radicación (100 - %). Default 70/30.
   const [icasConsolidarPct, setIcasConsolidarPct] = useState<number>(70);
   // ICAs: si está desglosado, el ítem se programa como DOS ítems (Consolidar / Elaborar y Radicar).
-  const [icasDesglosado, setIcasDesglosado] = useState<boolean>(false);
+  // Desglose por ítem: claves (id de ítem ICAs) que están desglosadas.
+  const [icasDesglosadoKeys, setIcasDesglosadoKeys] = useState<Set<string>>(new Set());
   // Cambio 4: IPC global (uno solo para toda la planeación)
   const [ipcGlobalActivo, setIpcGlobalActivo] = useState<boolean>(false);
   const [ipcGlobalPorcentaje, setIpcGlobalPorcentaje] = useState<number>(0);
@@ -1382,6 +1383,8 @@ export const PlaneacionWizard: React.FC<Props> = ({
   const [s3ParamPrecio, setS3ParamPrecio] = useState('');
   const [availableItems, setAvailableItems] = useState<ItemLinea[]>([]);
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
+  // Ítems/parámetros eliminados por el usuario (se ocultan aunque el efecto recargue desde el servicio).
+  const [deletedKeys, setDeletedKeys] = useState<Set<string>>(new Set());
   const [selectedLogistica, setSelectedLogistica] = useState<Set<string>>(new Set(ITEMS_LOGISTICA.map(it => it.id)));
   const [paramSearch, setParamSearch] = useState('');
   const [loading, setLoading] = useState(false);
@@ -1556,7 +1559,7 @@ export const PlaneacionWizard: React.FC<Props> = ({
         Object.entries(initialData.paramPuntos ?? {}).map(([key, value]) => [key, Number(value) || 1])
       ));
       if (typeof initialData.icasConsolidarPct === 'number') setIcasConsolidarPct(initialData.icasConsolidarPct);
-      setIcasDesglosado(!!initialData.icasDesglosado);
+      setIcasDesglosadoKeys(new Set(initialData.icasDesglosadoKeys ?? []));
       setMonthlyData(initialData.programacion ?? []);
       setIpcGlobalActivo(initialData.ipcGlobalActivo ?? false);
       setIpcGlobalPorcentaje(initialData.ipcGlobalPorcentaje ?? 0);
@@ -1606,6 +1609,8 @@ export const PlaneacionWizard: React.FC<Props> = ({
       setAvailableItems([]);
       setSelectedParams(new Set());
       setSelectedItems(new Set());
+      setDeletedKeys(new Set());
+      setIcasDesglosadoKeys(new Set());
       setSelectedLogistica(new Set(ITEMS_LOGISTICA.map(it => it.id)));
       setSelectedMatrices(new Set());
       setMatrizDetalleActiva(null);
@@ -1702,7 +1707,7 @@ export const PlaneacionWizard: React.FC<Props> = ({
       const customRows = customMonitoreoRows.filter(r =>
         r.zona === z && (tipoLugar === 'Zona' ? true : r.estacion === e)
       );
-      const rows = [...baseRows, ...customRows];
+      const rows = [...baseRows, ...customRows].filter(r => !deletedKeys.has(paramKey(r)));
       const mats = [...new Set(rows.map(r => r.matriz))].sort();
 
       setAvailableMatrices(mats);
@@ -1742,7 +1747,7 @@ export const PlaneacionWizard: React.FC<Props> = ({
       }
       setLoading(false);
     })();
-  }, [step, isMonitoreo, selectedZona, selectedEstacion, tipoLugar, customMonitoreoRows, paramKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [step, isMonitoreo, selectedZona, selectedEstacion, tipoLugar, customMonitoreoRows, paramKey, deletedKeys]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Load items when entering Parámetros step (non-monitoreos) ──
   useEffect(() => {
@@ -1780,6 +1785,8 @@ export const PlaneacionWizard: React.FC<Props> = ({
           return !c || c === contratoSeleccionado;
         });
       }
+      // Ocultar los ítems que el usuario eliminó (aunque vuelvan del servicio/catálogo).
+      merged = merged.filter(it => !deletedKeys.has(it.id));
 
       if (!cancelled) {
         setAvailableItems(merged);
@@ -1788,7 +1795,7 @@ export const PlaneacionWizard: React.FC<Props> = ({
     })();
 
     return () => { cancelled = true; };
-  }, [step, isMonitoreo, selectedLinea, customItemsMap, isCompensaciones, selectedZona, contratoSeleccionado]);
+  }, [step, isMonitoreo, selectedLinea, customItemsMap, isCompensaciones, selectedZona, contratoSeleccionado, deletedKeys]);
 
   // ── Build monthly data when entering Programación step ──
   useEffect(() => {
@@ -1860,7 +1867,7 @@ export const PlaneacionWizard: React.FC<Props> = ({
           for (const it of availableItems.filter(it => selectedItems.has(it.id))) {
             // ICAs: la tarifa es fija (no depende del catálogo). Otras líneas: precio efectivo.
             const base = isIcas ? TARIFA_ICAS : (isPrecioPorMes ? 0 : ItemsLineaService.getPrecioEfectivo(it, i));
-            if (isIcas && icasDesglosado) {
+            if (isIcas && icasDesglosadoKeys.has(it.id)) {
               // ICAs desglosado: dos ítems programables (Consolidar 70% / Radicación 30%).
               const pc = Math.max(0, Math.min(100, icasConsolidarPct)) / 100;
               const prevSingle = existing?.preciosIndividuales?.find(p => p.key === it.id);
@@ -1911,7 +1918,7 @@ export const PlaneacionWizard: React.FC<Props> = ({
         };
       });
     });
-  }, [step, paramTipoMuestra, paramCantCompuestos, paramPuntos, icasDesglosado, icasConsolidarPct]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [step, paramTipoMuestra, paramCantCompuestos, paramPuntos, icasDesglosadoKeys, icasConsolidarPct]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Filtered params (monitoreos) ──
   const filteredParams = useMemo(() => {
@@ -2464,7 +2471,7 @@ export const PlaneacionWizard: React.FC<Props> = ({
           if (excedeTope) return false;
           if (excedePagosDiferidos) return false;
           // ICAs: obligar a unir el desglose antes de completar (para la plantilla financiera/interna)
-          if (isIcas && icasDesglosado) return false;
+          if (isIcas && icasDesglosadoKeys.size > 0) return false;
           return true;
         }
         return false;
@@ -2540,7 +2547,7 @@ export const PlaneacionWizard: React.FC<Props> = ({
         paramCantCompuestos: Object.fromEntries(paramCantCompuestos),
         paramPuntos: Object.fromEntries(paramPuntos),
         icasConsolidarPct,
-        icasDesglosado,
+        icasDesglosadoKeys: [...icasDesglosadoKeys],
         ipcGlobalActivo,
         ipcGlobalPorcentaje,
         ipcMeses: [...ipcMeses],
@@ -2811,6 +2818,7 @@ export const PlaneacionWizard: React.FC<Props> = ({
       : `¿Eliminar "${item.item}" de esta planeación?`;
     if (typeof window !== 'undefined' && !window.confirm(msg)) return;
 
+    setDeletedKeys(prev => new Set(prev).add(item.id));
     setSelectedItems(prev => { const s = new Set(prev); s.delete(item.id); return s; });
     setAvailableItems(prev => prev.filter(it => it.id !== item.id));
     if (selectedLinea) {
@@ -2829,10 +2837,11 @@ export const PlaneacionWizard: React.FC<Props> = ({
   const handleDeleteParam = useCallback((r: MonitoreoRow) => {
     const key = paramKey(r);
     if (typeof window !== 'undefined' && !window.confirm(`¿Eliminar el parámetro "${r.parametro}" de esta planeación?`)) return;
+    setDeletedKeys(prev => new Set(prev).add(key));
     setSelectedParams(prev => { const s = new Set(prev); s.delete(key); return s; });
     setAvailableParams(prev => prev.filter(p => paramKey(p) !== key));
     setCustomMonitoreoRows(prev => prev.filter(p => paramKey(p) !== key));
-  }, [paramKey, selectedZona]);
+  }, [paramKey]);
 
   // ── Grupo de líneas por categoría ──
   const lineasPorCategoria = useMemo(() => {
@@ -4448,14 +4457,14 @@ export const PlaneacionWizard: React.FC<Props> = ({
 
                             {isIcas && !item.key.includes('::') && (
                               <Button size="small" appearance="primary" icon={<EditRegular />}
-                                onClick={() => setIcasDesglosado(true)}
+                                onClick={() => setIcasDesglosadoKeys(prev => new Set(prev).add(item.key))}
                                 style={{ borderRadius: '8px', alignSelf: 'flex-start', background: CENIT_COLORS.blueBrand }}>
                                 Abrir desglose (2 ítems)
                               </Button>
                             )}
                             {isIcas && item.key.endsWith('::CONSOLIDAR') && (
                               <Button size="small" appearance="subtle" icon={<DismissRegular />}
-                                onClick={() => setIcasDesglosado(false)}
+                                onClick={() => setIcasDesglosadoKeys(prev => { const s = new Set(prev); s.delete(item.key.split('::')[0]); return s; })}
                                 style={{ borderRadius: '8px', alignSelf: 'flex-start' }}>
                                 Unir en un ítem
                               </Button>
@@ -4641,14 +4650,14 @@ export const PlaneacionWizard: React.FC<Props> = ({
                               </div>
                               {isIcas && !item.key.includes('::') && (
                                 <Button size="small" appearance="primary" icon={<EditRegular />}
-                                  onClick={() => setIcasDesglosado(true)}
+                                  onClick={() => setIcasDesglosadoKeys(prev => new Set(prev).add(item.key))}
                                   style={{ marginBottom: '4px', borderRadius: '8px', background: CENIT_COLORS.blueBrand }}>
                                   Abrir desglose (2 ítems)
                                 </Button>
                               )}
                               {isIcas && item.key.endsWith('::CONSOLIDAR') && (
                                 <Button size="small" appearance="subtle" icon={<DismissRegular />}
-                                  onClick={() => setIcasDesglosado(false)}
+                                  onClick={() => setIcasDesglosadoKeys(prev => { const s = new Set(prev); s.delete(item.key.split('::')[0]); return s; })}
                                   style={{ marginBottom: '4px', borderRadius: '8px' }}>
                                   Unir en un ítem
                                 </Button>
@@ -4820,7 +4829,7 @@ export const PlaneacionWizard: React.FC<Props> = ({
           {/* Footer */}
           <div className={styles.wizardFooter}>
             <div className={styles.footerTotals}>
-              {step === STEP_PROGRAMACION && isIcas && icasDesglosado && (
+              {step === STEP_PROGRAMACION && isIcas && icasDesglosadoKeys.size > 0 && (
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#a4262c', fontWeight: 600, fontSize: '12px', marginRight: '8px' }}>
                   ⚠️ Une los ítems de ICAs ("Unir en un ítem") para poder completar.
                 </div>
