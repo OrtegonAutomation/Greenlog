@@ -28,7 +28,7 @@ import { CatalogoItemsGlobalService } from '../../services/CatalogoItemsGlobalSe
 import { useAuth } from '../../auth/AuthContext';
 import { DEPARTAMENTOS_MUNICIPIOS, DEPARTAMENTOS_LIST } from '../../data/jurisdiccionesCompensaciones';
 import type { ServicioEComplejidad } from '../../data/itemsServiciosE';
-import { TARIFA_ICAS } from '../../data/itemsIcas';
+import { TARIFA_ICAS, ICAS_CONSOLIDAR_2026 } from '../../data/itemsIcas';
 import { CENIT_COLORS } from '../../theme/cenitTheme';
 import { MEDIA, useResponsive } from '../../hooks/useResponsive';
 import {
@@ -1870,15 +1870,17 @@ export const PlaneacionWizard: React.FC<Props> = ({
             // ICAs: tarifa por ítem según el año (2026/2027). Otras líneas: precio efectivo.
             const base = isIcas ? (it.precioReferencia || TARIFA_ICAS) : (isPrecioPorMes ? 0 : ItemsLineaService.getPrecioEfectivo(it, i));
             if (isIcas && icasDesglosadoKeys.has(it.id)) {
-              // ICAs desglosado: dos ítems programables (Consolidar 70% / Radicación 30%).
+              // ICAs desglosado (2026): Consolidar valor fijo; Radicación se mantiene en 30%.
               // Ambos arrancan en 0 (sin auto-distribución); el usuario digita cada mes.
               const pc = Math.max(0, Math.min(100, icasConsolidarPct)) / 100;
+              const consPrecio = ICAS_CONSOLIDAR_2026;
+              const radPrecio = base * (1 - pc);
               const prevCons = existing?.preciosIndividuales?.find(p => p.key === `${it.id}::CONSOLIDAR`);
               const prevRad = existing?.preciosIndividuales?.find(p => p.key === `${it.id}::RADICACION`);
-              const eC = buildEntry(`${it.id}::CONSOLIDAR`, 'Consolidar información para ICAS', base * pc, i, existing, 1);
+              const eC = buildEntry(`${it.id}::CONSOLIDAR`, 'Consolidar información para ICAS', consPrecio, i, existing, 1);
               eC.cantidad = prevCons?.cantidad ?? 0;
               eC.total = calculateEntryTotal(eC, i);
-              const eR = buildEntry(`${it.id}::RADICACION`, 'Radicación información para ICAS', base * (1 - pc), i, existing, 1);
+              const eR = buildEntry(`${it.id}::RADICACION`, 'Radicación información para ICAS', radPrecio, i, existing, 1);
               eR.cantidad = prevRad?.cantidad ?? 0;
               eR.total = calculateEntryTotal(eR, i);
               list.push(eC, eR);

@@ -11,6 +11,9 @@ export const TARIFA_ICAS_2027 = 49832607;
 // Compat: la tarifa por defecto (2026) usada por código previo.
 export const TARIFA_ICAS = TARIFA_ICAS_2026;
 
+// Desglose 2026: valor fijo de Consolidar. Radicación se mantiene en 30% de la tarifa.
+export const ICAS_CONSOLIDAR_2026 = 23842915;
+
 export const ITEMS_ICAS: ItemLinea[] = [
   {
     id: 'ICA-2026-1',
