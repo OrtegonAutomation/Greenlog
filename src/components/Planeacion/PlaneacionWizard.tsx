@@ -1328,8 +1328,8 @@ export const PlaneacionWizard: React.FC<Props> = ({
   const [paramCantCompuestos, setParamCantCompuestos] = useState<Map<string, number>>(new Map());
   // Puntos por parámetro: solo guarda overrides; el default es r.puntos (del Excel)
   const [paramPuntos, setParamPuntos] = useState<Map<string, number>>(new Map());
-  // ICAs: desglose del ítem en Consolidar (%) y Elaborar y Radicar (100 - %). Default 30/70.
-  const [icasConsolidarPct, setIcasConsolidarPct] = useState<number>(30);
+  // ICAs: desglose del ítem en Consolidar (%) y Radicación (100 - %). Default 70/30.
+  const [icasConsolidarPct, setIcasConsolidarPct] = useState<number>(70);
   // ICAs: si está desglosado, el ítem se programa como DOS ítems (Consolidar / Elaborar y Radicar).
   const [icasDesglosado, setIcasDesglosado] = useState<boolean>(false);
   // Cambio 4: IPC global (uno solo para toda la planeación)
@@ -1829,12 +1829,27 @@ export const PlaneacionWizard: React.FC<Props> = ({
             // Sin precio de referencia: cada mes arranca en 0 y se digita.
             const base = isPrecioPorMes ? 0 : ItemsLineaService.getPrecioEfectivo(it, i);
             if (isIcas && icasDesglosado) {
-              // ICAs desglosado: dos ítems programables (Consolidar / Elaborar y Radicar).
+              // ICAs desglosado: dos ítems programables (Consolidar 70% / Radicación 30%).
+              // La cantidad por mes se hereda del ítem único (auto-distribución en proporciones).
               const pc = Math.max(0, Math.min(100, icasConsolidarPct)) / 100;
-              list.push(buildEntry(`${it.id}::CONSOLIDAR`, 'Consolidar información para ICAS', base * pc, i, existing, 1));
-              list.push(buildEntry(`${it.id}::ELABORAR`, 'Elaborar y Radicar información para ICAS', base * (1 - pc), i, existing, 1));
+              const prevSingle = existing?.preciosIndividuales?.find(p => p.key === it.id);
+              const prevCons = existing?.preciosIndividuales?.find(p => p.key === `${it.id}::CONSOLIDAR`);
+              const prevRad = existing?.preciosIndividuales?.find(p => p.key === `${it.id}::RADICACION`);
+              const eC = buildEntry(`${it.id}::CONSOLIDAR`, 'Consolidar información para ICAS', base * pc, i, existing, 1);
+              eC.cantidad = prevCons?.cantidad ?? prevSingle?.cantidad ?? 0;
+              eC.total = calculateEntryTotal(eC, i);
+              const eR = buildEntry(`${it.id}::RADICACION`, 'Radicación información para ICAS', base * (1 - pc), i, existing, 1);
+              eR.cantidad = prevRad?.cantidad ?? prevSingle?.cantidad ?? 0;
+              eR.total = calculateEntryTotal(eR, i);
+              list.push(eC, eR);
             } else {
-              list.push(buildEntry(it.id, it.item, base, i, existing, 1));
+              // Al unir, el ítem único hereda la cantidad del desglose (suma de proporciones).
+              const e = buildEntry(it.id, it.item, base, i, existing, 1);
+              if (isIcas && !existing?.preciosIndividuales?.find(p => p.key === it.id)) {
+                const prevCons = existing?.preciosIndividuales?.find(p => p.key === `${it.id}::CONSOLIDAR`);
+                if (prevCons) { e.cantidad = prevCons.cantidad; e.total = calculateEntryTotal(e, i); }
+              }
+              list.push(e);
             }
           }
         }
@@ -2414,6 +2429,8 @@ export const PlaneacionWizard: React.FC<Props> = ({
           // Compensaciones: bloquear si excede el saldo asignado (validación final)
           if (excedeTope) return false;
           if (excedePagosDiferidos) return false;
+          // ICAs: obligar a unir el desglose antes de completar (para la plantilla financiera/interna)
+          if (isIcas && icasDesglosado) return false;
           return true;
         }
         return false;
@@ -4775,6 +4792,11 @@ export const PlaneacionWizard: React.FC<Props> = ({
           {/* Footer */}
           <div className={styles.wizardFooter}>
             <div className={styles.footerTotals}>
+              {step === STEP_PROGRAMACION && isIcas && icasDesglosado && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#a4262c', fontWeight: 600, fontSize: '12px', marginRight: '8px' }}>
+                  ⚠️ Une los ítems de ICAs ("Unir en un ítem") para poder completar.
+                </div>
+              )}
               {step === STEP_PROGRAMACION && (
                 <>
                   <div className={styles.footerTotal}>

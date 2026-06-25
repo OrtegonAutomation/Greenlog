@@ -1,15 +1,20 @@
 import type { ItemLinea } from '../services/ItemsLineaService';
 
-// ICAs maneja un único ítem. El precio se digita por mes en el wizard
-// (la línea funciona como Pagos y Publicaciones), por eso no hay precio
-// de referencia ni desglose por estación/zona.
+// Tarifa única de ICAs (todas las zonas, por ahora).
+export const TARIFA_ICAS = 49423961;
+// Reparto del desglose: Consolidar 70% / Radicación 30%.
+export const ICAS_CONSOLIDAR_PCT = 70;
+
+// ICAs maneja un único ítem con su tarifa de referencia. En el paso de
+// programación se puede "abrir el desglose" en Consolidar (70%) y Radicación
+// (30%); antes de completar la planeación deben volverse a unir en un ítem.
 const ITEM_ICAS_UNICO: ItemLinea = {
   id: 'ICAS-UNICO',
   lineaOperativa: 'ICAs',
-  item: 'Consolidar, Elaborar y Radicar información para ICAS',
+  item: 'Consolidar y Radicar información para ICAS',
   descripcion: '',
   unidad: 'Global',
-  precioReferencia: 0,
+  precioReferencia: TARIFA_ICAS,
   cuentaContable: '7407020251',
 };
 
