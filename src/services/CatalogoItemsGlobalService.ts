@@ -133,4 +133,27 @@ export const CatalogoItemsGlobalService = {
     if (error) throw error;
     return mapRowToItem(data as CatalogoItemRow);
   },
+
+  /**
+   * Soft-delete: marca el ítem del catálogo como inactivo (activo=false) para
+   * que deje de aparecer en getItems. `itemKey` es el id lógico (item_key).
+   */
+  async deleteItem(itemKey: string, context: CatalogoItemContext = {}): Promise<boolean> {
+    if (!isSupabaseEnabled()) return false;
+
+    const supabase = getSupabaseClient();
+    const { data: sessionData } = await supabase.auth.getSession();
+    const email = sessionData.session?.user.email?.toLowerCase() ?? null;
+
+    let query = supabase
+      .from(TABLE)
+      .update({ activo: false, actualizado_por_email: email })
+      .eq('item_key', itemKey);
+
+    if (context.zona) query = query.eq('zona_scope', normalizeZonaScope(context.zona));
+
+    const { error } = await query;
+    if (error) throw error;
+    return true;
+  },
 };

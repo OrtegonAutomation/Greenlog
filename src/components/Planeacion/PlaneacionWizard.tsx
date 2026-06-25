@@ -8,7 +8,7 @@ import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import {
   makeStyles, shorthands, tokens, mergeClasses,
   Title2, Title3, Body1, Body2, Caption1,
-  Button, Input, Checkbox, Spinner, Portal,
+  Button, Input, Checkbox, Spinner, Portal, Tooltip,
   Popover, PopoverTrigger, PopoverSurface,
   Combobox, Option,
 } from '@fluentui/react-components';
@@ -20,10 +20,12 @@ import {
   SearchRegular,
   EditRegular,
   AddRegular,
+  DeleteRegular,
 } from '@fluentui/react-icons';
 import { MonitoreosMatrizService, MonitoreoRow } from '../../services/MonitoreosMatrizService';
 import { ItemsLineaService, ItemLinea, ITEMS_LOGISTICA } from '../../services/ItemsLineaService';
 import { CatalogoItemsGlobalService } from '../../services/CatalogoItemsGlobalService';
+import { useAuth } from '../../auth/AuthContext';
 import { DEPARTAMENTOS_MUNICIPIOS, DEPARTAMENTOS_LIST } from '../../data/jurisdiccionesCompensaciones';
 import type { ServicioEComplejidad } from '../../data/itemsServiciosE';
 import { CENIT_COLORS } from '../../theme/cenitTheme';
@@ -87,6 +89,7 @@ export interface PlaneacionWizardResult {
   paramTipoMuestra?: Record<string, 'simple' | 'compuesto'>;
   paramCantCompuestos?: Record<string, number>;
   paramPuntos?: Record<string, number>;
+  icasConsolidarPct?: number;
   // Cambio 4: IPC global
   ipcGlobalActivo?: boolean;
   ipcGlobalPorcentaje?: number;
@@ -167,6 +170,7 @@ export interface PlaneacionInitialData {
   paramTipoMuestra?: Record<string, 'simple' | 'compuesto'>;
   paramCantCompuestos?: Record<string, number>;
   paramPuntos?: Record<string, number>;
+  icasConsolidarPct?: number;
   ipcGlobalActivo?: boolean;
   ipcGlobalPorcentaje?: number;
   ipcMeses?: number[];
@@ -1254,6 +1258,7 @@ export const PlaneacionWizard: React.FC<Props> = ({
 }) => {
   const styles = useStyles();
   const { isMobile } = useResponsive();
+  const { isAdmin } = useAuth();
 
   // ── State ──
   const [step, setStep] = useState(0);
@@ -1321,6 +1326,8 @@ export const PlaneacionWizard: React.FC<Props> = ({
   const [paramCantCompuestos, setParamCantCompuestos] = useState<Map<string, number>>(new Map());
   // Puntos por parámetro: solo guarda overrides; el default es r.puntos (del Excel)
   const [paramPuntos, setParamPuntos] = useState<Map<string, number>>(new Map());
+  // ICAs: desglose del ítem en Consolidar (%) y Elaborar y Radicar (100 - %). Default 30/70.
+  const [icasConsolidarPct, setIcasConsolidarPct] = useState<number>(30);
   // Cambio 4: IPC global (uno solo para toda la planeación)
   const [ipcGlobalActivo, setIpcGlobalActivo] = useState<boolean>(false);
   const [ipcGlobalPorcentaje, setIpcGlobalPorcentaje] = useState<number>(0);
@@ -1408,10 +1415,10 @@ export const PlaneacionWizard: React.FC<Props> = ({
   const isEstudiosAmbientales = selectedLinea?.value === 'Estudios Ambientales';
   const isServiciosE = selectedLinea?.value === 'Servicios E';
   // Líneas donde el usuario digita el precio directamente por mes
-  // (sin precio de referencia ni cantidad): Pagos, ICAs y Compensaciones provisiones.
+  // (sin precio de referencia ni cantidad): Pagos y Compensaciones provisiones.
+  // ICAs vuelve a precio de referencia + cantidad por mes (ver desglose Consolidar/Elaborar).
   const isPagos = selectedLinea?.value === 'Pagos';
-  const isPrecioPorMes = isPagos || isIcas || isCompensacionesProvisiones;
-  // ICAs pasa a captura por mes como Pagos; el diferido queda solo para Estudios.
+  const isPrecioPorMes = isPagos || isCompensacionesProvisiones;
   const isPagosDiferidosDisponible = isEstudiosAmbientales;
   const tiposLugarDisponibles = useMemo(
     () => isServiciosE
@@ -1512,6 +1519,7 @@ export const PlaneacionWizard: React.FC<Props> = ({
       setParamPuntos(new Map(
         Object.entries(initialData.paramPuntos ?? {}).map(([key, value]) => [key, Number(value) || 1])
       ));
+      if (typeof initialData.icasConsolidarPct === 'number') setIcasConsolidarPct(initialData.icasConsolidarPct);
       setMonthlyData(initialData.programacion ?? []);
       setIpcGlobalActivo(initialData.ipcGlobalActivo ?? false);
       setIpcGlobalPorcentaje(initialData.ipcGlobalPorcentaje ?? 0);
@@ -2468,6 +2476,7 @@ export const PlaneacionWizard: React.FC<Props> = ({
         paramTipoMuestra: Object.fromEntries(paramTipoMuestra),
         paramCantCompuestos: Object.fromEntries(paramCantCompuestos),
         paramPuntos: Object.fromEntries(paramPuntos),
+        icasConsolidarPct,
         ipcGlobalActivo,
         ipcGlobalPorcentaje,
         ipcMeses: [...ipcMeses],
@@ -2729,6 +2738,37 @@ export const PlaneacionWizard: React.FC<Props> = ({
     setS3Nombre('');
     setS3Precio('');
   }, [persistCatalogItem, s3Nombre, s3Unidad, s3Precio, selectedLinea]);
+
+  // ── Eliminar ítem (no solo deseleccionar). Admin puede borrar del catálogo global. ──
+  const handleDeleteItem = useCallback((item: ItemLinea) => {
+    const esCatalogo = item.catalogSource === 'global';
+    const msg = esCatalogo
+      ? `¿Eliminar "${item.item}" del catálogo? Dejará de aparecer en nuevas planeaciones.`
+      : `¿Eliminar "${item.item}" de esta planeación?`;
+    if (typeof window !== 'undefined' && !window.confirm(msg)) return;
+
+    setSelectedItems(prev => { const s = new Set(prev); s.delete(item.id); return s; });
+    setAvailableItems(prev => prev.filter(it => it.id !== item.id));
+    if (selectedLinea) {
+      setCustomItemsMap(prev => ({
+        ...prev,
+        [selectedLinea.value]: (prev[selectedLinea.value] ?? []).filter(it => it.id !== item.id),
+      }));
+    }
+    if (esCatalogo && isAdmin) {
+      void CatalogoItemsGlobalService.deleteItem(item.id, { zona: selectedZona ?? undefined })
+        .catch(err => console.warn('No se pudo eliminar del catálogo global.', err));
+    }
+  }, [isAdmin, selectedLinea, selectedZona]);
+
+  // ── Eliminar parámetro de monitoreo (no solo deseleccionar) ──
+  const handleDeleteParam = useCallback((r: MonitoreoRow) => {
+    const key = paramKey(r);
+    if (typeof window !== 'undefined' && !window.confirm(`¿Eliminar el parámetro "${r.parametro}" de esta planeación?`)) return;
+    setSelectedParams(prev => { const s = new Set(prev); s.delete(key); return s; });
+    setAvailableParams(prev => prev.filter(p => paramKey(p) !== key));
+    setCustomMonitoreoRows(prev => prev.filter(p => paramKey(p) !== key));
+  }, [paramKey, selectedZona]);
 
   // ── Grupo de líneas por categoría ──
   const lineasPorCategoria = useMemo(() => {
@@ -3528,6 +3568,7 @@ export const PlaneacionWizard: React.FC<Props> = ({
                             <th className={styles.paramTh}>Puntos</th>
                             <th className={styles.paramTh}>Tipo muestra</th>
                             <th className={styles.paramTh}>Compuestos</th>
+                            <th className={styles.paramTh} style={{ width: '40px' }}></th>
                           </tr>
                         </thead>
                         <tbody>
@@ -3598,12 +3639,17 @@ export const PlaneacionWizard: React.FC<Props> = ({
                                     />
                                   )}
                                 </td>
+                                <td className={styles.paramTd} onClick={e => e.stopPropagation()}>
+                                  <Tooltip content="Eliminar parámetro" relationship="label">
+                                    <Button size="small" appearance="subtle" icon={<DeleteRegular />} onClick={() => handleDeleteParam(r)} aria-label="Eliminar parámetro" />
+                                  </Tooltip>
+                                </td>
                               </tr>
                             );
                           })}
                           {filteredParams.length === 0 && (
                             <tr>
-                              <td className={styles.paramTd} colSpan={tipoLugar === 'Zona' ? 8 : 7} style={{ textAlign: 'center', padding: '32px', color: tokens.colorNeutralForeground3 }}>
+                              <td className={styles.paramTd} colSpan={tipoLugar === 'Zona' ? 9 : 8} style={{ textAlign: 'center', padding: '32px', color: tokens.colorNeutralForeground3 }}>
                                 {selectedMatrices.size === 0
                                   ? 'Selecciona una o más matrices para ver y editar sus parámetros.'
                                   : 'No se encontraron parámetros para las matrices seleccionadas.'}
@@ -3717,6 +3763,7 @@ export const PlaneacionWizard: React.FC<Props> = ({
                           {!isIcas && <th className={styles.paramTh}>Descripción</th>}
                           <th className={styles.paramTh}>Unidad</th>
                           {!isPrecioPorMes && <th className={styles.paramTh}>Precio Ref.</th>}
+                          <th className={styles.paramTh} style={{ width: '40px' }}></th>
                         </tr>
                       </thead>
                       <tbody>
@@ -3741,12 +3788,17 @@ export const PlaneacionWizard: React.FC<Props> = ({
                               )}
                               <td className={styles.paramTd}>{it.unidad}</td>
                               {!isPrecioPorMes && <td className={styles.paramTd} style={{ fontWeight: '600' }}>{fmtCOP(it.precioReferencia)}</td>}
+                              <td className={styles.paramTd} onClick={e => e.stopPropagation()}>
+                                <Tooltip content={it.catalogSource === 'global' ? (isAdmin ? 'Eliminar del catálogo' : 'Quitar de la planeación') : 'Eliminar ítem'} relationship="label">
+                                  <Button size="small" appearance="subtle" icon={<DeleteRegular />} onClick={() => handleDeleteItem(it)} aria-label="Eliminar ítem" />
+                                </Tooltip>
+                              </td>
                             </tr>
                           );
                         })}
                         {filteredItems.length === 0 && (
                           <tr>
-                            <td className={styles.paramTd} colSpan={(isIcas ? 4 : 5) - (isPrecioPorMes ? 1 : 0)} style={{ textAlign: 'center', padding: '32px', color: tokens.colorNeutralForeground3 }}>
+                            <td className={styles.paramTd} colSpan={(isIcas ? 5 : 6) - (isPrecioPorMes ? 1 : 0)} style={{ textAlign: 'center', padding: '32px', color: tokens.colorNeutralForeground3 }}>
                               {isCompensacionesProvisiones
                                 ? 'Agrega ítems manualmente para esta provisión.'
                                 : `No se encontraron ítems para ${selectedLinea?.label}`}
@@ -4330,6 +4382,32 @@ export const PlaneacionWizard: React.FC<Props> = ({
                               </div>
                             )}
 
+                            {isIcas && (
+                              <Popover withArrow positioning="below-start">
+                                <PopoverTrigger disableButtonEnhancement>
+                                  <Button size="small" appearance="secondary" icon={<EditRegular />} style={{ borderRadius: '8px', alignSelf: 'flex-start' }}>
+                                    Abrir desglose
+                                  </Button>
+                                </PopoverTrigger>
+                                <PopoverSurface style={{ padding: '14px', minWidth: '260px', maxWidth: '92vw', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                  <Title3 style={{ fontSize: '13px', color: '#003057' }}>Desglose ICAS</Title3>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <Caption1 style={{ flex: 1 }}>Consolidar</Caption1>
+                                    <Input type="number" size="small" min={0} max={100} value={String(icasConsolidarPct)}
+                                      onChange={(_, d) => { const v = Math.max(0, Math.min(100, Number(d.value) || 0)); setIcasConsolidarPct(v); }}
+                                      style={{ width: '60px' }} />
+                                    <span style={{ fontWeight: 700, color: '#003057', fontSize: '12px' }}>{fmtCOP(rowTotal * icasConsolidarPct / 100)}</span>
+                                  </div>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <Caption1 style={{ flex: 1 }}>Elaborar y Radicar</Caption1>
+                                    <Input type="number" size="small" value={String(100 - icasConsolidarPct)} disabled style={{ width: '60px' }} />
+                                    <span style={{ fontWeight: 700, color: CENIT_COLORS.greenDark, fontSize: '12px' }}>{fmtCOP(rowTotal * (100 - icasConsolidarPct) / 100)}</span>
+                                  </div>
+                                  <Caption1 style={{ color: tokens.colorNeutralForeground3 }}>Total ítem: {fmtCOP(rowTotal)}</Caption1>
+                                </PopoverSurface>
+                              </Popover>
+                            )}
+
                             {ivaGlobalActivo && ivaGlobalPorcentaje > 0 && (
                               <Checkbox
                                 label={`IVA +${ivaGlobalPorcentaje}%`}
@@ -4511,6 +4589,42 @@ export const PlaneacionWizard: React.FC<Props> = ({
                                 {isLog && <span style={{ marginRight: '4px', fontSize: '10px' }}>🚐</span>}
                                 {item.nombre}
                               </div>
+                              {isIcas && (
+                                <Popover withArrow positioning="below-start">
+                                  <PopoverTrigger disableButtonEnhancement>
+                                    <Button size="small" appearance="secondary" icon={<EditRegular />} style={{ marginBottom: '4px', borderRadius: '8px' }}>
+                                      Abrir desglose
+                                    </Button>
+                                  </PopoverTrigger>
+                                  <PopoverSurface style={{ padding: '16px', minWidth: '300px', maxWidth: '92vw', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                                    <Title3 style={{ fontSize: '14px', color: '#003057' }}>Desglose ICAS — {item.nombre}</Title3>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                      <Caption1 style={{ flex: 1 }}>Consolidar</Caption1>
+                                      <Input
+                                        type="number" size="small" min={0} max={100}
+                                        value={String(icasConsolidarPct)}
+                                        onChange={(_, d) => { const v = Math.max(0, Math.min(100, Number(d.value) || 0)); setIcasConsolidarPct(v); }}
+                                        style={{ width: '64px' }}
+                                      />
+                                      <Caption1 style={{ width: '14px' }}>%</Caption1>
+                                      <span style={{ fontWeight: 700, color: '#003057', fontSize: '12px', minWidth: '92px', textAlign: 'right' }}>
+                                        {fmtCOP(rowTotal * icasConsolidarPct / 100)}
+                                      </span>
+                                    </div>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                      <Caption1 style={{ flex: 1 }}>Elaborar y Radicar</Caption1>
+                                      <Input type="number" size="small" value={String(100 - icasConsolidarPct)} disabled style={{ width: '64px' }} />
+                                      <Caption1 style={{ width: '14px' }}>%</Caption1>
+                                      <span style={{ fontWeight: 700, color: CENIT_COLORS.greenDark, fontSize: '12px', minWidth: '92px', textAlign: 'right' }}>
+                                        {fmtCOP(rowTotal * (100 - icasConsolidarPct) / 100)}
+                                      </span>
+                                    </div>
+                                    <Caption1 style={{ color: tokens.colorNeutralForeground3 }}>
+                                      Total ítem: {fmtCOP(rowTotal)} · El desglose reparte el valor anual del ítem.
+                                    </Caption1>
+                                  </PopoverSurface>
+                                </Popover>
+                              )}
                               {!isPrecioPorMes && (
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                                   <Caption1 style={{ color: tokens.colorNeutralForeground3, fontSize: '10px', whiteSpace: 'nowrap' }}>$/u:</Caption1>
