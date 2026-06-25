@@ -1865,8 +1865,8 @@ export const PlaneacionWizard: React.FC<Props> = ({
           }
         } else {
           for (const it of availableItems.filter(it => selectedItems.has(it.id))) {
-            // ICAs: la tarifa es fija (no depende del catálogo). Otras líneas: precio efectivo.
-            const base = isIcas ? TARIFA_ICAS : (isPrecioPorMes ? 0 : ItemsLineaService.getPrecioEfectivo(it, i));
+            // ICAs: tarifa por ítem según el año (2026/2027). Otras líneas: precio efectivo.
+            const base = isIcas ? (it.precioReferencia || TARIFA_ICAS) : (isPrecioPorMes ? 0 : ItemsLineaService.getPrecioEfectivo(it, i));
             if (isIcas && icasDesglosadoKeys.has(it.id)) {
               // ICAs desglosado: dos ítems programables (Consolidar 70% / Radicación 30%).
               const pc = Math.max(0, Math.min(100, icasConsolidarPct)) / 100;
@@ -1958,9 +1958,9 @@ export const PlaneacionWizard: React.FC<Props> = ({
     const q = paramSearch.toLowerCase();
     return availableItems.filter(it =>
       it.item.toLowerCase().includes(q) ||
-      (!isIcas && it.descripcion.toLowerCase().includes(q))
+      it.descripcion.toLowerCase().includes(q)
     );
-  }, [availableItems, paramSearch, isIcas]);
+  }, [availableItems, paramSearch]);
 
   const totalSelectedCount = isMonitoreo
     ? selectedParams.size
@@ -3833,7 +3833,7 @@ export const PlaneacionWizard: React.FC<Props> = ({
                             />
                           </th>
                           <th className={styles.paramTh}>Ítem</th>
-                          {!isIcas && <th className={styles.paramTh}>Descripción</th>}
+                          <th className={styles.paramTh}>{isIcas ? 'Expediente / Año' : 'Descripción'}</th>
                           <th className={styles.paramTh}>Unidad</th>
                           {!isPrecioPorMes && <th className={styles.paramTh}>Precio Ref.</th>}
                           <th className={styles.paramTh} style={{ width: '40px' }}></th>
@@ -3852,15 +3852,13 @@ export const PlaneacionWizard: React.FC<Props> = ({
                                 <Checkbox checked={sel} onChange={() => toggleItem(it)} />
                               </td>
                               <td className={styles.paramTd} style={{ fontWeight: '600' }}>{it.item}</td>
-                              {!isIcas && (
-                                <td className={styles.paramTd} style={{ maxWidth: '260px' }}>
-                                  <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                    {it.descripcion}
-                                  </div>
-                                </td>
-                              )}
+                              <td className={styles.paramTd} style={{ maxWidth: '260px' }}>
+                                <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                  {it.descripcion}
+                                </div>
+                              </td>
                               <td className={styles.paramTd}>{it.unidad}</td>
-                              {!isPrecioPorMes && <td className={styles.paramTd} style={{ fontWeight: '600' }}>{fmtCOP(isIcas ? TARIFA_ICAS : it.precioReferencia)}</td>}
+                              {!isPrecioPorMes && <td className={styles.paramTd} style={{ fontWeight: '600' }}>{fmtCOP(it.precioReferencia)}</td>}
                               <td className={styles.paramTd} onClick={e => e.stopPropagation()}>
                                 <Tooltip content={it.catalogSource === 'global' ? (isAdmin ? 'Eliminar del catálogo' : 'Quitar de la planeación') : 'Eliminar ítem'} relationship="label">
                                   <Button size="small" appearance="subtle" icon={<DeleteRegular />} onClick={() => handleDeleteItem(it)} aria-label="Eliminar ítem" />
@@ -3871,7 +3869,7 @@ export const PlaneacionWizard: React.FC<Props> = ({
                         })}
                         {filteredItems.length === 0 && (
                           <tr>
-                            <td className={styles.paramTd} colSpan={(isIcas ? 5 : 6) - (isPrecioPorMes ? 1 : 0)} style={{ textAlign: 'center', padding: '32px', color: tokens.colorNeutralForeground3 }}>
+                            <td className={styles.paramTd} colSpan={6 - (isPrecioPorMes ? 1 : 0)} style={{ textAlign: 'center', padding: '32px', color: tokens.colorNeutralForeground3 }}>
                               {isCompensacionesProvisiones
                                 ? 'Agrega ítems manualmente para esta provisión.'
                                 : `No se encontraron ítems para ${selectedLinea?.label}`}
@@ -4455,7 +4453,7 @@ export const PlaneacionWizard: React.FC<Props> = ({
                               </div>
                             )}
 
-                            {isIcas && !item.key.includes('::') && (
+                            {isIcas && !item.key.includes('::') && item.key.includes('-2026') && (
                               <Button size="small" appearance="primary" icon={<EditRegular />}
                                 onClick={() => setIcasDesglosadoKeys(prev => new Set(prev).add(item.key))}
                                 style={{ borderRadius: '8px', alignSelf: 'flex-start', background: CENIT_COLORS.blueBrand }}>
@@ -4648,7 +4646,7 @@ export const PlaneacionWizard: React.FC<Props> = ({
                                 {isLog && <span style={{ marginRight: '4px', fontSize: '10px' }}>🚐</span>}
                                 {item.nombre}
                               </div>
-                              {isIcas && !item.key.includes('::') && (
+                              {isIcas && !item.key.includes('::') && item.key.includes('-2026') && (
                                 <Button size="small" appearance="primary" icon={<EditRegular />}
                                   onClick={() => setIcasDesglosadoKeys(prev => new Set(prev).add(item.key))}
                                   style={{ marginBottom: '4px', borderRadius: '8px', background: CENIT_COLORS.blueBrand }}>

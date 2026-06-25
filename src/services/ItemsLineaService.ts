@@ -19,6 +19,9 @@ export interface ItemLinea {
   preciosMensuales?: Record<number, number>; // Override por mes
   tipoIca?: 'consolidacion' | 'elaboracion';
   zonaIca?: string;
+  zonaIcaFull?: string;       // zona con participación (ej. "Coveñas 70%")
+  anioIca?: '2026' | '2027';  // año del ICA (solo 2026 admite desglose)
+  expedienteIca?: string;     // expediente del oleoducto
   baseServicio?: string;
   ordenInterna?: string;
   cuentaContable?: string;
