@@ -90,6 +90,7 @@ export interface PlaneacionWizardResult {
   paramCantCompuestos?: Record<string, number>;
   paramPuntos?: Record<string, number>;
   icasConsolidarPct?: number;
+  icasDesglosado?: boolean;
   // Cambio 4: IPC global
   ipcGlobalActivo?: boolean;
   ipcGlobalPorcentaje?: number;
@@ -171,6 +172,7 @@ export interface PlaneacionInitialData {
   paramCantCompuestos?: Record<string, number>;
   paramPuntos?: Record<string, number>;
   icasConsolidarPct?: number;
+  icasDesglosado?: boolean;
   ipcGlobalActivo?: boolean;
   ipcGlobalPorcentaje?: number;
   ipcMeses?: number[];
@@ -1328,6 +1330,8 @@ export const PlaneacionWizard: React.FC<Props> = ({
   const [paramPuntos, setParamPuntos] = useState<Map<string, number>>(new Map());
   // ICAs: desglose del ítem en Consolidar (%) y Elaborar y Radicar (100 - %). Default 30/70.
   const [icasConsolidarPct, setIcasConsolidarPct] = useState<number>(30);
+  // ICAs: si está desglosado, el ítem se programa como DOS ítems (Consolidar / Elaborar y Radicar).
+  const [icasDesglosado, setIcasDesglosado] = useState<boolean>(false);
   // Cambio 4: IPC global (uno solo para toda la planeación)
   const [ipcGlobalActivo, setIpcGlobalActivo] = useState<boolean>(false);
   const [ipcGlobalPorcentaje, setIpcGlobalPorcentaje] = useState<number>(0);
@@ -1520,6 +1524,7 @@ export const PlaneacionWizard: React.FC<Props> = ({
         Object.entries(initialData.paramPuntos ?? {}).map(([key, value]) => [key, Number(value) || 1])
       ));
       if (typeof initialData.icasConsolidarPct === 'number') setIcasConsolidarPct(initialData.icasConsolidarPct);
+      setIcasDesglosado(!!initialData.icasDesglosado);
       setMonthlyData(initialData.programacion ?? []);
       setIpcGlobalActivo(initialData.ipcGlobalActivo ?? false);
       setIpcGlobalPorcentaje(initialData.ipcGlobalPorcentaje ?? 0);
@@ -1823,7 +1828,14 @@ export const PlaneacionWizard: React.FC<Props> = ({
           for (const it of availableItems.filter(it => selectedItems.has(it.id))) {
             // Sin precio de referencia: cada mes arranca en 0 y se digita.
             const base = isPrecioPorMes ? 0 : ItemsLineaService.getPrecioEfectivo(it, i);
-            list.push(buildEntry(it.id, it.item, base, i, existing, 1));
+            if (isIcas && icasDesglosado) {
+              // ICAs desglosado: dos ítems programables (Consolidar / Elaborar y Radicar).
+              const pc = Math.max(0, Math.min(100, icasConsolidarPct)) / 100;
+              list.push(buildEntry(`${it.id}::CONSOLIDAR`, 'Consolidar información para ICAS', base * pc, i, existing, 1));
+              list.push(buildEntry(`${it.id}::ELABORAR`, 'Elaborar y Radicar información para ICAS', base * (1 - pc), i, existing, 1));
+            } else {
+              list.push(buildEntry(it.id, it.item, base, i, existing, 1));
+            }
           }
         }
 
@@ -1850,7 +1862,7 @@ export const PlaneacionWizard: React.FC<Props> = ({
         };
       });
     });
-  }, [step, paramTipoMuestra, paramCantCompuestos, paramPuntos]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [step, paramTipoMuestra, paramCantCompuestos, paramPuntos, icasDesglosado, icasConsolidarPct]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Filtered params (monitoreos) ──
   const filteredParams = useMemo(() => {
@@ -2477,6 +2489,7 @@ export const PlaneacionWizard: React.FC<Props> = ({
         paramCantCompuestos: Object.fromEntries(paramCantCompuestos),
         paramPuntos: Object.fromEntries(paramPuntos),
         icasConsolidarPct,
+        icasDesglosado,
         ipcGlobalActivo,
         ipcGlobalPorcentaje,
         ipcMeses: [...ipcMeses],
@@ -4382,30 +4395,19 @@ export const PlaneacionWizard: React.FC<Props> = ({
                               </div>
                             )}
 
-                            {isIcas && (
-                              <Popover withArrow positioning="below-start">
-                                <PopoverTrigger disableButtonEnhancement>
-                                  <Button size="small" appearance="secondary" icon={<EditRegular />} style={{ borderRadius: '8px', alignSelf: 'flex-start' }}>
-                                    Abrir desglose
-                                  </Button>
-                                </PopoverTrigger>
-                                <PopoverSurface style={{ padding: '14px', minWidth: '260px', maxWidth: '92vw', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                  <Title3 style={{ fontSize: '13px', color: '#003057' }}>Desglose ICAS</Title3>
-                                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                    <Caption1 style={{ flex: 1 }}>Consolidar</Caption1>
-                                    <Input type="number" size="small" min={0} max={100} value={String(icasConsolidarPct)}
-                                      onChange={(_, d) => { const v = Math.max(0, Math.min(100, Number(d.value) || 0)); setIcasConsolidarPct(v); }}
-                                      style={{ width: '60px' }} />
-                                    <span style={{ fontWeight: 700, color: '#003057', fontSize: '12px' }}>{fmtCOP(rowTotal * icasConsolidarPct / 100)}</span>
-                                  </div>
-                                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                    <Caption1 style={{ flex: 1 }}>Elaborar y Radicar</Caption1>
-                                    <Input type="number" size="small" value={String(100 - icasConsolidarPct)} disabled style={{ width: '60px' }} />
-                                    <span style={{ fontWeight: 700, color: CENIT_COLORS.greenDark, fontSize: '12px' }}>{fmtCOP(rowTotal * (100 - icasConsolidarPct) / 100)}</span>
-                                  </div>
-                                  <Caption1 style={{ color: tokens.colorNeutralForeground3 }}>Total ítem: {fmtCOP(rowTotal)}</Caption1>
-                                </PopoverSurface>
-                              </Popover>
+                            {isIcas && !item.key.includes('::') && (
+                              <Button size="small" appearance="primary" icon={<EditRegular />}
+                                onClick={() => setIcasDesglosado(true)}
+                                style={{ borderRadius: '8px', alignSelf: 'flex-start', background: CENIT_COLORS.blueBrand }}>
+                                Abrir desglose (2 ítems)
+                              </Button>
+                            )}
+                            {isIcas && item.key.endsWith('::CONSOLIDAR') && (
+                              <Button size="small" appearance="subtle" icon={<DismissRegular />}
+                                onClick={() => setIcasDesglosado(false)}
+                                style={{ borderRadius: '8px', alignSelf: 'flex-start' }}>
+                                Unir en un ítem
+                              </Button>
                             )}
 
                             {ivaGlobalActivo && ivaGlobalPorcentaje > 0 && (
@@ -4589,41 +4591,19 @@ export const PlaneacionWizard: React.FC<Props> = ({
                                 {isLog && <span style={{ marginRight: '4px', fontSize: '10px' }}>🚐</span>}
                                 {item.nombre}
                               </div>
-                              {isIcas && (
-                                <Popover withArrow positioning="below-start">
-                                  <PopoverTrigger disableButtonEnhancement>
-                                    <Button size="small" appearance="secondary" icon={<EditRegular />} style={{ marginBottom: '4px', borderRadius: '8px' }}>
-                                      Abrir desglose
-                                    </Button>
-                                  </PopoverTrigger>
-                                  <PopoverSurface style={{ padding: '16px', minWidth: '300px', maxWidth: '92vw', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                                    <Title3 style={{ fontSize: '14px', color: '#003057' }}>Desglose ICAS — {item.nombre}</Title3>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                      <Caption1 style={{ flex: 1 }}>Consolidar</Caption1>
-                                      <Input
-                                        type="number" size="small" min={0} max={100}
-                                        value={String(icasConsolidarPct)}
-                                        onChange={(_, d) => { const v = Math.max(0, Math.min(100, Number(d.value) || 0)); setIcasConsolidarPct(v); }}
-                                        style={{ width: '64px' }}
-                                      />
-                                      <Caption1 style={{ width: '14px' }}>%</Caption1>
-                                      <span style={{ fontWeight: 700, color: '#003057', fontSize: '12px', minWidth: '92px', textAlign: 'right' }}>
-                                        {fmtCOP(rowTotal * icasConsolidarPct / 100)}
-                                      </span>
-                                    </div>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                      <Caption1 style={{ flex: 1 }}>Elaborar y Radicar</Caption1>
-                                      <Input type="number" size="small" value={String(100 - icasConsolidarPct)} disabled style={{ width: '64px' }} />
-                                      <Caption1 style={{ width: '14px' }}>%</Caption1>
-                                      <span style={{ fontWeight: 700, color: CENIT_COLORS.greenDark, fontSize: '12px', minWidth: '92px', textAlign: 'right' }}>
-                                        {fmtCOP(rowTotal * (100 - icasConsolidarPct) / 100)}
-                                      </span>
-                                    </div>
-                                    <Caption1 style={{ color: tokens.colorNeutralForeground3 }}>
-                                      Total ítem: {fmtCOP(rowTotal)} · El desglose reparte el valor anual del ítem.
-                                    </Caption1>
-                                  </PopoverSurface>
-                                </Popover>
+                              {isIcas && !item.key.includes('::') && (
+                                <Button size="small" appearance="primary" icon={<EditRegular />}
+                                  onClick={() => setIcasDesglosado(true)}
+                                  style={{ marginBottom: '4px', borderRadius: '8px', background: CENIT_COLORS.blueBrand }}>
+                                  Abrir desglose (2 ítems)
+                                </Button>
+                              )}
+                              {isIcas && item.key.endsWith('::CONSOLIDAR') && (
+                                <Button size="small" appearance="subtle" icon={<DismissRegular />}
+                                  onClick={() => setIcasDesglosado(false)}
+                                  style={{ marginBottom: '4px', borderRadius: '8px' }}>
+                                  Unir en un ítem
+                                </Button>
                               )}
                               {!isPrecioPorMes && (
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
