@@ -345,6 +345,8 @@ function validateRow(raw: Record<string, unknown>, rowIdx: number, detailRows: R
       const estacionDet = String(det['Estación'] ?? raw['Estación'] ?? '').trim();
       const matrizDet = String(det['Matriz'] ?? '').trim();
       const precioUnitario = Number(det['Precio Unitario']) || 0;
+      // Puntos por parámetro (Monitoreos): se pliega en el precio efectivo. Default 1.
+      const puntos = Number(det['Puntos']) || 1;
 
       nombres.push(nombre);
       if (estacionDet) {
@@ -360,7 +362,7 @@ function validateRow(raw: Record<string, unknown>, rowIdx: number, detailRows: R
       }
 
       MESES.forEach((mes, mi) => {
-        const precio = Number(det[`Precio ${mes}`]) || precioUnitario;
+        const precio = (Number(det[`Precio ${mes}`]) || precioUnitario) * puntos;
         const cantidad = Number(det[`Cantidad ${mes}`]) || 0;
         const freqRaw = det[`Frecuencia ${mes}`];
         const frecuencia = (freqRaw !== '' && freqRaw !== undefined && freqRaw !== null)
@@ -775,17 +777,18 @@ async function generateTemplate(): Promise<void> {
   });
 
   const detailHeaders = [
-    'ActividadKey', 'Estación', 'Matriz', 'Ítem / Parámetro', 'Precio Unitario',
+    'ActividadKey', 'Estación', 'Matriz', 'Ítem / Parámetro', 'Precio Unitario', 'Puntos',
     ...MESES.flatMap((mes) => [`Cantidad ${mes}`, `Frecuencia ${mes}`, `Total ${mes}`]),
     'Total Anual',
   ];
 
   const COL_PRECIO_UNIT = 5;
-  const COL_FIRST_MONTH = 6;
+  const COL_PUNTOS = 6;
+  const COL_FIRST_MONTH = 7;
   const COL_TOTAL_ANIO = detailHeaders.length;
 
   wsDet.columns = [
-    { width: 18 }, { width: 18 }, { width: 16 }, { width: 34 }, { width: 14 },
+    { width: 18 }, { width: 18 }, { width: 16 }, { width: 34 }, { width: 14 }, { width: 10 },
     ...Array(MESES.length * 3).fill(null).map((_, i) => ({ width: i % 3 === 0 ? 12 : i % 3 === 1 ? 12 : 14 })),
     { width: 16 },
   ];
@@ -794,7 +797,7 @@ async function generateTemplate(): Promise<void> {
   detHdr.height = 34;
   detHdr.eachCell((cell, c) => {
     cell.font = hdrFont();
-    if (c <= 5) cell.fill = fill('FF' + C.blueBase);
+    if (c <= 6) cell.fill = fill('FF' + C.blueBase);
     else if (c === COL_TOTAL_ANIO) cell.fill = fill('FF' + C.redTotal);
     else if ((c - COL_FIRST_MONTH) % 3 === 0) cell.fill = fill('FF' + C.greenQ);
     else if ((c - COL_FIRST_MONTH) % 3 === 1) cell.fill = fill('FF' + C.amber);
@@ -804,13 +807,13 @@ async function generateTemplate(): Promise<void> {
   });
 
   const detailExamples = [
-    { key: 'MON-ZONA-001', estacion: 'Samoré', matriz: 'ARD', nombre: 'AMONIACO', precio: 852200, meses: MESES.map((_, i) => ({ c: i === 0 ? 1 : 0, f: 1 })) },
-    { key: 'MON-ZONA-001', estacion: 'Samoré', matriz: 'ARD', nombre: 'ARSENICO TOTAL', precio: 111400, meses: MESES.map((_, i) => ({ c: i === 1 ? 1 : 0, f: 1 })) },
-    { key: 'SER-001', estacion: '', matriz: '', nombre: 'Mantenimiento zonas verdes', precio: 250000, meses: MESES.map(() => ({ c: 4, f: 1 })) },
+    { key: 'MON-ZONA-001', estacion: 'Samoré', matriz: 'ARD', nombre: 'AMONIACO', precio: 852200, puntos: 1, meses: MESES.map((_, i) => ({ c: i === 0 ? 1 : 0, f: 1 })) },
+    { key: 'MON-ZONA-001', estacion: 'Samoré', matriz: 'ARD', nombre: 'ARSENICO TOTAL', precio: 111400, puntos: 7, meses: MESES.map((_, i) => ({ c: i === 1 ? 1 : 0, f: 1 })) },
+    { key: 'SER-001', estacion: '', matriz: '', nombre: 'Mantenimiento zonas verdes', precio: 250000, puntos: 1, meses: MESES.map(() => ({ c: 4, f: 1 })) },
   ];
 
   detailExamples.forEach((ex, idx) => {
-    const rowValues: (string | number)[] = [ex.key, ex.estacion, ex.matriz, ex.nombre, ex.precio];
+    const rowValues: (string | number)[] = [ex.key, ex.estacion, ex.matriz, ex.nombre, ex.precio, ex.puntos];
     ex.meses.forEach(({ c, f }) => {
       rowValues.push(c);
       rowValues.push(f);
@@ -836,16 +839,17 @@ async function generateTemplate(): Promise<void> {
       const colFreq = colCant + 1;
       const colTot = colCant + 2;
       const precioAddr = wsDet.getCell(xlRowNum, COL_PRECIO_UNIT).address;
+      const puntosAddr = wsDet.getCell(xlRowNum, COL_PUNTOS).address;
       const cantAddr = wsDet.getCell(xlRowNum, colCant).address;
       const freqAddr = wsDet.getCell(xlRowNum, colFreq).address;
       const totalCell = wsDet.getCell(xlRowNum, colTot);
-      totalCell.value = { formula: `${precioAddr}*${cantAddr}*${freqAddr}`, result: ex.precio * ex.meses[mi].c * ex.meses[mi].f } as ExcelJS.CellFormulaValue;
+      totalCell.value = { formula: `${precioAddr}*${puntosAddr}*${cantAddr}*${freqAddr}`, result: ex.precio * ex.puntos * ex.meses[mi].c * ex.meses[mi].f } as ExcelJS.CellFormulaValue;
       totalCell.numFmt = '$#,##0';
     });
 
     const totalRefs = MESES.map((_m, mi) => wsDet.getCell(xlRowNum, COL_FIRST_MONTH + mi * 3 + 2).address).join('+');
     const totalAnioCell = wsDet.getCell(xlRowNum, COL_TOTAL_ANIO);
-    totalAnioCell.value = { formula: totalRefs, result: ex.meses.reduce((s, m) => s + ex.precio * m.c * m.f, 0) } as ExcelJS.CellFormulaValue;
+    totalAnioCell.value = { formula: totalRefs, result: ex.meses.reduce((s, m) => s + ex.precio * ex.puntos * m.c * m.f, 0) } as ExcelJS.CellFormulaValue;
     totalAnioCell.numFmt = '$#,##0';
     totalAnioCell.font = { ...dataFont(), bold: true, color: { argb: 'FF' + C.redTotal } };
   });

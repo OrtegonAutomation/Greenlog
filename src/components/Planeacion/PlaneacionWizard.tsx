@@ -28,6 +28,7 @@ import { CatalogoItemsGlobalService } from '../../services/CatalogoItemsGlobalSe
 import { useAuth } from '../../auth/AuthContext';
 import { DEPARTAMENTOS_MUNICIPIOS, DEPARTAMENTOS_LIST } from '../../data/jurisdiccionesCompensaciones';
 import type { ServicioEComplejidad } from '../../data/itemsServiciosE';
+import { TARIFA_ICAS } from '../../data/itemsIcas';
 import { CENIT_COLORS } from '../../theme/cenitTheme';
 import { MEDIA, useResponsive } from '../../hooks/useResponsive';
 import {
@@ -213,6 +214,37 @@ const formatCOPInput = (value: string) => {
 const parseCOPInput = (value: string) => {
   const digits = value.replace(/\D/g, '');
   return digits ? Number(digits) : 0;
+};
+// Cantidad con decimales: acepta coma o punto (ej. "0,08" o "0.08").
+const parseCantidad = (value: string) => {
+  const clean = String(value).replace(/[^\d.,-]/g, '').replace(',', '.');
+  const n = Number(clean);
+  return Number.isFinite(n) ? n : 0;
+};
+
+// Input de cantidad que admite decimales con coma o punto sin pelear con el
+// valor controlado (mantiene un buffer local mientras se escribe).
+const CantidadInput: React.FC<{
+  value: number;
+  onCommit: (n: number) => void;
+  style?: React.CSSProperties;
+}> = ({ value, onCommit, style }) => {
+  const [txt, setTxt] = React.useState(value > 0 ? String(value) : '');
+  React.useEffect(() => {
+    // Sincroniza solo cuando el cambio viene de afuera (no de lo que se está escribiendo).
+    if (parseCantidad(txt) !== value) setTxt(value > 0 ? String(value) : '');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value]);
+  return (
+    <Input
+      inputMode="decimal"
+      size="small"
+      value={txt}
+      placeholder="0"
+      style={style}
+      onChange={(_, d) => { setTxt(d.value); onCommit(parseCantidad(d.value)); }}
+    />
+  );
 };
 const clampPct = (value: number) => Math.min(100, Math.max(0, Number.isFinite(value) ? value : 0));
 const roundPct = (value: number) => Number(value.toFixed(6));
@@ -1826,20 +1858,22 @@ export const PlaneacionWizard: React.FC<Props> = ({
           }
         } else {
           for (const it of availableItems.filter(it => selectedItems.has(it.id))) {
-            // Sin precio de referencia: cada mes arranca en 0 y se digita.
-            const base = isPrecioPorMes ? 0 : ItemsLineaService.getPrecioEfectivo(it, i);
+            // ICAs: la tarifa es fija (no depende del catálogo). Otras líneas: precio efectivo.
+            const base = isIcas ? TARIFA_ICAS : (isPrecioPorMes ? 0 : ItemsLineaService.getPrecioEfectivo(it, i));
             if (isIcas && icasDesglosado) {
               // ICAs desglosado: dos ítems programables (Consolidar 70% / Radicación 30%).
-              // La cantidad por mes se hereda del ítem único (auto-distribución en proporciones).
               const pc = Math.max(0, Math.min(100, icasConsolidarPct)) / 100;
               const prevSingle = existing?.preciosIndividuales?.find(p => p.key === it.id);
               const prevCons = existing?.preciosIndividuales?.find(p => p.key === `${it.id}::CONSOLIDAR`);
               const prevRad = existing?.preciosIndividuales?.find(p => p.key === `${it.id}::RADICACION`);
+              // Auto-distribución: al desglosar por primera vez se reparte 1/12 en cada mes.
+              const primeraVez = !prevCons && !prevRad && !((prevSingle?.cantidad ?? 0) > 0);
+              const autoCant = Math.round((1 / 12) * 10000) / 10000; // 0.0833
               const eC = buildEntry(`${it.id}::CONSOLIDAR`, 'Consolidar información para ICAS', base * pc, i, existing, 1);
-              eC.cantidad = prevCons?.cantidad ?? prevSingle?.cantidad ?? 0;
+              eC.cantidad = prevCons?.cantidad ?? (primeraVez ? autoCant : (prevSingle?.cantidad ?? 0));
               eC.total = calculateEntryTotal(eC, i);
               const eR = buildEntry(`${it.id}::RADICACION`, 'Radicación información para ICAS', base * (1 - pc), i, existing, 1);
-              eR.cantidad = prevRad?.cantidad ?? prevSingle?.cantidad ?? 0;
+              eR.cantidad = prevRad?.cantidad ?? (primeraVez ? autoCant : (prevSingle?.cantidad ?? 0));
               eR.total = calculateEntryTotal(eR, i);
               list.push(eC, eR);
             } else {
@@ -3817,7 +3851,7 @@ export const PlaneacionWizard: React.FC<Props> = ({
                                 </td>
                               )}
                               <td className={styles.paramTd}>{it.unidad}</td>
-                              {!isPrecioPorMes && <td className={styles.paramTd} style={{ fontWeight: '600' }}>{fmtCOP(it.precioReferencia)}</td>}
+                              {!isPrecioPorMes && <td className={styles.paramTd} style={{ fontWeight: '600' }}>{fmtCOP(isIcas ? TARIFA_ICAS : it.precioReferencia)}</td>}
                               <td className={styles.paramTd} onClick={e => e.stopPropagation()}>
                                 <Tooltip content={it.catalogSource === 'global' ? (isAdmin ? 'Eliminar del catálogo' : 'Quitar de la planeación') : 'Eliminar ítem'} relationship="label">
                                   <Button size="small" appearance="subtle" icon={<DeleteRegular />} onClick={() => handleDeleteItem(it)} aria-label="Eliminar ítem" />
@@ -4508,12 +4542,9 @@ export const PlaneacionWizard: React.FC<Props> = ({
                                           style={{ flex: 1, minWidth: 0 }}
                                         />
                                       ) : (
-                                        <Input
-                                          type="number"
-                                          size="small"
-                                          value={entry.cantidad > 0 ? String(entry.cantidad) : ''}
-                                          placeholder="0"
-                                          onChange={(_, d) => updateItemMonth(mi, item.key, 'cantidad', Number(d.value) || 0)}
+                                        <CantidadInput
+                                          value={entry.cantidad}
+                                          onCommit={(n) => updateItemMonth(mi, item.key, 'cantidad', n)}
                                           style={{ flex: 1, minWidth: 0 }}
                                         />
                                       )}
@@ -4726,12 +4757,9 @@ export const PlaneacionWizard: React.FC<Props> = ({
                                       style={{ width: '100%', minWidth: 0 }}
                                     />
                                   ) : (
-                                    <Input
-                                      type="number"
-                                      size="small"
-                                      value={entry.cantidad > 0 ? String(entry.cantidad) : ''}
-                                      placeholder="0"
-                                      onChange={(_, d) => updateItemMonth(mi, item.key, 'cantidad', Number(d.value) || 0)}
+                                    <CantidadInput
+                                      value={entry.cantidad}
+                                      onCommit={(n) => updateItemMonth(mi, item.key, 'cantidad', n)}
                                       style={{ width: '100%', minWidth: 0 }}
                                     />
                                   )}
