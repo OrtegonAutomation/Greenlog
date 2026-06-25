@@ -2848,6 +2848,40 @@ export const PlaneacionWizard: React.FC<Props> = ({
     setCustomMonitoreoRows(prev => prev.filter(p => paramKey(p) !== key));
   }, [paramKey]);
 
+  // ── Eliminar VARIOS ítems seleccionados (los marcados con checkbox) ──
+  const handleDeleteSelectedItems = useCallback(() => {
+    const ids = [...itemsSelSet];
+    if (!ids.length) return;
+    if (typeof window !== 'undefined' && !window.confirm(`¿Eliminar ${ids.length} ítem(s) seleccionado(s)?`)) return;
+    const idSet = new Set(ids);
+    setDeletedKeys(prev => new Set([...prev, ...ids]));
+    setItemsSelSet(new Set());
+    setAvailableItems(prev => prev.filter(it => !idSet.has(it.id)));
+    if (selectedLinea) {
+      setCustomItemsMap(prev => ({
+        ...prev,
+        [selectedLinea.value]: (prev[selectedLinea.value] ?? []).filter(it => !idSet.has(it.id)),
+      }));
+    }
+    if (isAdmin) {
+      availableItems
+        .filter(it => idSet.has(it.id) && it.catalogSource === 'global')
+        .forEach(it => void CatalogoItemsGlobalService.deleteItem(it.id, { zona: selectedZona ?? undefined }).catch(() => {}));
+    }
+  }, [itemsSelSet, setItemsSelSet, selectedLinea, selectedZona, isAdmin, availableItems]);
+
+  // ── Eliminar VARIOS parámetros seleccionados ──
+  const handleDeleteSelectedParams = useCallback(() => {
+    const keys = [...selectedParams];
+    if (!keys.length) return;
+    if (typeof window !== 'undefined' && !window.confirm(`¿Eliminar ${keys.length} parámetro(s) seleccionado(s)?`)) return;
+    const keySet = new Set(keys);
+    setDeletedKeys(prev => new Set([...prev, ...keys]));
+    setSelectedParams(new Set());
+    setAvailableParams(prev => prev.filter(p => !keySet.has(paramKey(p))));
+    setCustomMonitoreoRows(prev => prev.filter(p => !keySet.has(paramKey(p))));
+  }, [selectedParams, paramKey]);
+
   // ── Grupo de líneas por categoría ──
   const lineasPorCategoria = useMemo(() => {
     const all = [...lineasPlaneacionVisibles, ...(allowCustomLineas ? customLineas : [])];
@@ -3588,6 +3622,20 @@ export const PlaneacionWizard: React.FC<Props> = ({
                       ? `${selectedMatrices.size} matrices · ${selectedParams.size} parámetros`
                       : `${totalSelectedCount} seleccionados`}
                   </span>
+                  {isMonitoreo && selectedParams.size > 0 && (
+                    <Button size="small" appearance="subtle" icon={<DeleteRegular />}
+                      onClick={handleDeleteSelectedParams}
+                      style={{ color: CENIT_COLORS.red, borderRadius: '8px' }}>
+                      Eliminar seleccionados ({selectedParams.size})
+                    </Button>
+                  )}
+                  {!isMonitoreo && itemsSelSet.size > 0 && (
+                    <Button size="small" appearance="subtle" icon={<DeleteRegular />}
+                      onClick={handleDeleteSelectedItems}
+                      style={{ color: CENIT_COLORS.red, borderRadius: '8px' }}>
+                      Eliminar seleccionados ({itemsSelSet.size})
+                    </Button>
+                  )}
                 </div>
 
                 {catalogWarning && (
