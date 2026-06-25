@@ -1873,22 +1873,29 @@ export const PlaneacionWizard: React.FC<Props> = ({
               const prevSingle = existing?.preciosIndividuales?.find(p => p.key === it.id);
               const prevCons = existing?.preciosIndividuales?.find(p => p.key === `${it.id}::CONSOLIDAR`);
               const prevRad = existing?.preciosIndividuales?.find(p => p.key === `${it.id}::RADICACION`);
-              // Auto-distribución: al desglosar por primera vez se reparte 1/12 en cada mes.
+              // Auto-distribución 1/12 SOLO en Consolidar (la primera vez que se desglosa).
+              // Radicación arranca en 0 para que el usuario la digite.
               const primeraVez = !prevCons && !prevRad && !((prevSingle?.cantidad ?? 0) > 0);
               const autoCant = Math.round((1 / 12) * 10000) / 10000; // 0.0833
               const eC = buildEntry(`${it.id}::CONSOLIDAR`, 'Consolidar información para ICAS', base * pc, i, existing, 1);
               eC.cantidad = prevCons?.cantidad ?? (primeraVez ? autoCant : (prevSingle?.cantidad ?? 0));
               eC.total = calculateEntryTotal(eC, i);
               const eR = buildEntry(`${it.id}::RADICACION`, 'Radicación información para ICAS', base * (1 - pc), i, existing, 1);
-              eR.cantidad = prevRad?.cantidad ?? (primeraVez ? autoCant : (prevSingle?.cantidad ?? 0));
+              eR.cantidad = prevRad?.cantidad ?? 0;
               eR.total = calculateEntryTotal(eR, i);
               list.push(eC, eR);
             } else {
-              // Al unir, el ítem único hereda la cantidad del desglose (suma de proporciones).
+              // Al unir, el ítem único suma las proporciones de Consolidar y Radicación
+              // ponderadas por su % (para que el total mensual sea Consolidar + Radicación).
               const e = buildEntry(it.id, it.item, base, i, existing, 1);
               if (isIcas && !existing?.preciosIndividuales?.find(p => p.key === it.id)) {
                 const prevCons = existing?.preciosIndividuales?.find(p => p.key === `${it.id}::CONSOLIDAR`);
-                if (prevCons) { e.cantidad = prevCons.cantidad; e.total = calculateEntryTotal(e, i); }
+                const prevRad = existing?.preciosIndividuales?.find(p => p.key === `${it.id}::RADICACION`);
+                if (prevCons || prevRad) {
+                  const pcU = Math.max(0, Math.min(100, icasConsolidarPct)) / 100;
+                  e.cantidad = pcU * (prevCons?.cantidad ?? 0) + (1 - pcU) * (prevRad?.cantidad ?? 0);
+                  e.total = calculateEntryTotal(e, i);
+                }
               }
               list.push(e);
             }
