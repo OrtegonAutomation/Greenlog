@@ -514,19 +514,29 @@ export const PlaneacionModule: React.FC = () => {
   }, [canEditActividad]);
 
   const handleDetailDelete = useCallback(async (id: string) => {
-    if (!isAdmin) {
-      setErrorGuardar('Solo un administrador puede eliminar actividades.');
+    if (!currentUser) {
+      setErrorGuardar('Debes iniciar sesión para eliminar actividades.');
+      return;
+    }
+    const actividad = detalleItem?.id === id ? detalleItem : actividadesVisibles.find(a => a.id === id);
+    if (!actividad || !canViewActividad(actividad)) {
+      setErrorGuardar('No tienes permisos para eliminar esta actividad.');
+      return;
+    }
+    const ok = window.confirm(`¿Eliminar la actividad "${actividad.tarea}"? Esta acción no se puede deshacer.`);
+    if (!ok) {
       return;
     }
     try {
       if(eliminar) await eliminar(id);
       setDetalleAbierto(false);
+      setDetalleItem(null);
       setToastMsg('La actividad fue eliminada correctamente.');
       setToastOk(true);
     } catch (err) {
       setErrorGuardar(err instanceof Error ? err.message : 'Error al eliminar.');
     }
-  }, [eliminar, isAdmin]);
+  }, [actividadesVisibles, canViewActividad, currentUser, detalleItem, eliminar]);
 
   const [tarifasCargando, setTarifasCargando] = useState(false);
   const handleActualizarTarifas = useCallback(async () => {
@@ -933,9 +943,9 @@ export const PlaneacionModule: React.FC = () => {
         open={detalleAbierto}
         onClose={handleDetailClose}
         onEdit={handleDetailEdit}
-        onDelete={isAdmin ? handleDetailDelete : undefined}
+        onDelete={currentUser ? handleDetailDelete : undefined}
         canEdit={!!detalleItem && canEditActividad(detalleItem)}
-        canDelete={isAdmin}
+        canDelete={!!currentUser && !!detalleItem && canViewActividad(detalleItem)}
         canReview={!!detalleItem && detalleItem.estadoAprobacion === 'Pendiente' && canReview(detalleItem.lineaOperativa, detalleItem.zona)}
         onApprove={(actividad) => handleReview(actividad, 'Aprobado')}
         onReject={(actividad) => handleReview(actividad, 'Rechazado')}
