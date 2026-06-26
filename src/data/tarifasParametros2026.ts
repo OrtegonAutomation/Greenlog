@@ -559,4 +559,13 @@ export const TARIFAS_PARAMETROS_2026: TarifaParametro[] = [
   { categoria: 'suelo', parametroNorm: 'vanadioenextractotclp', parametro: 'VANADIO EN EXTRACTO TCLP', precio: 16816 },
   { categoria: 'suelo', parametroNorm: 'zincenextractotclp', parametro: 'ZINC EN EXTRACTO TCLP', precio: 16816 },
   { categoria: 'suelo', parametroNorm: 'zinctotal', parametro: 'ZINC TOTAL', precio: 15975 },
+
+  // --- Overrides manuales: parámetros del catálogo con nombre distinto al Excel
+  // (segundo pase de match laxo; solo los inequívocos). ---
+  { categoria: 'agua', parametroNorm: 'dbo5', parametro: 'DBO5', precio: 23493 },
+  { categoria: 'agua', parametroNorm: 'solidossuspendidostotales', parametro: 'SOLIDOS SUSPENDIDOS TOTALES', precio: 9985 },
+  { categoria: 'suelo', parametroNorm: 'escherichiacoli', parametro: 'ESCHERICHIA COLI', precio: 29428 },
+  { categoria: 'suelo', parametroNorm: 'capacidaddeintercambiocationicocic', parametro: 'CAPACIDAD DE INTERCAMBIO CATIONICO - CIC', precio: 16816 },
+  { categoria: 'suelo', parametroNorm: 'conductividadelectrica', parametro: 'CONDUCTIVIDAD ELECTRICA', precio: 1071 },
+  { categoria: 'suelo', parametroNorm: 'estructura', parametro: 'ESTRUCTURA', precio: 63060 },
 ];
