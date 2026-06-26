@@ -218,4 +218,28 @@ export const SupabaseService = {
 
     if (error) throw error;
   },
+
+  /**
+   * Propaga las tarifas vigentes a las planeaciones de Monitoreos ya guardadas:
+   * recalcula el opex_data_raw (precios de matriz + totales) y el presupuesto_plan.
+   * Devuelve el nº de planeaciones actualizadas. No-op fuera de supabase.
+   */
+  async propagarTarifas(map: Map<string, number>): Promise<number> {
+    const { recomputeOpexConTarifas } = await import('./monitoreosTarifas');
+    const actividades = await this.getAll();
+    let actualizadas = 0;
+    for (const act of actividades) {
+      if (act.lineaOperativa !== 'Monitoreos' || !act.opexDataRaw) continue;
+      let opex: Record<string, unknown>;
+      try { opex = JSON.parse(act.opexDataRaw); } catch { continue; }
+      const res = recomputeOpexConTarifas(opex, map);
+      if (!res) continue;
+      await this.update(act.id, {
+        opexDataRaw: JSON.stringify(res.opex),
+        presupuestoPlan: res.valorTotal,
+      });
+      actualizadas += 1;
+    }
+    return actualizadas;
+  },
 };

@@ -35,11 +35,23 @@ async function loadData(): Promise<MonitoreosData> {
   const base = mod.default as unknown as MonitoreosData;
   // Parámetros suplementarios (no vienen del Excel base): Piezómetros Occidente.
   const { PIEZOMETROS_ROWS } = await import('../data/piezometrosOccidente');
-  _cache = {
-    estacionesPorZona: base.estacionesPorZona,
-    matrizData: [...base.matrizData, ...PIEZOMETROS_ROWS],
-  };
+  let matrizData = [...base.matrizData, ...PIEZOMETROS_ROWS];
+  // Overlay de tarifas vigentes (tabla greenlog_tarifas_parametros o bundle del Excel).
+  try {
+    const { TarifasParametrosService } = await import('./TarifasParametrosService');
+    const { aplicarTarifasARows } = await import('./monitoreosTarifas');
+    const map = await TarifasParametrosService.getTarifaMap();
+    matrizData = aplicarTarifasARows(matrizData, map);
+  } catch {
+    // Falla suave: si no hay tarifas/conexión, se usan los precios base.
+  }
+  _cache = { estacionesPorZona: base.estacionesPorZona, matrizData };
   return _cache;
+}
+
+/** Invalida el cache para forzar recarga del catálogo (p. ej. tras cambiar tarifas). */
+export function invalidateMonitoreosCache() {
+  _cache = null;
 }
 
 export const MonitoreosMatrizService = {

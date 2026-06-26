@@ -22,9 +22,14 @@ import {
   AddRegular,
   DeleteRegular,
 } from '@fluentui/react-icons';
-import { MonitoreosMatrizService, MonitoreoRow } from '../../services/MonitoreosMatrizService';
+import { MonitoreosMatrizService, MonitoreoRow, invalidateMonitoreosCache } from '../../services/MonitoreosMatrizService';
+import { SupabaseService } from '../../services/SupabaseService';
+import { isSupabaseEnabled } from '../../services/supabaseClient';
 import { ItemsLineaService, ItemLinea, ITEMS_LOGISTICA } from '../../services/ItemsLineaService';
 import { CatalogoItemsGlobalService } from '../../services/CatalogoItemsGlobalService';
+import { paramKeyOf, precioMatriz } from '../../services/monitoreosTarifas';
+import { TarifasParametrosService } from '../../services/TarifasParametrosService';
+import { categoriaDeMatriz } from '../../data/tarifasParametros2026';
 import { useAuth } from '../../auth/AuthContext';
 import { DEPARTAMENTOS_MUNICIPIOS, DEPARTAMENTOS_LIST } from '../../data/jurisdiccionesCompensaciones';
 import type { ServicioEComplejidad } from '../../data/itemsServiciosE';
@@ -1498,18 +1503,7 @@ export const PlaneacionWizard: React.FC<Props> = ({
   );
 
   // ── Param key helper ──
-  const paramKey = useCallback((r: MonitoreoRow) => [
-    r.zona,
-    r.estacion,
-    r.parametro,
-    r.matriz,
-    r.norma,
-    r.permiso,
-    r.receptor,
-    r.requerimiento,
-    r.item ?? '',
-    r.sistema ?? '',
-  ].join('|'), []);
+  const paramKey = useCallback((r: MonitoreoRow) => paramKeyOf(r), []);
 
   const zonasDisponiblesPaso = useMemo(() => {
     const zonasBase = isCompensaciones ? ZONAS_COMPENSACIONES : ZONAS;
@@ -1863,14 +1857,7 @@ export const PlaneacionWizard: React.FC<Props> = ({
             // Precio matriz = Σ(precio_param × compuestos_param × puntos_param)
             // compuestos_param = cantCompuestos si tipo=compuesto, sino 1 (simple)
             // puntos_param = override del usuario o el valor del Excel (r.puntos)
-            const matrizPrecio = rows.reduce((s, r) => {
-              const key = paramKey(r);
-              const precioParam = r.preciosMensuales?.[i] ?? r.chemilab;
-              const compuestos = paramTipoMuestra.get(key) === 'compuesto'
-                ? (paramCantCompuestos.get(key) || 1) : 1;
-              const puntos = paramPuntos.get(key) ?? (r.puntos || 1);
-              return s + precioParam * compuestos * puntos;
-            }, 0);
+            const matrizPrecio = precioMatriz(rows, i, paramTipoMuestra, paramCantCompuestos, paramPuntos);
             list.push(buildEntry(`MATRIZ|${matriz}`, `${matriz} (${rows.length} params)`, matrizPrecio, i, existing, 1, true));
           }
         } else {
@@ -2083,6 +2070,27 @@ export const PlaneacionWizard: React.FC<Props> = ({
     setCustomMonitoreoRows(prev => prev.map(updater));
     setMonthlyData([]);
   }, [paramKey]);
+
+  // Al confirmar (blur) el precio de un parámetro: si es admin y hay supabase,
+  // persiste la tarifa en el catálogo y propaga el cambio a las planeaciones ya hechas.
+  const commitTarifaParametro = useCallback((row: MonitoreoRow) => {
+    if (!isMonitoreo || !isAdmin || !isSupabaseEnabled()) return;
+    const key = paramKey(row);
+    const current = availableParams.find(r => paramKey(r) === key) ?? row;
+    const precio = current.chemilab || 0;
+    if (precio <= 0) return;
+    const categoria = categoriaDeMatriz(current.matriz);
+    void (async () => {
+      try {
+        await TarifasParametrosService.upsertTarifa(categoria, current.parametro, precio);
+        invalidateMonitoreosCache();
+        const map = await TarifasParametrosService.getTarifaMap();
+        await SupabaseService.propagarTarifas(map);
+      } catch {
+        // No bloquear la edición si falla la propagación.
+      }
+    })();
+  }, [isMonitoreo, isAdmin, availableParams, paramKey]);
 
   const handleAddParametroStep3 = useCallback(() => {
     if (!selectedZona || !s3ParamNombre.trim()) return;
@@ -3761,6 +3769,7 @@ export const PlaneacionWizard: React.FC<Props> = ({
                                     value={r.chemilab ? r.chemilab.toLocaleString('es-CO') : ''}
                                     placeholder="0"
                                     onChange={(_, d) => updateParamPrice(r, parseCOPInput(d.value))}
+                                    onBlur={() => commitTarifaParametro(r)}
                                     style={{ width: '96px' }}
                                   />
                                 </td>

@@ -4,7 +4,7 @@ import {
   Title2, Body1, Button, MessageBar, MessageBarBody, MessageBarTitle, Divider,
   Tooltip,
 } from '@fluentui/react-components';
-import { AddRegular, ArrowUploadRegular, DocumentArrowDownRegular } from '@fluentui/react-icons';
+import { AddRegular, ArrowUploadRegular, DocumentArrowDownRegular, MoneyRegular } from '@fluentui/react-icons';
 import { ActividadAmbiental, NuevaActividadPayload } from '../../types';
 import { useActividades } from '../../hooks/useActividades';
 import { MEDIA } from '../../hooks/useResponsive';
@@ -26,6 +26,10 @@ import { NotificacionesService } from '../../services/NotificacionesService';
 import { useNotificaciones } from '../../context/NotificacionesContext';
 import { ItemLinea, ItemsLineaService } from '../../services/ItemsLineaService';
 import { LineaOperativa } from '../../types';
+import { TarifasParametrosService } from '../../services/TarifasParametrosService';
+import { SupabaseService } from '../../services/SupabaseService';
+import { invalidateMonitoreosCache } from '../../services/MonitoreosMatrizService';
+import { isSupabaseEnabled } from '../../services/supabaseClient';
 
 const useStyles = makeStyles({
   root: {
@@ -524,6 +528,29 @@ export const PlaneacionModule: React.FC = () => {
     }
   }, [eliminar, isAdmin]);
 
+  const [tarifasCargando, setTarifasCargando] = useState(false);
+  const handleActualizarTarifas = useCallback(async () => {
+    if (!isAdmin || !isSupabaseEnabled() || tarifasCargando) return;
+    const ok = window.confirm(
+      'Esto cargará las tarifas nuevas de Monitoreos al catálogo y recalculará TODAS las planeaciones de monitoreos ya guardadas. ¿Continuar?',
+    );
+    if (!ok) return;
+    setTarifasCargando(true);
+    try {
+      const total = await TarifasParametrosService.seedDesdeExcel();
+      invalidateMonitoreosCache();
+      const map = await TarifasParametrosService.getTarifaMap();
+      const actualizadas = await SupabaseService.propagarTarifas(map);
+      setToastMsg(`Tarifas actualizadas (${total} parámetros). Planeaciones recalculadas: ${actualizadas}.`);
+      setToastOk(true);
+      if (recargar) await recargar();
+    } catch (err) {
+      setErrorGuardar(err instanceof Error ? err.message : 'Error al actualizar tarifas.');
+    } finally {
+      setTarifasCargando(false);
+    }
+  }, [isAdmin, tarifasCargando, recargar]);
+
   const handleReview = useCallback(async (actividad: ActividadAmbiental, estadoAprobacion: 'Aprobado' | 'Rechazado') => {
     if (!currentUser || !canReview(actividad.lineaOperativa, actividad.zona)) {
       setErrorGuardar('No tienes permisos para revisar esta actividad.');
@@ -797,6 +824,21 @@ export const PlaneacionModule: React.FC = () => {
                 onClick={() => setBulkAbierto(true)}
               >
                 Carga Masiva
+              </Button>
+            </Tooltip>
+          )}
+
+          {isAdmin && isSupabaseEnabled() && (
+            <Tooltip content="Cargar las tarifas nuevas de Monitoreos y recalcular las planeaciones ya guardadas" relationship="label">
+              <Button
+                appearance="secondary"
+                icon={<MoneyRegular />}
+                size="large"
+                style={{ borderRadius: '12px', border: '1px solid rgba(0,0,0,0.1)' }}
+                disabled={tarifasCargando}
+                onClick={handleActualizarTarifas}
+              >
+                {tarifasCargando ? 'Actualizando…' : 'Tarifas Monitoreos'}
               </Button>
             </Tooltip>
           )}
