@@ -97,7 +97,7 @@ export interface PlaneacionWizardResult {
   paramPuntos?: Record<string, number>;
   icasConsolidarPct?: number;
   icasDesglosadoKeys?: string[];
-  icasSplitData?: Record<string, { cons: number[]; rad: number[] }>;
+  icasSplitData?: Record<string, IcaSplitItemData>;
   // Cambio 4: IPC global
   ipcGlobalActivo?: boolean;
   ipcGlobalPorcentaje?: number;
@@ -158,6 +158,13 @@ export interface PagoDiferidoItemConfig {
   porcentajesMensuales: Record<number, number>;
 }
 
+export interface IcaSplitItemData {
+  cons: number[];
+  rad: number[];
+  consPrecio?: number[];
+  radPrecio?: number[];
+}
+
 export interface PlaneacionInitialData {
   lineaOperativa?: LineaOperativa;
   zona?: string;
@@ -180,7 +187,7 @@ export interface PlaneacionInitialData {
   paramPuntos?: Record<string, number>;
   icasConsolidarPct?: number;
   icasDesglosadoKeys?: string[];
-  icasSplitData?: Record<string, { cons: number[]; rad: number[] }>;
+  icasSplitData?: Record<string, IcaSplitItemData>;
   ipcGlobalActivo?: boolean;
   ipcGlobalPorcentaje?: number;
   ipcMeses?: number[];
@@ -1377,7 +1384,7 @@ export const PlaneacionWizard: React.FC<Props> = ({
   // ICAs: cantidades mensuales del desglose (Consolidar/Radicación) por ítem.
   // Persisten al unir/re-desglosar para no perder lo digitado; al unir, el ítem
   // único conserva el DINERO (consPrecio×cons + radPrecio×rad), no la suma de cantidades.
-  const [icasSplitData, setIcasSplitData] = useState<Record<string, { cons: number[]; rad: number[] }>>({});
+  const [icasSplitData, setIcasSplitData] = useState<Record<string, IcaSplitItemData>>({});
   // Cambio 4: IPC global (uno solo para toda la planeación)
   const [ipcGlobalActivo, setIpcGlobalActivo] = useState<boolean>(false);
   const [ipcGlobalPorcentaje, setIpcGlobalPorcentaje] = useState<number>(0);
@@ -1869,16 +1876,17 @@ export const PlaneacionWizard: React.FC<Props> = ({
             const radPrecio = base * (1 - pc);
             const saved = icasSplitData[it.id];
             if (isIcas && icasDesglosadoKeys.has(it.id)) {
-              // ICAs desglosado (2026): Consolidar valor fijo; Radicación al 30%.
+              // ICAs desglosado (2026): precio editable solo en las filas de desglose.
               // La cantidad se toma de lo digitado en sesión (prev) o, si se re-desglosa
               // tras unir, de icasSplitData (no se pierde lo digitado). Default 0.
               const prevCons = existing?.preciosIndividuales?.find(p => p.key === `${it.id}::CONSOLIDAR`);
               const prevRad = existing?.preciosIndividuales?.find(p => p.key === `${it.id}::RADICACION`);
-              // forcePrice=true: el precio es fijo (no se hereda de datos guardados/corruptos).
-              const eC = buildEntry(`${it.id}::CONSOLIDAR`, 'Consolidar información para ICAS', consPrecio, i, existing, 1, true);
+              const consPrecioMes = prevCons?.precio ?? saved?.consPrecio?.[i] ?? consPrecio;
+              const radPrecioMes = prevRad?.precio ?? saved?.radPrecio?.[i] ?? radPrecio;
+              const eC = buildEntry(`${it.id}::CONSOLIDAR`, 'Consolidar información para ICAS', consPrecioMes, i, existing, 1, true);
               eC.cantidad = prevCons?.cantidad ?? saved?.cons[i] ?? 0;
               eC.total = calculateEntryTotal(eC, i);
-              const eR = buildEntry(`${it.id}::RADICACION`, 'Radicación información para ICAS', radPrecio, i, existing, 1, true);
+              const eR = buildEntry(`${it.id}::RADICACION`, 'Radicación información para ICAS', radPrecioMes, i, existing, 1, true);
               eR.cantidad = prevRad?.cantidad ?? saved?.rad[i] ?? 0;
               eR.total = calculateEntryTotal(eR, i);
               list.push(eC, eR);
@@ -1891,7 +1899,9 @@ export const PlaneacionWizard: React.FC<Props> = ({
               const prevSingle = existing?.preciosIndividuales?.find(p => p.key === it.id);
               if (isIcas && saved && !prevSingle) {
                 // Primera vez que se une: derivar del desglose guardado (preserva el dinero).
-                const money = consPrecio * (saved.cons[i] ?? 0) + radPrecio * (saved.rad[i] ?? 0);
+                const money =
+                  (saved.consPrecio?.[i] ?? consPrecio) * (saved.cons[i] ?? 0) +
+                  (saved.radPrecio?.[i] ?? radPrecio) * (saved.rad[i] ?? 0);
                 e.cantidad = base > 0 ? money / base : 0;
                 e.total = calculateEntryTotal(e, i);
               }
@@ -2184,13 +2194,21 @@ export const PlaneacionWizard: React.FC<Props> = ({
   // Captura las cantidades mensuales de Consolidar/Radicación para no perderlas
   // (se restauran si se vuelve a desglosar) y para derivar el dinero del ítem unido.
   const unirIca = useCallback((baseId: string) => {
-    const cons = Array.from({ length: 12 }, (_, i) =>
-      monthlyData[i]?.preciosIndividuales?.find(p => p.key === `${baseId}::CONSOLIDAR`)?.cantidad ?? 0);
-    const rad = Array.from({ length: 12 }, (_, i) =>
-      monthlyData[i]?.preciosIndividuales?.find(p => p.key === `${baseId}::RADICACION`)?.cantidad ?? 0);
-    setIcasSplitData(sd => ({ ...sd, [baseId]: { cons, rad } }));
+    const baseItem = availableItems.find(it => it.id === baseId);
+    const base = baseItem?.precioReferencia || TARIFA_ICAS;
+    const pc = Math.max(0, Math.min(100, icasConsolidarPct)) / 100;
+    const defaultRadPrecio = base * (1 - pc);
+    const consEntries = Array.from({ length: 12 }, (_, i) =>
+      monthlyData[i]?.preciosIndividuales?.find(p => p.key === `${baseId}::CONSOLIDAR`));
+    const radEntries = Array.from({ length: 12 }, (_, i) =>
+      monthlyData[i]?.preciosIndividuales?.find(p => p.key === `${baseId}::RADICACION`));
+    const cons = consEntries.map(entry => entry?.cantidad ?? 0);
+    const rad = radEntries.map(entry => entry?.cantidad ?? 0);
+    const consPrecio = consEntries.map(entry => entry?.precio ?? ICAS_CONSOLIDAR_2026);
+    const radPrecio = radEntries.map(entry => entry?.precio ?? defaultRadPrecio);
+    setIcasSplitData(sd => ({ ...sd, [baseId]: { cons, rad, consPrecio, radPrecio } }));
     setIcasDesglosadoKeys(prev => { const s = new Set(prev); s.delete(baseId); return s; });
-  }, [monthlyData]);
+  }, [availableItems, icasConsolidarPct, monthlyData]);
 
   // ── Precio digitado por mes (línea Pagos): edita solo el mes indicado ──
   const updateItemMonthPrice = useCallback((mesIndex: number, itemKey: string, value: number) => {
@@ -4502,6 +4520,8 @@ export const PlaneacionWizard: React.FC<Props> = ({
 
                     {(monthlyData[0]?.preciosIndividuales ?? []).map(item => {
                       const isLog = item.key.startsWith('LOG-');
+                      const isIcaSplitRow = isIcas && item.key.includes('::');
+                      const isIcaBaseRow = isIcas && !isIcaSplitRow;
                       const rowTotal = monthlyData.reduce((s, m) => {
                         const e = m.preciosIndividuales.find(p => p.key === item.key);
                         return s + (e?.total ?? 0);
@@ -4537,11 +4557,13 @@ export const PlaneacionWizard: React.FC<Props> = ({
                                 <Input
                                   inputMode="numeric"
                                   size="small"
-                                  readOnly={isIcas}
+                                  readOnly={isIcaBaseRow}
                                   value={item.precio > 0 ? item.precio.toLocaleString('es-CO') : ''}
                                   placeholder="0"
                                   onChange={(_, d) => updateItemPrice(item.key, parseCOPInput(d.value))}
-                                  onBlur={() => { void persistCatalogPrice(item.key); }}
+                                  onBlur={() => {
+                                    if (!isIcaSplitRow) void persistCatalogPrice(item.key);
+                                  }}
                                   style={{ flex: 1, minWidth: 0 }}
                                 />
                               </div>
@@ -4719,6 +4741,8 @@ export const PlaneacionWizard: React.FC<Props> = ({
                     <tbody>
                       {(monthlyData[0]?.preciosIndividuales ?? []).map(item => {
                         const isLog = item.key.startsWith('LOG-');
+                        const isIcaSplitRow = isIcas && item.key.includes('::');
+                        const isIcaBaseRow = isIcas && !isIcaSplitRow;
                         const rowTotal = monthlyData.reduce((s, m) => {
                           const e = m.preciosIndividuales.find(p => p.key === item.key);
                           return s + (e?.total ?? 0);
@@ -4760,11 +4784,13 @@ export const PlaneacionWizard: React.FC<Props> = ({
                                   <Input
                                     inputMode="numeric"
                                     size="small"
-                                    readOnly={isIcas}
+                                    readOnly={isIcaBaseRow}
                                     value={item.precio > 0 ? item.precio.toLocaleString('es-CO') : ''}
                                     placeholder="0"
                                     onChange={(_, d) => updateItemPrice(item.key, parseCOPInput(d.value))}
-                                    onBlur={() => { void persistCatalogPrice(item.key); }}
+                                    onBlur={() => {
+                                      if (!isIcaSplitRow) void persistCatalogPrice(item.key);
+                                    }}
                                     style={{ width: '90px' }}
                                   />
                                 </div>
