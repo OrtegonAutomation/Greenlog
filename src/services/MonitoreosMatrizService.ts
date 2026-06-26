@@ -32,7 +32,13 @@ let _cache: MonitoreosData | null = null;
 async function loadData(): Promise<MonitoreosData> {
   if (_cache) return _cache;
   const mod = await import('./monitoreos_data.json');
-  _cache = mod.default as unknown as MonitoreosData;
+  const base = mod.default as unknown as MonitoreosData;
+  // Parámetros suplementarios (no vienen del Excel base): Piezómetros Occidente.
+  const { PIEZOMETROS_ROWS } = await import('../data/piezometrosOccidente');
+  _cache = {
+    estacionesPorZona: base.estacionesPorZona,
+    matrizData: [...base.matrizData, ...PIEZOMETROS_ROWS],
+  };
   return _cache;
 }
 

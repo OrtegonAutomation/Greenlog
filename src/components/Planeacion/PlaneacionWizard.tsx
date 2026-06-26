@@ -92,6 +92,7 @@ export interface PlaneacionWizardResult {
   paramPuntos?: Record<string, number>;
   icasConsolidarPct?: number;
   icasDesglosadoKeys?: string[];
+  icasSplitData?: Record<string, { cons: number[]; rad: number[] }>;
   // Cambio 4: IPC global
   ipcGlobalActivo?: boolean;
   ipcGlobalPorcentaje?: number;
@@ -174,6 +175,7 @@ export interface PlaneacionInitialData {
   paramPuntos?: Record<string, number>;
   icasConsolidarPct?: number;
   icasDesglosadoKeys?: string[];
+  icasSplitData?: Record<string, { cons: number[]; rad: number[] }>;
   ipcGlobalActivo?: boolean;
   ipcGlobalPorcentaje?: number;
   ipcMeses?: number[];
@@ -1367,6 +1369,10 @@ export const PlaneacionWizard: React.FC<Props> = ({
   // ICAs: si está desglosado, el ítem se programa como DOS ítems (Consolidar / Elaborar y Radicar).
   // Desglose por ítem: claves (id de ítem ICAs) que están desglosadas.
   const [icasDesglosadoKeys, setIcasDesglosadoKeys] = useState<Set<string>>(new Set());
+  // ICAs: cantidades mensuales del desglose (Consolidar/Radicación) por ítem.
+  // Persisten al unir/re-desglosar para no perder lo digitado; al unir, el ítem
+  // único conserva el DINERO (consPrecio×cons + radPrecio×rad), no la suma de cantidades.
+  const [icasSplitData, setIcasSplitData] = useState<Record<string, { cons: number[]; rad: number[] }>>({});
   // Cambio 4: IPC global (uno solo para toda la planeación)
   const [ipcGlobalActivo, setIpcGlobalActivo] = useState<boolean>(false);
   const [ipcGlobalPorcentaje, setIpcGlobalPorcentaje] = useState<number>(0);
@@ -1562,6 +1568,7 @@ export const PlaneacionWizard: React.FC<Props> = ({
       ));
       if (typeof initialData.icasConsolidarPct === 'number') setIcasConsolidarPct(initialData.icasConsolidarPct);
       setIcasDesglosadoKeys(new Set(initialData.icasDesglosadoKeys ?? []));
+      setIcasSplitData(initialData.icasSplitData ?? {});
       setMonthlyData(initialData.programacion ?? []);
       setIpcGlobalActivo(initialData.ipcGlobalActivo ?? false);
       setIpcGlobalPorcentaje(initialData.ipcGlobalPorcentaje ?? 0);
@@ -1613,6 +1620,7 @@ export const PlaneacionWizard: React.FC<Props> = ({
       setSelectedItems(new Set());
       setDeletedKeys(new Set());
       setIcasDesglosadoKeys(new Set());
+      setIcasSplitData({});
       setSelectedLogistica(new Set(ITEMS_LOGISTICA.map(it => it.id)));
       setSelectedMatrices(new Set());
       setMatrizDetalleActiva(null);
@@ -1869,31 +1877,36 @@ export const PlaneacionWizard: React.FC<Props> = ({
           for (const it of availableItems.filter(it => selectedItems.has(it.id))) {
             // ICAs: tarifa por ítem según el año (2026/2027). Otras líneas: precio efectivo.
             const base = isIcas ? (it.precioReferencia || TARIFA_ICAS) : (isPrecioPorMes ? 0 : ItemsLineaService.getPrecioEfectivo(it, i));
+            const pc = Math.max(0, Math.min(100, icasConsolidarPct)) / 100;
+            const consPrecio = ICAS_CONSOLIDAR_2026;
+            const radPrecio = base * (1 - pc);
+            const saved = icasSplitData[it.id];
             if (isIcas && icasDesglosadoKeys.has(it.id)) {
-              // ICAs desglosado (2026): Consolidar valor fijo; Radicación se mantiene en 30%.
-              // Ambos arrancan en 0 (sin auto-distribución); el usuario digita cada mes.
-              const pc = Math.max(0, Math.min(100, icasConsolidarPct)) / 100;
-              const consPrecio = ICAS_CONSOLIDAR_2026;
-              const radPrecio = base * (1 - pc);
+              // ICAs desglosado (2026): Consolidar valor fijo; Radicación al 30%.
+              // La cantidad se toma de lo digitado en sesión (prev) o, si se re-desglosa
+              // tras unir, de icasSplitData (no se pierde lo digitado). Default 0.
               const prevCons = existing?.preciosIndividuales?.find(p => p.key === `${it.id}::CONSOLIDAR`);
               const prevRad = existing?.preciosIndividuales?.find(p => p.key === `${it.id}::RADICACION`);
-              const eC = buildEntry(`${it.id}::CONSOLIDAR`, 'Consolidar información para ICAS', consPrecio, i, existing, 1);
-              eC.cantidad = prevCons?.cantidad ?? 0;
+              // forcePrice=true: el precio es fijo (no se hereda de datos guardados/corruptos).
+              const eC = buildEntry(`${it.id}::CONSOLIDAR`, 'Consolidar información para ICAS', consPrecio, i, existing, 1, true);
+              eC.cantidad = prevCons?.cantidad ?? saved?.cons[i] ?? 0;
               eC.total = calculateEntryTotal(eC, i);
-              const eR = buildEntry(`${it.id}::RADICACION`, 'Radicación información para ICAS', radPrecio, i, existing, 1);
-              eR.cantidad = prevRad?.cantidad ?? 0;
+              const eR = buildEntry(`${it.id}::RADICACION`, 'Radicación información para ICAS', radPrecio, i, existing, 1, true);
+              eR.cantidad = prevRad?.cantidad ?? saved?.rad[i] ?? 0;
               eR.total = calculateEntryTotal(eR, i);
               list.push(eC, eR);
             } else {
-              // Al unir, el ítem único SUMA las cantidades de Consolidar + Radicación (suma directa).
-              const e = buildEntry(it.id, it.item, base, i, existing, 1);
-              if (isIcas && !existing?.preciosIndividuales?.find(p => p.key === it.id)) {
-                const prevCons = existing?.preciosIndividuales?.find(p => p.key === `${it.id}::CONSOLIDAR`);
-                const prevRad = existing?.preciosIndividuales?.find(p => p.key === `${it.id}::RADICACION`);
-                if (prevCons || prevRad) {
-                  e.cantidad = roundCant((prevCons?.cantidad ?? 0) + (prevRad?.cantidad ?? 0));
-                  e.total = calculateEntryTotal(e, i);
-                }
+              // Al unir, el ítem único conserva el DINERO del desglose:
+              //   total = consPrecio×consCant + radPrecio×radCant
+              // y la cantidad se deriva (= total / tarifa) para mantener $/u = tarifa.
+              // forcePrice para ICAs: la tarifa siempre es la del año (no se corrompe).
+              const e = buildEntry(it.id, it.item, base, i, existing, 1, isIcas);
+              const prevSingle = existing?.preciosIndividuales?.find(p => p.key === it.id);
+              if (isIcas && saved && !prevSingle) {
+                // Primera vez que se une: derivar del desglose guardado (preserva el dinero).
+                const money = consPrecio * (saved.cons[i] ?? 0) + radPrecio * (saved.rad[i] ?? 0);
+                e.cantidad = base > 0 ? money / base : 0;
+                e.total = calculateEntryTotal(e, i);
               }
               list.push(e);
             }
@@ -1923,7 +1936,7 @@ export const PlaneacionWizard: React.FC<Props> = ({
         };
       });
     });
-  }, [step, paramTipoMuestra, paramCantCompuestos, paramPuntos, icasDesglosadoKeys, icasConsolidarPct]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [step, paramTipoMuestra, paramCantCompuestos, paramPuntos, icasDesglosadoKeys, icasConsolidarPct, icasSplitData]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Filtered params (monitoreos) ──
   const filteredParams = useMemo(() => {
@@ -2153,6 +2166,23 @@ export const PlaneacionWizard: React.FC<Props> = ({
       return next;
     });
   }, [calculateEntryTotal]);
+
+  // ── ICAs: abrir desglose de un ítem (Consolidar / Radicación) ──
+  const abrirDesgloseIca = useCallback((baseId: string) => {
+    setIcasDesglosadoKeys(prev => new Set(prev).add(baseId));
+  }, []);
+
+  // ── ICAs: unir el desglose en un solo ítem ──
+  // Captura las cantidades mensuales de Consolidar/Radicación para no perderlas
+  // (se restauran si se vuelve a desglosar) y para derivar el dinero del ítem unido.
+  const unirIca = useCallback((baseId: string) => {
+    const cons = Array.from({ length: 12 }, (_, i) =>
+      monthlyData[i]?.preciosIndividuales?.find(p => p.key === `${baseId}::CONSOLIDAR`)?.cantidad ?? 0);
+    const rad = Array.from({ length: 12 }, (_, i) =>
+      monthlyData[i]?.preciosIndividuales?.find(p => p.key === `${baseId}::RADICACION`)?.cantidad ?? 0);
+    setIcasSplitData(sd => ({ ...sd, [baseId]: { cons, rad } }));
+    setIcasDesglosadoKeys(prev => { const s = new Set(prev); s.delete(baseId); return s; });
+  }, [monthlyData]);
 
   // ── Precio digitado por mes (línea Pagos): edita solo el mes indicado ──
   const updateItemMonthPrice = useCallback((mesIndex: number, itemKey: string, value: number) => {
@@ -2553,6 +2583,7 @@ export const PlaneacionWizard: React.FC<Props> = ({
         paramPuntos: Object.fromEntries(paramPuntos),
         icasConsolidarPct,
         icasDesglosadoKeys: [...icasDesglosadoKeys],
+        icasSplitData,
         ipcGlobalActivo,
         ipcGlobalPorcentaje,
         ipcMeses: [...ipcMeses],
@@ -4497,6 +4528,7 @@ export const PlaneacionWizard: React.FC<Props> = ({
                                 <Input
                                   inputMode="numeric"
                                   size="small"
+                                  readOnly={isIcas}
                                   value={item.precio > 0 ? item.precio.toLocaleString('es-CO') : ''}
                                   placeholder="0"
                                   onChange={(_, d) => updateItemPrice(item.key, parseCOPInput(d.value))}
@@ -4508,14 +4540,14 @@ export const PlaneacionWizard: React.FC<Props> = ({
 
                             {isIcas && !item.key.includes('::') && item.key.includes('-2026') && (
                               <Button size="small" appearance="primary" icon={<EditRegular />}
-                                onClick={() => setIcasDesglosadoKeys(prev => new Set(prev).add(item.key))}
+                                onClick={() => abrirDesgloseIca(item.key)}
                                 style={{ borderRadius: '8px', alignSelf: 'flex-start', background: CENIT_COLORS.blueBrand }}>
                                 Abrir desglose (2 ítems)
                               </Button>
                             )}
                             {isIcas && item.key.endsWith('::CONSOLIDAR') && (
                               <Button size="small" appearance="subtle" icon={<DismissRegular />}
-                                onClick={() => setIcasDesglosadoKeys(prev => { const s = new Set(prev); s.delete(item.key.split('::')[0]); return s; })}
+                                onClick={() => unirIca(item.key.split('::')[0])}
                                 style={{ borderRadius: '8px', alignSelf: 'flex-start' }}>
                                 Unir en un ítem
                               </Button>
@@ -4701,14 +4733,14 @@ export const PlaneacionWizard: React.FC<Props> = ({
                               </div>
                               {isIcas && !item.key.includes('::') && item.key.includes('-2026') && (
                                 <Button size="small" appearance="primary" icon={<EditRegular />}
-                                  onClick={() => setIcasDesglosadoKeys(prev => new Set(prev).add(item.key))}
+                                  onClick={() => abrirDesgloseIca(item.key)}
                                   style={{ marginBottom: '4px', borderRadius: '8px', background: CENIT_COLORS.blueBrand }}>
                                   Abrir desglose (2 ítems)
                                 </Button>
                               )}
                               {isIcas && item.key.endsWith('::CONSOLIDAR') && (
                                 <Button size="small" appearance="subtle" icon={<DismissRegular />}
-                                  onClick={() => setIcasDesglosadoKeys(prev => { const s = new Set(prev); s.delete(item.key.split('::')[0]); return s; })}
+                                  onClick={() => unirIca(item.key.split('::')[0])}
                                   style={{ marginBottom: '4px', borderRadius: '8px' }}>
                                   Unir en un ítem
                                 </Button>
@@ -4719,6 +4751,7 @@ export const PlaneacionWizard: React.FC<Props> = ({
                                   <Input
                                     inputMode="numeric"
                                     size="small"
+                                    readOnly={isIcas}
                                     value={item.precio > 0 ? item.precio.toLocaleString('es-CO') : ''}
                                     placeholder="0"
                                     onChange={(_, d) => updateItemPrice(item.key, parseCOPInput(d.value))}
