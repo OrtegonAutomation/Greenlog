@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   makeStyles, shorthands, tokens,
   Caption1, Dropdown, Input, Option, Textarea,
@@ -12,6 +12,8 @@ import {
   contratosPorTipo, getContratoByNo,
   TIPO_CONTRATO_LABEL,
 } from '../../data/contratosAmbientales';
+import { NecesidadesService } from '../../services/NecesidadesService';
+import { CatalogoNecesidades, NECESIDADES_DEFAULT } from '../../data/necesidades';
 
 export interface DatosAuxiliaresPresupuestales {
   procesoAbastecimiento: string;
@@ -23,6 +25,9 @@ export interface DatosAuxiliaresPresupuestales {
   administrador: string;
   supervisor: string;
   estadoContrato: string;
+  necesidad: string;
+  subnecesidad: string;
+  /** Notas libres (antes "Descripción de la necesidad"); se exportan como "Observaciones". */
   descripcionNecesidad: string;
 }
 
@@ -36,8 +41,11 @@ export const DEFAULT_DATOS_AUXILIARES: DatosAuxiliaresPresupuestales = {
   administrador: '',
   supervisor: '',
   estadoContrato: 'VIGENTE',
+  necesidad: '',
+  subnecesidad: '',
   descripcionNecesidad: '',
 };
+
 
 interface Props {
   value: DatosAuxiliaresPresupuestales;
@@ -100,8 +108,35 @@ export const DatosAuxiliaresPresupuestalesForm: React.FC<Props> = ({ value, onCh
   const contratoActual = useMemo(() => getContratoByNo(value.contrato), [value.contrato]);
   const [seleccion, setSeleccion] = useState<string>(contratoActual ? value.contrato : '');
 
+  // Catálogo de Necesidad → Subnecesidad (Supabase + bundle base).
+  const [catalogo, setCatalogo] = useState<CatalogoNecesidades>(NECESIDADES_DEFAULT);
+  useEffect(() => {
+    let cancel = false;
+    NecesidadesService.getCatalogo().then(c => { if (!cancel) setCatalogo(c); }).catch(() => {});
+    return () => { cancel = true; };
+  }, []);
+  const necesidades = useMemo(() => Object.keys(catalogo).sort((a, b) => a.localeCompare(b, 'es')), [catalogo]);
+  const subnecesidades = useMemo(
+    () => (value.necesidad && catalogo[value.necesidad]) ? catalogo[value.necesidad] : [],
+    [catalogo, value.necesidad],
+  );
+
   const handleChange = (field: keyof DatosAuxiliaresPresupuestales, nextValue: string) => {
     onChange({ ...value, [field]: nextValue });
+  };
+
+  // Necesidad: al cambiar (incluida una nueva), resetea la subnecesidad.
+  const setNecesidad = (n: string) => {
+    onChange({ ...value, necesidad: n, subnecesidad: '' });
+  };
+  // Subnecesidad: al fijarla, persiste el par en el catálogo (cualquier planeador).
+  const setSubnecesidad = (s: string) => {
+    onChange({ ...value, subnecesidad: s });
+    const n = value.necesidad.trim();
+    if (n && s.trim() && !(catalogo[n]?.includes(s.trim()))) {
+      setCatalogo(prev => ({ ...prev, [n]: [...(prev[n] ?? []), s.trim()].sort((a, b) => a.localeCompare(b, 'es')) }));
+      void NecesidadesService.crearPar(n, s.trim());
+    }
   };
 
   const handleSeleccionContrato = (optionValue?: string) => {
@@ -251,6 +286,39 @@ export const DatosAuxiliaresPresupuestalesForm: React.FC<Props> = ({ value, onCh
         />
       </div>
 
+      <div className={styles.fieldGroup}>
+        <span className={styles.fieldLabel}>Necesidad <span style={{ color: '#e00' }}>*</span></span>
+        <Combobox
+          placeholder="Elige o escribe una nueva necesidad…"
+          freeform
+          value={value.necesidad}
+          selectedOptions={value.necesidad ? [value.necesidad] : []}
+          onOptionSelect={(_, data) => setNecesidad(data.optionValue || '')}
+          onChange={(e) => setNecesidad((e.target as HTMLInputElement).value)}
+        >
+          {necesidades.map(n => <Option key={n} value={n} text={n}>{n}</Option>)}
+        </Combobox>
+        <Caption1 style={{ color: tokens.colorNeutralForeground3 }}>
+          Escribe una nueva para crearla; quedará disponible para todos.
+        </Caption1>
+      </div>
+
+      <div className={styles.fieldGroup}>
+        <span className={styles.fieldLabel}>Subnecesidad <span style={{ color: '#e00' }}>*</span></span>
+        <Combobox
+          placeholder={value.necesidad ? 'Elige o escribe una nueva subnecesidad…' : 'Selecciona primero la necesidad'}
+          freeform
+          disabled={!value.necesidad.trim()}
+          value={value.subnecesidad}
+          selectedOptions={value.subnecesidad ? [value.subnecesidad] : []}
+          onOptionSelect={(_, data) => setSubnecesidad(data.optionValue || '')}
+          onChange={(e) => handleChange('subnecesidad', (e.target as HTMLInputElement).value)}
+          onBlur={(e) => setSubnecesidad((e.target as HTMLInputElement).value)}
+        >
+          {subnecesidades.map(s => <Option key={s} value={s} text={s}>{s}</Option>)}
+        </Combobox>
+      </div>
+
       <div className={`${styles.fieldGroup} ${styles.fullWidth}`}>
         <span className={styles.fieldLabel}>Objeto del Contrato</span>
         <Textarea
@@ -262,14 +330,15 @@ export const DatosAuxiliaresPresupuestalesForm: React.FC<Props> = ({ value, onCh
       </div>
 
       <div className={`${styles.fieldGroup} ${styles.fullWidth}`}>
-        <span className={styles.fieldLabel}>Descripción de la Necesidad (Resumen)</span>
+        <span className={styles.fieldLabel}>Observaciones</span>
         <Textarea
           value={value.descripcionNecesidad}
           onChange={(_, data) => handleChange('descripcionNecesidad', data.value)}
+          placeholder="Notas u observaciones de la actividad…"
           resize="vertical"
         />
         <Caption1 style={{ color: tokens.colorNeutralForeground3 }}>
-          Esta información se incluirá en la exportación presupuestal.
+          Se incluye al final de la exportación presupuestal como "Observaciones".
         </Caption1>
       </div>
     </div>

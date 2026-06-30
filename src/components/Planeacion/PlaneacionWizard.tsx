@@ -2546,7 +2546,9 @@ export const PlaneacionWizard: React.FC<Props> = ({
         }
         if (step === STEP_DATOS_AUXILIARES) {
           return datosAuxiliaresPresupuestales.contrato.trim().length > 0
-            && datosAuxiliaresPresupuestales.proveedor.trim().length > 0;
+            && datosAuxiliaresPresupuestales.proveedor.trim().length > 0
+            && datosAuxiliaresPresupuestales.necesidad.trim().length > 0
+            && datosAuxiliaresPresupuestales.subnecesidad.trim().length > 0;
         }
         if (step === STEP_PARAMETROS) {
           if (preserveNextProgramacionBuild && monthlyData.length > 0) return true;

@@ -331,6 +331,8 @@ const buildInitialDataFromActividad = (actividad: ActividadAmbiental, opx: any):
       fechaFin:              opx.fechaFin     ?? actividad.fechaFin    ?? '',
       estadoContrato:        opx.estadoContrato        ?? 'VIGENTE',
       procesoAbastecimiento: opx.procesoAbastecimiento ?? 'Ejecución contractual',
+      necesidad:             opx.necesidad             ?? '',
+      subnecesidad:          opx.subnecesidad          ?? '',
       descripcionNecesidad:  opx.descripcionNecesidad  ?? '',
     },
     programacion,

@@ -62,7 +62,8 @@ export const exportOpexToExcel = (actividades: ActividadAmbiental[]) => {
       "Administrador": opx.administrador || "",
       "Supervisor técnico": opx.supervisor || "",
       "Estado del contrato": opx.estadoContrato || "",
-      "Descripción de la necesidad": opx.descripcionNecesidad || item.tarea,
+      "Necesidad": opx.necesidad || "",
+      "Subnecesidad": opx.subnecesidad || "",
       // Compensaciones metadata (empty for non-compensaciones)
       "ID Obligación": opx.obligacion?.id || "",
       "Fecha creación obligación": opx.obligacion?.fechaCreacion || "",
@@ -109,7 +110,10 @@ export const exportOpexToExcel = (actividades: ActividadAmbiental[]) => {
       "Total equivalente julio año 1 Ajustado8": 0, "Total equivalente agosto año 1 Ajustado9": 0,
       "Total equivalente septiembre año 1 Ajustado10": 0, "Total equivalente octubre año 1 Ajustado11": 0,
       "Total equivalente noviembre año 1 Ajustado12": 0, "Total equivalente diciembre año 1 Ajustado13": 0,
-      "Total equivalente año 1 Ajustado14": 0
+      "Total equivalente año 1 Ajustado14": 0,
+
+      // Notas libres al final (antes "Descripción de la necesidad").
+      "Observaciones": opx.descripcionNecesidad || ""
     };
   });
 
@@ -218,7 +222,8 @@ export const exportDetalleInternoToExcel = (actividades: ActividadAmbiental[]) =
           "Año": anio,
           "Estación / Ubicación": estacion,
           "Objeto del contrato": objetoContrato,
-          "Descripcion de la necesidad": descripcionNecesidad,
+          "Necesidad": opx.necesidad || "",
+          "Subnecesidad": opx.subnecesidad || "",
           "Ítem / Parámetro": firstEntry.nombre,
           "Puntos": opx.paramTipoMuestra?.[itemKey] === 'compuesto' ? 0 : 1,
           "Compuestos": opx.paramTipoMuestra?.[itemKey] === 'compuesto' ? (opx.paramCantCompuestos?.[itemKey] || 1) : 0,
@@ -237,6 +242,7 @@ export const exportDetalleInternoToExcel = (actividades: ActividadAmbiental[]) =
           if (!(m in row)) row[m] = 0;
         }
         row["Total Anual"] = totalAnual;
+        row["Observaciones"] = descripcionNecesidad;
         rows.push(row);
       }
     } else {
@@ -253,7 +259,8 @@ export const exportDetalleInternoToExcel = (actividades: ActividadAmbiental[]) =
         "Año": anio,
         "Estación / Ubicación": estacion,
         "Objeto del contrato": objetoContrato,
-        "Descripcion de la necesidad": descripcionNecesidad,
+        "Necesidad": opx.necesidad || "",
+        "Subnecesidad": opx.subnecesidad || "",
         "Ítem / Parámetro": item.tarea || '',
         "Puntos": 0,
         "Compuestos": 0,
@@ -261,6 +268,7 @@ export const exportDetalleInternoToExcel = (actividades: ActividadAmbiental[]) =
       };
       for (const m of MESES_LABEL) row[m] = monthTotals[m] || 0;
       row["Total Anual"] = item.presupuestoPlan || 0;
+      row["Observaciones"] = descripcionNecesidad;
       rows.push(row);
     }
   }
