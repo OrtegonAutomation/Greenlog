@@ -324,21 +324,25 @@ export const DatosAuxiliaresPresupuestalesForm: React.FC<Props> = ({ value, onCh
         </Dropdown>
       </div>
 
-      <div className={`${styles.fieldGroup} ${styles.fullWidth}`} style={{ flexDirection: 'row', alignItems: 'center', gap: '10px' }}>
-        <Button size="small" icon={<AddRegular />} onClick={() => setGestionAbierto(true)}>
-          Crear / gestionar necesidades
-        </Button>
-        <Caption1 style={{ color: tokens.colorNeutralForeground3 }}>
-          ¿No está en la lista? Créala aquí (Necesidad + Subnecesidad){isAdmin ? ', elimina o usa la plantilla de carga masiva' : ''}.
-        </Caption1>
-      </div>
+      {isAdmin && (
+        <div className={`${styles.fieldGroup} ${styles.fullWidth}`} style={{ flexDirection: 'row', alignItems: 'center', gap: '10px' }}>
+          <Button size="small" icon={<AddRegular />} onClick={() => setGestionAbierto(true)}>
+            Crear / gestionar necesidades
+          </Button>
+          <Caption1 style={{ color: tokens.colorNeutralForeground3 }}>
+            Crea (Necesidad + Subnecesidad), elimina o usa la plantilla de carga masiva.
+          </Caption1>
+        </div>
+      )}
 
-      <NecesidadesAdminDialog
-        open={gestionAbierto}
-        onOpenChange={setGestionAbierto}
-        isAdmin={isAdmin}
-        onChanged={() => { NecesidadesService.invalidate(); void NecesidadesService.getCatalogo().then(setCatalogo); }}
-      />
+      {isAdmin && (
+        <NecesidadesAdminDialog
+          open={gestionAbierto}
+          onOpenChange={setGestionAbierto}
+          isAdmin={isAdmin}
+          onChanged={() => { NecesidadesService.invalidate(); void NecesidadesService.getCatalogo().then(setCatalogo); }}
+        />
+      )}
 
       <div className={styles.fieldGroup}>
         <span className={styles.fieldLabel}>Aplica Ajuste Tarifario</span>
