@@ -1,12 +1,13 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   makeStyles, shorthands, tokens,
-  Caption1, Dropdown, Input, Option, Textarea,
+  Caption1, Dropdown, Input, Option, Textarea, Button,
   Combobox, OptionGroup, Badge,
 } from '@fluentui/react-components';
 import {
   DocumentTextRegular,
   OrganizationRegular,
+  AddRegular,
 } from '@fluentui/react-icons';
 import {
   contratosPorTipo, getContratoByNo,
@@ -14,6 +15,8 @@ import {
 } from '../../data/contratosAmbientales';
 import { NecesidadesService } from '../../services/NecesidadesService';
 import { CatalogoNecesidades, NECESIDADES_DEFAULT } from '../../data/necesidades';
+import { NecesidadesAdminDialog } from './NecesidadesAdminDialog';
+import { useAuth } from '../../auth/AuthContext';
 
 export interface DatosAuxiliaresPresupuestales {
   procesoAbastecimiento: string;
@@ -108,8 +111,11 @@ export const DatosAuxiliaresPresupuestalesForm: React.FC<Props> = ({ value, onCh
   const contratoActual = useMemo(() => getContratoByNo(value.contrato), [value.contrato]);
   const [seleccion, setSeleccion] = useState<string>(contratoActual ? value.contrato : '');
 
+  const { isAdmin } = useAuth();
+
   // Catálogo de Necesidad → Subnecesidad (Supabase + bundle base).
   const [catalogo, setCatalogo] = useState<CatalogoNecesidades>(NECESIDADES_DEFAULT);
+  const [gestionAbierto, setGestionAbierto] = useState(false);
   useEffect(() => {
     let cancel = false;
     NecesidadesService.getCatalogo().then(c => { if (!cancel) setCatalogo(c); }).catch(() => {});
@@ -125,18 +131,9 @@ export const DatosAuxiliaresPresupuestalesForm: React.FC<Props> = ({ value, onCh
     onChange({ ...value, [field]: nextValue });
   };
 
-  // Necesidad: al cambiar (incluida una nueva), resetea la subnecesidad.
+  // Necesidad: al cambiar, resetea la subnecesidad.
   const setNecesidad = (n: string) => {
     onChange({ ...value, necesidad: n, subnecesidad: '' });
-  };
-  // Subnecesidad: al fijarla, persiste el par en el catálogo (cualquier planeador).
-  const setSubnecesidad = (s: string) => {
-    onChange({ ...value, subnecesidad: s });
-    const n = value.necesidad.trim();
-    if (n && s.trim() && !(catalogo[n]?.includes(s.trim()))) {
-      setCatalogo(prev => ({ ...prev, [n]: [...(prev[n] ?? []), s.trim()].sort((a, b) => a.localeCompare(b, 'es')) }));
-      void NecesidadesService.crearPar(n, s.trim());
-    }
   };
 
   const handleSeleccionContrato = (optionValue?: string) => {
@@ -286,39 +283,6 @@ export const DatosAuxiliaresPresupuestalesForm: React.FC<Props> = ({ value, onCh
         />
       </div>
 
-      <div className={styles.fieldGroup}>
-        <span className={styles.fieldLabel}>Necesidad <span style={{ color: '#e00' }}>*</span></span>
-        <Combobox
-          placeholder="Elige o escribe una nueva necesidad…"
-          freeform
-          value={value.necesidad}
-          selectedOptions={value.necesidad ? [value.necesidad] : []}
-          onOptionSelect={(_, data) => setNecesidad(data.optionValue || '')}
-          onChange={(e) => setNecesidad((e.target as HTMLInputElement).value)}
-        >
-          {necesidades.map(n => <Option key={n} value={n} text={n}>{n}</Option>)}
-        </Combobox>
-        <Caption1 style={{ color: tokens.colorNeutralForeground3 }}>
-          Escribe una nueva para crearla; quedará disponible para todos.
-        </Caption1>
-      </div>
-
-      <div className={styles.fieldGroup}>
-        <span className={styles.fieldLabel}>Subnecesidad <span style={{ color: '#e00' }}>*</span></span>
-        <Combobox
-          placeholder={value.necesidad ? 'Elige o escribe una nueva subnecesidad…' : 'Selecciona primero la necesidad'}
-          freeform
-          disabled={!value.necesidad.trim()}
-          value={value.subnecesidad}
-          selectedOptions={value.subnecesidad ? [value.subnecesidad] : []}
-          onOptionSelect={(_, data) => setSubnecesidad(data.optionValue || '')}
-          onChange={(e) => handleChange('subnecesidad', (e.target as HTMLInputElement).value)}
-          onBlur={(e) => setSubnecesidad((e.target as HTMLInputElement).value)}
-        >
-          {subnecesidades.map(s => <Option key={s} value={s} text={s}>{s}</Option>)}
-        </Combobox>
-      </div>
-
       <div className={`${styles.fieldGroup} ${styles.fullWidth}`}>
         <span className={styles.fieldLabel}>Objeto del Contrato</span>
         <Textarea
@@ -328,6 +292,47 @@ export const DatosAuxiliaresPresupuestalesForm: React.FC<Props> = ({ value, onCh
           resize="vertical"
         />
       </div>
+
+      <div className={styles.fieldGroup}>
+        <span className={styles.fieldLabel}>Necesidad <span style={{ color: '#e00' }}>*</span></span>
+        <Dropdown
+          placeholder="Seleccione una necesidad"
+          value={value.necesidad}
+          selectedOptions={value.necesidad ? [value.necesidad] : []}
+          onOptionSelect={(_, data) => setNecesidad(data.optionValue || '')}
+        >
+          {necesidades.map(n => <Option key={n} value={n}>{n}</Option>)}
+        </Dropdown>
+      </div>
+
+      <div className={styles.fieldGroup}>
+        <span className={styles.fieldLabel}>Subnecesidad <span style={{ color: '#e00' }}>*</span></span>
+        <Dropdown
+          placeholder={value.necesidad ? 'Seleccione una subnecesidad' : 'Elija primero la necesidad'}
+          disabled={!value.necesidad.trim()}
+          value={value.subnecesidad}
+          selectedOptions={value.subnecesidad ? [value.subnecesidad] : []}
+          onOptionSelect={(_, data) => handleChange('subnecesidad', data.optionValue || '')}
+        >
+          {subnecesidades.map(s => <Option key={s} value={s}>{s}</Option>)}
+        </Dropdown>
+      </div>
+
+      <div className={`${styles.fieldGroup} ${styles.fullWidth}`} style={{ flexDirection: 'row', alignItems: 'center', gap: '10px' }}>
+        <Button size="small" icon={<AddRegular />} onClick={() => setGestionAbierto(true)}>
+          Crear / gestionar necesidades
+        </Button>
+        <Caption1 style={{ color: tokens.colorNeutralForeground3 }}>
+          ¿No está en la lista? Créala aquí (Necesidad + Subnecesidad){isAdmin ? ', elimina o usa la plantilla de carga masiva' : ''}.
+        </Caption1>
+      </div>
+
+      <NecesidadesAdminDialog
+        open={gestionAbierto}
+        onOpenChange={setGestionAbierto}
+        isAdmin={isAdmin}
+        onChanged={() => { NecesidadesService.invalidate(); void NecesidadesService.getCatalogo().then(setCatalogo); }}
+      />
 
       <div className={`${styles.fieldGroup} ${styles.fullWidth}`}>
         <span className={styles.fieldLabel}>Observaciones</span>
