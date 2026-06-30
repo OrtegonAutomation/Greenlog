@@ -2186,9 +2186,37 @@ export const PlaneacionWizard: React.FC<Props> = ({
   }, [calculateEntryTotal]);
 
   // ── ICAs: abrir desglose de un ítem (Consolidar / Radicación) ──
+  // Si el ítem unido ya tiene datos digitados (y no hay un desglose guardado),
+  // se migran al desglose para NO perder la información: el dinero de cada mes se
+  // lleva a la fila Consolidar (Radicación inicia en 0), conservando el total.
   const abrirDesgloseIca = useCallback((baseId: string) => {
+    setIcasSplitData(sd => {
+      if (sd[baseId]) return sd; // ya hay desglose guardado: respetarlo
+      const baseItem = availableItems.find(it => it.id === baseId);
+      const base = baseItem?.precioReferencia || TARIFA_ICAS;
+      const pc = Math.max(0, Math.min(100, icasConsolidarPct)) / 100;
+      const consPrecioDefault = ICAS_CONSOLIDAR_2026;
+      const radPrecioDefault = base * (1 - pc);
+      const singles = Array.from({ length: 12 }, (_, i) =>
+        monthlyData[i]?.preciosIndividuales?.find(p => p.key === baseId));
+      const tieneDatos = singles.some(e => e && (e.cantidad ?? 0) > 0);
+      if (!tieneDatos) return sd; // sin datos: el desglose arranca vacío
+      const cons = singles.map(e => {
+        const money = (e?.precio ?? base) * (e?.cantidad ?? 0);
+        return consPrecioDefault > 0 ? money / consPrecioDefault : 0;
+      });
+      return {
+        ...sd,
+        [baseId]: {
+          cons,
+          rad: Array(12).fill(0),
+          consPrecio: Array(12).fill(consPrecioDefault),
+          radPrecio: Array(12).fill(radPrecioDefault),
+        },
+      };
+    });
     setIcasDesglosadoKeys(prev => new Set(prev).add(baseId));
-  }, []);
+  }, [availableItems, icasConsolidarPct, monthlyData]);
 
   // ── ICAs: unir el desglose en un solo ítem ──
   // Captura las cantidades mensuales de Consolidar/Radicación para no perderlas
