@@ -4,12 +4,13 @@
 import React, { useMemo, useState } from 'react';
 import {
   makeStyles, shorthands, tokens, mergeClasses,
-  Input, Button, Caption1,
+  Input, Button, Caption1, Select,
   Tooltip,
 } from '@fluentui/react-components';
 import {
   SearchRegular, DismissRegular, FilterRegular,
   LocationRegular, ClipboardTaskListLtrRegular, OrganizationRegular,
+  LayerRegular,
 } from '@fluentui/react-icons';
 import { ActividadAmbiental, EstadoActividad } from '../../types';
 import { StatusBadge } from '../shared/StatusBadge';
@@ -173,7 +174,7 @@ const parseOpex = (raw?: string) => {
 const formatter = new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 });
 
 // Anchos de columna (px) — table-layout: fixed los respeta exactamente
-const COL = { tarea: 280, proveedor: 210, zona: 150, presupuesto: 150, meses: 170, estado: 130 };
+const COL = { tarea: 260, linea: 160, proveedor: 200, zona: 150, presupuesto: 150, meses: 160, estado: 130 };
 
 // Estilos inline compartidos
 const thStyle: React.CSSProperties = {
@@ -218,6 +219,8 @@ export const ActivityTable: React.FC<ActivityTableProps> = ({ actividades, carga
   const [search, setSearch] = useState('');
   const [filtroEstado, setFiltroEstado] = useState<EstadoActividad | 'Todos'>('Todos');
   const [filtroAnio, setFiltroAnio] = useState<number | null>(null);
+  const [filtroZona, setFiltroZona] = useState<string>('Todas');
+  const [filtroLinea, setFiltroLinea] = useState<string>('Todas');
 
   // Compute available years from the data
   const aniosDisponibles = useMemo(() => {
@@ -229,12 +232,24 @@ export const ActivityTable: React.FC<ActivityTableProps> = ({ actividades, carga
     return [...years].sort();
   }, [actividades]);
 
+  // Zonas y líneas operativas presentes en los datos
+  const zonasDisponibles = useMemo(
+    () => [...new Set(actividades.map(a => a.zona).filter(Boolean))].sort(),
+    [actividades],
+  );
+  const lineasDisponibles = useMemo(
+    () => [...new Set(actividades.map(a => a.lineaOperativa).filter(Boolean))].sort(),
+    [actividades],
+  );
+
   const filtradas = useMemo(() => {
     const q = search.toLowerCase().trim();
     return actividades.filter((a) => {
       const matchEstado = filtroEstado === 'Todos' || a.estado === filtroEstado;
       if (!matchEstado) return false;
       if (filtroAnio !== null && (a as any).anioPlaneacion !== filtroAnio) return false;
+      if (filtroZona !== 'Todas' && a.zona !== filtroZona) return false;
+      if (filtroLinea !== 'Todas' && a.lineaOperativa !== filtroLinea) return false;
       if (!q) return true;
       return (
         a.tarea.toLowerCase().includes(q) ||
@@ -245,7 +260,7 @@ export const ActivityTable: React.FC<ActivityTableProps> = ({ actividades, carga
         (a.contrato ?? '').toLowerCase().includes(q)
       );
     });
-  }, [actividades, search, filtroEstado, filtroAnio]);
+  }, [actividades, search, filtroEstado, filtroAnio, filtroZona, filtroLinea]);
 
   return (
     <div className={styles.root}>
@@ -310,6 +325,32 @@ export const ActivityTable: React.FC<ActivityTableProps> = ({ actividades, carga
           </div>
         )}
 
+        {lineasDisponibles.length > 0 && (
+          <Select
+            size="small"
+            aria-label="Filtrar por línea operativa"
+            value={filtroLinea}
+            onChange={(_, d) => setFiltroLinea(d.value)}
+            style={{ minWidth: 0, maxWidth: 200 }}
+          >
+            <option value="Todas">Todas las líneas</option>
+            {lineasDisponibles.map(l => <option key={l} value={l}>{l}</option>)}
+          </Select>
+        )}
+
+        {zonasDisponibles.length > 0 && (
+          <Select
+            size="small"
+            aria-label="Filtrar por zona"
+            value={filtroZona}
+            onChange={(_, d) => setFiltroZona(d.value)}
+            style={{ minWidth: 0, maxWidth: 160 }}
+          >
+            <option value="Todas">Todas las zonas</option>
+            {zonasDisponibles.map(z => <option key={z} value={z}>{z}</option>)}
+          </Select>
+        )}
+
         <Caption1 className={styles.count}>
           {filtradas.length} {filtradas.length === 1 ? 'actividad' : 'actividades'}
         </Caption1>
@@ -357,9 +398,15 @@ export const ActivityTable: React.FC<ActivityTableProps> = ({ actividades, carga
                   {description && <span className={styles.mobileCardDesc}>{description}</span>}
                   <div className={styles.mobileCardMeta}>
                     <span className={styles.mobileCardMetaItem}>
+                      <LayerRegular style={{ fontSize: '14px', color: '#107C41' }} />
+                      {item.lineaOperativa || '—'}
+                    </span>
+                    <span className={styles.mobileCardMetaItem}>
                       <LocationRegular style={{ fontSize: '14px' }} />
                       {item.zona}{item.estacion ? ` · ${item.estacion}` : ''}
                     </span>
+                  </div>
+                  <div className={styles.mobileCardMeta}>
                     <span className={styles.mobileCardMetaItem}>
                       <OrganizationRegular style={{ fontSize: '14px' }} />
                       {opx?.proveedor || 'No asignado'}
@@ -379,6 +426,7 @@ export const ActivityTable: React.FC<ActivityTableProps> = ({ actividades, carga
           <table style={{ width: '100%', tableLayout: 'fixed', borderCollapse: 'collapse' }}>
             <colgroup>
               <col style={{ width: COL.tarea }} />
+              <col style={{ width: COL.linea }} />
               <col style={{ width: COL.proveedor }} />
               <col style={{ width: COL.zona }} />
               <col style={{ width: COL.presupuesto }} />
@@ -388,6 +436,7 @@ export const ActivityTable: React.FC<ActivityTableProps> = ({ actividades, carga
             <thead>
               <tr>
                 <th style={thStyle}>Objeto / Tarea</th>
+                <th style={thStyle}>Línea Operativa</th>
                 <th style={thStyle}>Contrato y Proveedor</th>
                 <th style={thStyle}>Ubicación</th>
                 <th style={thStyle}>Total OPEX</th>
@@ -431,6 +480,14 @@ export const ActivityTable: React.FC<ActivityTableProps> = ({ actividades, carga
                             {description.length > 60 ? description.substring(0, 60) + '...' : description}
                           </span>
                         </div>
+                      </div>
+                    </td>
+
+                    {/* Línea Operativa */}
+                    <td style={tdStyle}>
+                      <div style={cellInner}>
+                        <LayerRegular style={{ flexShrink: 0, fontSize: '16px', color: '#107C41' }} />
+                        <span style={line1}>{item.lineaOperativa || '—'}</span>
                       </div>
                     </td>
 
