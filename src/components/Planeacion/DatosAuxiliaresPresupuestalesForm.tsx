@@ -354,7 +354,10 @@ export const DatosAuxiliaresPresupuestalesForm: React.FC<Props> = ({ value, onCh
       </div>
 
       <div className={styles.fieldGroup}>
-        <span className={styles.fieldLabel}>Fecha del Ajuste Tarifario</span>
+        <span className={styles.fieldLabel}>
+          Fecha del Ajuste Tarifario
+          {value.aplicaAjusteTarifario === 'SI' && <span style={{ color: '#e00' }}> *</span>}
+        </span>
         <Input
           type="date"
           value={value.fechaAjusteTarifario}

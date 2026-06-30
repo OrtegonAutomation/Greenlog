@@ -2545,10 +2545,14 @@ export const PlaneacionWizard: React.FC<Props> = ({
           return true;
         }
         if (step === STEP_DATOS_AUXILIARES) {
+          // Si aplica ajuste tarifario, la fecha del ajuste es obligatoria.
+          const ajusteOk = datosAuxiliaresPresupuestales.aplicaAjusteTarifario !== 'SI'
+            || datosAuxiliaresPresupuestales.fechaAjusteTarifario.trim().length > 0;
           return datosAuxiliaresPresupuestales.contrato.trim().length > 0
             && datosAuxiliaresPresupuestales.proveedor.trim().length > 0
             && datosAuxiliaresPresupuestales.necesidad.trim().length > 0
-            && datosAuxiliaresPresupuestales.subnecesidad.trim().length > 0;
+            && datosAuxiliaresPresupuestales.subnecesidad.trim().length > 0
+            && ajusteOk;
         }
         if (step === STEP_PARAMETROS) {
           if (preserveNextProgramacionBuild && monthlyData.length > 0) return true;
