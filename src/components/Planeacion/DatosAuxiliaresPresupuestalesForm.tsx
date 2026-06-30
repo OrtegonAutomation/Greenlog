@@ -30,9 +30,6 @@ export interface DatosAuxiliaresPresupuestales {
   estadoContrato: string;
   necesidad: string;
   subnecesidad: string;
-  aplicaAjusteTarifario: string;        // 'SI' | 'NO' | ''
-  fechaAjusteTarifario: string;         // fecha (YYYY-MM-DD)
-  aplicaReajusteTablasSalariales: string; // 'SI' | 'NO' | ''
   /** Notas libres (antes "Descripción de la necesidad"); se exportan como "Observaciones". */
   descripcionNecesidad: string;
 }
@@ -49,9 +46,6 @@ export const DEFAULT_DATOS_AUXILIARES: DatosAuxiliaresPresupuestales = {
   estadoContrato: 'VIGENTE',
   necesidad: '',
   subnecesidad: '',
-  aplicaAjusteTarifario: '',
-  fechaAjusteTarifario: '',
-  aplicaReajusteTablasSalariales: '',
   descripcionNecesidad: '',
 };
 
@@ -343,46 +337,6 @@ export const DatosAuxiliaresPresupuestalesForm: React.FC<Props> = ({ value, onCh
           onChanged={() => { NecesidadesService.invalidate(); void NecesidadesService.getCatalogo().then(setCatalogo); }}
         />
       )}
-
-      <div className={styles.fieldGroup}>
-        <span className={styles.fieldLabel}>Aplica Ajuste Tarifario</span>
-        <Dropdown
-          placeholder="Seleccione"
-          value={value.aplicaAjusteTarifario}
-          selectedOptions={value.aplicaAjusteTarifario ? [value.aplicaAjusteTarifario] : []}
-          onOptionSelect={(_, data) => handleChange('aplicaAjusteTarifario', data.optionValue || '')}
-        >
-          <Option value="SI">SI</Option>
-          <Option value="NO">NO</Option>
-        </Dropdown>
-      </div>
-
-      <div className={styles.fieldGroup}>
-        <span className={styles.fieldLabel}>
-          Fecha del Ajuste Tarifario
-          {value.aplicaAjusteTarifario === 'SI' && <span style={{ color: '#e00' }}> *</span>}
-        </span>
-        <Input
-          type="date"
-          value={value.fechaAjusteTarifario}
-          disabled={value.aplicaAjusteTarifario !== 'SI'}
-          onChange={(_, data) => handleChange('fechaAjusteTarifario', data.value)}
-        />
-      </div>
-
-      <div className={`${styles.fieldGroup} ${styles.fullWidth}`}>
-        <span className={styles.fieldLabel}>Aplica Reajuste de tarifas por tablas salariales</span>
-        <Dropdown
-          placeholder="Seleccione"
-          value={value.aplicaReajusteTablasSalariales}
-          selectedOptions={value.aplicaReajusteTablasSalariales ? [value.aplicaReajusteTablasSalariales] : []}
-          onOptionSelect={(_, data) => handleChange('aplicaReajusteTablasSalariales', data.optionValue || '')}
-          style={{ maxWidth: '260px' }}
-        >
-          <Option value="SI">SI</Option>
-          <Option value="NO">NO</Option>
-        </Dropdown>
-      </div>
 
       <div className={`${styles.fieldGroup} ${styles.fullWidth}`}>
         <span className={styles.fieldLabel}>Observaciones</span>

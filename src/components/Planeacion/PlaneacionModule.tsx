@@ -334,9 +334,6 @@ const buildInitialDataFromActividad = (actividad: ActividadAmbiental, opx: any):
       procesoAbastecimiento: opx.procesoAbastecimiento ?? 'Ejecución contractual',
       necesidad:             opx.necesidad             ?? '',
       subnecesidad:          opx.subnecesidad          ?? '',
-      aplicaAjusteTarifario:          opx.aplicaAjusteTarifario          ?? '',
-      fechaAjusteTarifario:           opx.fechaAjusteTarifario           ?? '',
-      aplicaReajusteTablasSalariales: opx.aplicaReajusteTablasSalariales ?? '',
       descripcionNecesidad:  opx.descripcionNecesidad  ?? '',
     },
     programacion,
@@ -861,7 +858,7 @@ export const PlaneacionModule: React.FC = () => {
           )}
 
           {isAdmin && (
-            <Tooltip content="Completar masivamente Necesidad, Subnecesidad y Ajuste Tarifario en las planeaciones ya creadas" relationship="label">
+            <Tooltip content="Completar masivamente Necesidad y Subnecesidad en las planeaciones ya creadas" relationship="label">
               <Button
                 appearance="secondary"
                 icon={<DocumentEditRegular />}

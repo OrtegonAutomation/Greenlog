@@ -1,7 +1,7 @@
 // ============================================================
 // ActualizarPlaneacionesDialog — actualización masiva (admin) de planeaciones
-// ya creadas: backfill de Necesidad, Subnecesidad y los 3 campos de ajuste
-// tarifario, mediante una plantilla Excel descargable y cargable.
+// ya creadas: backfill de Necesidad y Subnecesidad, mediante una plantilla
+// Excel descargable y cargable.
 // Uso poco frecuente; la plantilla es explicativa.
 // ============================================================
 import React, { useRef, useState } from 'react';
@@ -19,18 +19,10 @@ import { NecesidadesService } from '../../services/NecesidadesService';
 const COL_CONTEXTO = ['ID', 'Línea Operativa', 'Zona', 'Lugar', 'Tarea', 'Contrato', 'Año'];
 const COL_NECESIDAD = 'Necesidad';
 const COL_SUBNECESIDAD = 'Subnecesidad';
-const COL_AJUSTE = 'Aplica Ajuste Tarifario (SI/NO)';
-const COL_FECHA = 'Fecha del Ajuste Tarifario (AAAA-MM-DD)';
-const COL_REAJUSTE = 'Aplica Reajuste tablas salariales (SI/NO)';
-const COL_EDITABLES = [COL_NECESIDAD, COL_SUBNECESIDAD, COL_AJUSTE, COL_FECHA, COL_REAJUSTE];
+const COL_EDITABLES = [COL_NECESIDAD, COL_SUBNECESIDAD];
 const HEADERS = [...COL_CONTEXTO, ...COL_EDITABLES];
 
 const parseOpex = (raw?: string): any => { try { return raw ? JSON.parse(raw) : {}; } catch { return {}; } };
-const toFecha = (v: unknown): string => {
-  if (!v) return '';
-  if (v instanceof Date) return v.toISOString().slice(0, 10);
-  return String(v).trim();
-};
 
 interface Props {
   open: boolean;
@@ -55,15 +47,11 @@ export const ActualizarPlaneacionesDialog: React.FC<Props> = ({ open, onOpenChan
       const wsI = wb.addWorksheet('Instrucciones');
       wsI.getColumn(1).width = 110;
       const instr = [
-        'ACTUALIZACIÓN MASIVA DE PLANEACIONES — Necesidad, Subnecesidad y Ajuste Tarifario',
+        'ACTUALIZACIÓN MASIVA DE PLANEACIONES — Necesidad y Subnecesidad',
         '',
         '1. En la hoja "Planeaciones" tienes una fila por cada planeación ya creada, con su información actual.',
         '2. NO modifiques las columnas grises (ID, Línea, Zona, Lugar, Tarea, Contrato, Año). El "ID" se usa para identificar la planeación.',
-        '3. Completa solo las columnas VERDES del final:',
-        '     • Necesidad y Subnecesidad (usa la hoja "Referencia" para ver las opciones válidas).',
-        '     • Aplica Ajuste Tarifario: escribe SI o NO.',
-        '     • Fecha del Ajuste Tarifario: solo si marcaste SI (formato AAAA-MM-DD).',
-        '     • Aplica Reajuste tablas salariales: SI o NO.',
+        '3. Completa solo las columnas VERDES del final: Necesidad y Subnecesidad (usa la hoja "Referencia" para ver las opciones válidas).',
         '4. Si dejas una celda verde vacía, esa planeación NO se cambia en ese campo (se conserva lo que ya tenía).',
         '5. Guarda el archivo y cárgalo con el botón "Cargar plantilla".',
       ];
@@ -106,9 +94,6 @@ export const ActualizarPlaneacionesDialog: React.FC<Props> = ({ open, onOpenChan
           opx.anioPlaneacion || (a as any).anioPlaneacion || '',
           opx.necesidad || '',
           opx.subnecesidad || '',
-          opx.aplicaAjusteTarifario || '',
-          opx.fechaAjusteTarifario || '',
-          opx.aplicaReajusteTablasSalariales || '',
         ]);
         row.eachCell({ includeEmpty: true }, (cell, c) => {
           cell.font = { size: 10 };
@@ -122,15 +107,13 @@ export const ActualizarPlaneacionesDialog: React.FC<Props> = ({ open, onOpenChan
       const listaNec = `"${necesidades.join(',')}"`;
       for (let r = 2; r <= lastRow; r++) {
         ws.getCell(r, colIdx(COL_NECESIDAD)).dataValidation = { type: 'list', allowBlank: true, formulae: [listaNec] };
-        ws.getCell(r, colIdx(COL_AJUSTE)).dataValidation = { type: 'list', allowBlank: true, formulae: ['"SI,NO"'] };
-        ws.getCell(r, colIdx(COL_REAJUSTE)).dataValidation = { type: 'list', allowBlank: true, formulae: ['"SI,NO"'] };
       }
 
       const buf = await wb.xlsx.writeBuffer();
       const blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
       const a = document.createElement('a');
       a.href = URL.createObjectURL(blob);
-      a.download = 'ActualizarPlaneaciones_NecesidadAjuste.xlsx';
+      a.download = 'ActualizarPlaneaciones_Necesidad.xlsx';
       a.click(); URL.revokeObjectURL(a.href);
       setMsg(`Plantilla generada con ${ordenadas.length} planeación(es).`);
     } catch (e) {
@@ -154,16 +137,10 @@ export const ActualizarPlaneacionesDialog: React.FC<Props> = ({ open, onOpenChan
         if (!act) { sinId++; continue; }
         const nec = String(row[COL_NECESIDAD] ?? '').trim();
         const sub = String(row[COL_SUBNECESIDAD] ?? '').trim();
-        const aj = String(row[COL_AJUSTE] ?? '').trim().toUpperCase();
-        const fecha = toFecha(row[COL_FECHA]);
-        const re = String(row[COL_REAJUSTE] ?? '').trim().toUpperCase();
-        if (!nec && !sub && !aj && !fecha && !re) continue; // nada que cambiar
+        if (!nec && !sub) continue; // nada que cambiar
         const opx = parseOpex(act.opexDataRaw);
         if (nec) opx.necesidad = nec;
         if (sub) opx.subnecesidad = sub;
-        if (aj) opx.aplicaAjusteTarifario = aj === 'SI' ? 'SI' : 'NO';
-        if (fecha) opx.fechaAjusteTarifario = fecha;
-        if (re) opx.aplicaReajusteTablasSalariales = re === 'SI' ? 'SI' : 'NO';
         try {
           await actualizar(id, { opexDataRaw: JSON.stringify(opx) });
           actualizadas++;
@@ -186,8 +163,8 @@ export const ActualizarPlaneacionesDialog: React.FC<Props> = ({ open, onOpenChan
           <DialogContent>
             <Caption1>
               Herramienta para completar de forma masiva, en las planeaciones ya creadas, la
-              <b> Necesidad</b>, <b>Subnecesidad</b> y los campos de <b>Ajuste Tarifario</b>. Descarga la
-              plantilla (trae todas las planeaciones con su información), complétala en Excel y cárgala.
+              <b> Necesidad</b> y <b>Subnecesidad</b>. Descarga la plantilla (trae todas las
+              planeaciones con su información), complétala en Excel y cárgala.
             </Caption1>
 
             <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', margin: '16px 0' }}>
