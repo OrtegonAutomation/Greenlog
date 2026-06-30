@@ -50,6 +50,13 @@ export const NecesidadesService = {
 
   invalidate() { _cache = null; },
 
+  /** Lista plana de pares (necesidad, subnecesidad) del catálogo vigente. */
+  async getPares(): Promise<Array<{ necesidad: string; subnecesidad: string }>> {
+    const cat = await this.getCatalogo();
+    return Object.entries(cat).flatMap(([necesidad, subs]) =>
+      subs.map(subnecesidad => ({ necesidad, subnecesidad })));
+  },
+
   /** Agrega un par (necesidad, subnecesidad) al catálogo. Devuelve true si persistió en supabase. */
   async crearPar(necesidad: string, subnecesidad: string): Promise<boolean> {
     const n = (necesidad || '').trim();
@@ -69,5 +76,44 @@ export const NecesidadesService = {
     } catch {
       return false;
     }
+  },
+
+  /** Importa varios pares (plantilla de carga masiva). Devuelve cuántos se procesaron. */
+  async importarPares(pares: Array<{ necesidad: string; subnecesidad: string }>): Promise<number> {
+    const limpios = pares
+      .map(p => ({ necesidad: (p.necesidad || '').trim(), subnecesidad: (p.subnecesidad || '').trim() }))
+      .filter(p => p.necesidad && p.subnecesidad);
+    if (limpios.length === 0) return 0;
+    if (_cache) for (const p of limpios) agregarPar(_cache, p.necesidad, p.subnecesidad);
+    if (!isSupabaseEnabled()) return limpios.length;
+    const supabase = getSupabaseClient();
+    const { data: sessionData } = await supabase.auth.getSession();
+    const email = sessionData.session?.user.email?.toLowerCase() ?? null;
+    const rows = limpios.map(p => ({ ...p, creado_por_email: email }));
+    const { error } = await supabase.from(TABLE).upsert(rows, { onConflict: 'necesidad,subnecesidad' });
+    if (error) throw error;
+    this.invalidate();
+    return limpios.length;
+  },
+
+  /** Elimina una subnecesidad (un par). */
+  async eliminarSubnecesidad(necesidad: string, subnecesidad: string): Promise<void> {
+    if (_cache?.[necesidad]) _cache[necesidad] = _cache[necesidad].filter(s => s !== subnecesidad);
+    if (!isSupabaseEnabled()) return;
+    const supabase = getSupabaseClient();
+    const { error } = await supabase.from(TABLE).delete()
+      .eq('necesidad', necesidad).eq('subnecesidad', subnecesidad);
+    if (error) throw error;
+    this.invalidate();
+  },
+
+  /** Elimina una necesidad padre completa (todas sus subnecesidades). */
+  async eliminarNecesidad(necesidad: string): Promise<void> {
+    if (_cache) delete _cache[necesidad];
+    if (!isSupabaseEnabled()) return;
+    const supabase = getSupabaseClient();
+    const { error } = await supabase.from(TABLE).delete().eq('necesidad', necesidad);
+    if (error) throw error;
+    this.invalidate();
   },
 };

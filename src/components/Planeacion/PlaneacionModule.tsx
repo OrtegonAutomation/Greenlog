@@ -4,7 +4,7 @@ import {
   Title2, Body1, Button, MessageBar, MessageBarBody, MessageBarTitle, Divider,
   Tooltip,
 } from '@fluentui/react-components';
-import { AddRegular, ArrowUploadRegular, DocumentArrowDownRegular, MoneyRegular } from '@fluentui/react-icons';
+import { AddRegular, ArrowUploadRegular, DocumentArrowDownRegular, MoneyRegular, AppsListRegular } from '@fluentui/react-icons';
 import { ActividadAmbiental, NuevaActividadPayload } from '../../types';
 import { useActividades } from '../../hooks/useActividades';
 import { MEDIA } from '../../hooks/useResponsive';
@@ -12,6 +12,7 @@ import { ActivityTable } from './ActivityTable';
 import { ActivityForm } from './ActivityForm';
 import { ActivityDetailPanel } from './ActivityDetailPanel';
 import { BulkUploadPanel, BulkUploadResult } from './BulkUploadPanel';
+import { NecesidadesAdminDialog } from './NecesidadesAdminDialog';
 import {
   PlaneacionMensual,
   PlaneacionMensualParam,
@@ -357,6 +358,7 @@ export const PlaneacionModule: React.FC = () => {
   const [detalleItem, setDetalleItem]            = useState<ActividadAmbiental | null>(null);
   const [detalleAbierto, setDetalleAbierto]      = useState(false);
   const [bulkAbierto, setBulkAbierto]            = useState(false);
+  const [necesidadesAbierto, setNecesidadesAbierto] = useState(false);
 
   const [wizardAbierto, setWizardAbierto]        = useState(false);
 
@@ -855,6 +857,20 @@ export const PlaneacionModule: React.FC = () => {
             </Tooltip>
           )}
 
+          {isAdmin && (
+            <Tooltip content="Gestionar el catálogo de Necesidades/Subnecesidades (eliminar, descargar y cargar plantilla)" relationship="label">
+              <Button
+                appearance="secondary"
+                icon={<AppsListRegular />}
+                size="large"
+                style={{ borderRadius: '12px', border: '1px solid rgba(0,0,0,0.1)' }}
+                onClick={() => setNecesidadesAbierto(true)}
+              >
+                Necesidades
+              </Button>
+            </Tooltip>
+          )}
+
           {canPlanAny && (
             <Button
               appearance="primary"
@@ -962,6 +978,11 @@ export const PlaneacionModule: React.FC = () => {
         onUpload={handleBulkUpload}
         guardando={guardando}
       />
+
+      {/* Gestión del catálogo de necesidades (admin) */}
+      {isAdmin && (
+        <NecesidadesAdminDialog open={necesidadesAbierto} onOpenChange={setNecesidadesAbierto} />
+      )}
 
       {/* Wizard de planeación unificado */}
       <PlaneacionWizard
