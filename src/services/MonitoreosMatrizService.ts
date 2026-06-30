@@ -33,9 +33,10 @@ async function loadData(): Promise<MonitoreosData> {
   if (_cache) return _cache;
   const mod = await import('./monitoreos_data.json');
   const base = mod.default as unknown as MonitoreosData;
-  // Parámetros suplementarios (no vienen del Excel base): Piezómetros Occidente.
+  // Parámetros suplementarios (no vienen del Excel base).
   const { PIEZOMETROS_ROWS } = await import('../data/piezometrosOccidente');
-  let matrizData = [...base.matrizData, ...PIEZOMETROS_ROWS];
+  const { SUELO_MONTERREY_ARD_ROWS } = await import('../data/sueloMonterreyARD');
+  let matrizData = [...base.matrizData, ...PIEZOMETROS_ROWS, ...SUELO_MONTERREY_ARD_ROWS];
   // Overlay de tarifas vigentes (tabla greenlog_tarifas_parametros o bundle del Excel).
   try {
     const { TarifasParametrosService } = await import('./TarifasParametrosService');
