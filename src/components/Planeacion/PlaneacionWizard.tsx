@@ -4549,7 +4549,6 @@ export const PlaneacionWizard: React.FC<Props> = ({
                     {(monthlyData[0]?.preciosIndividuales ?? []).map(item => {
                       const isLog = item.key.startsWith('LOG-');
                       const isIcaSplitRow = isIcas && item.key.includes('::');
-                      const isIcaBaseRow = isIcas && !isIcaSplitRow;
                       const rowTotal = monthlyData.reduce((s, m) => {
                         const e = m.preciosIndividuales.find(p => p.key === item.key);
                         return s + (e?.total ?? 0);
@@ -4585,7 +4584,6 @@ export const PlaneacionWizard: React.FC<Props> = ({
                                 <Input
                                   inputMode="numeric"
                                   size="small"
-                                  readOnly={isIcaBaseRow}
                                   value={item.precio > 0 ? item.precio.toLocaleString('es-CO') : ''}
                                   placeholder="0"
                                   onChange={(_, d) => updateItemPrice(item.key, parseCOPInput(d.value))}
@@ -4770,7 +4768,6 @@ export const PlaneacionWizard: React.FC<Props> = ({
                       {(monthlyData[0]?.preciosIndividuales ?? []).map(item => {
                         const isLog = item.key.startsWith('LOG-');
                         const isIcaSplitRow = isIcas && item.key.includes('::');
-                        const isIcaBaseRow = isIcas && !isIcaSplitRow;
                         const rowTotal = monthlyData.reduce((s, m) => {
                           const e = m.preciosIndividuales.find(p => p.key === item.key);
                           return s + (e?.total ?? 0);
@@ -4812,7 +4809,6 @@ export const PlaneacionWizard: React.FC<Props> = ({
                                   <Input
                                     inputMode="numeric"
                                     size="small"
-                                    readOnly={isIcaBaseRow}
                                     value={item.precio > 0 ? item.precio.toLocaleString('es-CO') : ''}
                                     placeholder="0"
                                     onChange={(_, d) => updateItemPrice(item.key, parseCOPInput(d.value))}
