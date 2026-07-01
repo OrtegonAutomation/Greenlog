@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import {
-  makeStyles, shorthands, tokens,
+  makeStyles, mergeClasses, shorthands, tokens,
   Title2, Title3, Body1, Caption1, Card, Button, Spinner, Select,
 } from '@fluentui/react-components';
 import { ArrowTrendingLinesRegular, DataBarVerticalRegular, FilterRegular } from '@fluentui/react-icons';
@@ -77,11 +77,13 @@ const useStyles = makeStyles({
   eyebrow: { fontSize: '11px', fontWeight: 700, letterSpacing: '1px', color: tokens.colorNeutralForeground3, textTransform: 'uppercase' },
   heroTitle: { fontSize: '30px', fontWeight: 800, color: '#003057', lineHeight: 1.05 },
   bigCard: {
-    ...shorthands.padding('16px'), borderRadius: '14px', background: 'rgba(255,255,255,0.9)',
+    ...shorthands.padding('12px', '14px'), borderRadius: '14px', background: 'rgba(255,255,255,0.9)',
     border: '1px solid rgba(0,0,0,0.05)', boxShadow: '0 4px 18px rgba(0,0,0,0.04)',
-    display: 'flex', flexDirection: 'column', ...shorthands.gap('4px'),
+    display: 'flex', flexDirection: 'column', ...shorthands.gap('3px'),
   },
-  bigValue: { fontSize: '34px', fontWeight: 800, color: '#003057', lineHeight: 1 },
+  bigValue: { fontSize: '27px', fontWeight: 800, color: '#003057', lineHeight: 1 },
+  // Variante compacta de chartCard para las tarjetas del hero (panel izquierdo).
+  heroChartCard: { ...shorthands.padding('14px'), rowGap: '2px' },
   pill: { display: 'inline-flex', alignItems: 'center', ...shorthands.gap('4px'), fontSize: '12px', fontWeight: 700, ...shorthands.padding('2px', '8px'), borderRadius: '999px', width: 'fit-content' },
   miniRow: { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', ...shorthands.gap('8px') },
   miniKpi: { ...shorthands.padding('10px', '10px'), borderRadius: '12px', background: 'rgba(255,255,255,0.7)', border: '1px solid rgba(0,0,0,0.04)', display: 'flex', flexDirection: 'column', ...shorthands.gap('2px') },
@@ -323,38 +325,38 @@ export const ReportesModule: React.FC = () => {
           </div>
 
           {/* Evolución 2026 vs 2027 + todas las líneas operativas, justo debajo del panel */}
-          <Card className={styles.chartCard} style={{ marginTop: 12 }}>
-            <span className={styles.chartTitle}>Evolución presupuesto {filtroZona !== 'Todas' ? `— ${filtroZona}` : ''}</span>
-            <span className={styles.chartHint}>Base 2026 vs 2027 (miles de millones COP).</span>
-            <ResponsiveContainer width="100%" height={200}>
-              <BarChart data={[{ nombre: '2026', valor: resumen.total2026 }, { nombre: '2027', valor: resumen.total2027 }]} margin={{ left: 4, right: 10 }}>
+          <Card className={mergeClasses(styles.chartCard, styles.heroChartCard)} style={{ marginTop: 10 }}>
+            <span className={styles.chartTitle} style={{ fontSize: 14 }}>Evolución presupuesto {filtroZona !== 'Todas' ? `— ${filtroZona}` : ''}</span>
+            <span className={styles.chartHint} style={{ marginBottom: 4 }}>Base 2026 vs 2027 (miles de millones COP).</span>
+            <ResponsiveContainer width="100%" height={150}>
+              <BarChart data={[{ nombre: '2026', valor: resumen.total2026 }, { nombre: '2027', valor: resumen.total2027 }]} margin={{ top: 18, left: 0, right: 10 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                <XAxis dataKey="nombre" tick={{ fontSize: 12, fontWeight: 700 }} />
-                <YAxis tickFormatter={fmtAxis} tick={{ fontSize: 11 }} />
+                <XAxis dataKey="nombre" tick={{ fontSize: 11, fontWeight: 700 }} />
+                <YAxis tickFormatter={(v: number) => `$${(v / 1e9).toFixed(0)}`} tick={{ fontSize: 10 }} width={34} />
                 <RTooltip content={<TT />} />
-                <Bar dataKey="valor" radius={[6, 6, 0, 0]} barSize={64}>
+                <Bar dataKey="valor" radius={[6, 6, 0, 0]} barSize={48}>
                   <Cell fill="#9db8d6" /><Cell fill={AZUL} />
-                  <LabelList dataKey="valor" position="top" formatter={(v: any) => fmtB(Number(v))} style={{ fontSize: 11, fontWeight: 800, fill: '#003057' }} />
+                  <LabelList dataKey="valor" position="top" formatter={(v: any) => fmtB(Number(v))} style={{ fontSize: 10, fontWeight: 800, fill: '#003057' }} />
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
           </Card>
 
-          <Card className={styles.chartCard} style={{ marginTop: 12 }}>
-            <span className={styles.chartTitle}>Líneas operativas {filtroZona !== 'Todas' ? `— ${filtroZona}` : ''}</span>
-            <span className={styles.chartHint}>Presupuesto 2027 por línea operativa.</span>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 9, marginTop: 8 }}>
+          <Card className={mergeClasses(styles.chartCard, styles.heroChartCard)} style={{ marginTop: 10 }}>
+            <span className={styles.chartTitle} style={{ fontSize: 14 }}>Líneas operativas {filtroZona !== 'Todas' ? `— ${filtroZona}` : ''}</span>
+            <span className={styles.chartHint} style={{ marginBottom: 4 }}>Presupuesto 2027 por línea operativa.</span>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 4 }}>
               {R.lineasOrdenadas.map(f => {
                 const mayor = R.lineasOrdenadas[0]?.valor || 1;
                 const pctBar = (f.valor / mayor) * 100;
                 const pctTot = pareto.total ? (f.valor / pareto.total) * 100 : 0;
                 return (
                   <div key={f.nombre}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 3 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, marginBottom: 2 }}>
                       <span style={{ fontWeight: 600, color: '#323130', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 180 }}>{f.nombre}</span>
                       <span style={{ fontWeight: 700, color: '#003057' }}>{fmtB(f.valor)} <span style={{ color: tokens.colorNeutralForeground3, fontWeight: 500 }}>{pctTot.toFixed(0)}%</span></span>
                     </div>
-                    <div style={{ height: 8, background: 'rgba(0,0,0,0.05)', borderRadius: 5 }}>
+                    <div style={{ height: 6, background: 'rgba(0,0,0,0.05)', borderRadius: 5 }}>
                       <div style={{ width: `${pctBar}%`, height: '100%', background: AZUL, borderRadius: 5, transition: 'width 0.6s cubic-bezier(0.16,1,0.3,1)' }} />
                     </div>
                   </div>
