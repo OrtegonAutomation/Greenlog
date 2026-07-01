@@ -58,6 +58,12 @@ const useStyles = makeStyles({
     position: 'relative', zIndex: 2, maxWidth: '400px', display: 'flex', flexDirection: 'column',
     [MEDIA.mobile]: { maxWidth: '100%' },
   },
+  // Bloque de título flotante en la esquina inferior derecha del mapa
+  heroCaption: {
+    position: 'absolute', right: '2%', bottom: '4px', zIndex: 2, maxWidth: '320px', textAlign: 'right',
+    pointerEvents: 'none',
+    [MEDIA.mobile]: { position: 'relative', right: 0, bottom: 0, textAlign: 'left', maxWidth: '100%', marginTop: '12px', order: 3 },
+  },
   hero: {
     display: 'grid', gridTemplateColumns: '360px 1fr', ...shorthands.gap('16px'), alignItems: 'stretch',
     [MEDIA.mobile]: { gridTemplateColumns: '1fr' },
@@ -303,20 +309,6 @@ export const ReportesModule: React.FC = () => {
 
         {/* Contenido flotante (izquierda) */}
         <div className={styles.heroContent}>
-          <span className={styles.eyebrow}>Presupuesto 2026 vs 2027</span>
-          <div className={styles.heroTitle} style={{ margin: '4px 0 6px' }}>Explora por zona</div>
-          <Caption1 style={{ color: tokens.colorNeutralForeground3, marginBottom: 14, maxWidth: 320 }}>
-            Selecciona una zona en el mapa (o en la lista) para filtrar y analizar su presupuesto.
-          </Caption1>
-
-          <div className={styles.filterItem} style={{ marginBottom: 12 }}>
-            <span className={styles.filterLabel}>Zona seleccionada</span>
-            <Select size="medium" value={filtroZona} onChange={(_, d) => setFiltroZona(d.value)}>
-              <option value="Todas">Todas las zonas (general)</option>
-              {opciones.zonas.map(z => <option key={z} value={z}>{z}</option>)}
-            </Select>
-          </div>
-
           <div className={styles.bigCard}>
             <span className={styles.kpiLabel}>Presupuesto 2027</span>
             <div className={styles.bigValue}>{fmtB(resumen.total2027)} <span style={{ fontSize: 13, color: tokens.colorNeutralForeground3 }}>COP</span></div>
@@ -334,6 +326,15 @@ export const ReportesModule: React.FC = () => {
             <div className={styles.miniKpi}><span className={styles.miniLabel}>Mayor mes caja</span><span className={styles.miniValue}>{caja.picoMes}</span><Caption1 style={{ fontSize: 10, color: tokens.colorNeutralForeground3 }}>{fmtB(caja.picoValor)}</Caption1></div>
             <div className={styles.miniKpi}><span className={styles.miniLabel}>Actividades</span><span className={styles.miniValue}>{R.resumenAmbito.nActividades}</span></div>
           </div>
+        </div>
+
+        {/* Título flotante en la esquina inferior derecha del mapa */}
+        <div className={styles.heroCaption}>
+          <span className={styles.eyebrow}>Presupuesto 2026 vs 2027</span>
+          <div className={styles.heroTitle} style={{ margin: '4px 0 6px' }}>Explora por zona</div>
+          <Caption1 style={{ color: tokens.colorNeutralForeground3, display: 'block' }}>
+            Selecciona una zona en el mapa para filtrar y analizar su presupuesto.
+          </Caption1>
         </div>
       </div>
 
