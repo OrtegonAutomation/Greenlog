@@ -58,18 +58,21 @@ export const ColombiaMapa: React.FC<Props> = ({ presupuestoPorZona, crecimientoP
   const callouts = (() => {
     const total = zonas.reduce((s, z) => s + (presupuestoPorZona[z] ?? 0), 0) || 1;
     const items = zonas.map(z => ({ z, ...ZONA_CIUDAD[z], v: presupuestoPorZona[z] ?? 0 }));
-    const colocar = (col: typeof items, bx: number) => {
+    // Tarjeta cerca de su departamento (offset corto desde el punto),
+    // hacia el lado con más espacio; de-solape vertical por lado.
+    const colocar = (col: typeof items, izquierda: boolean) => {
       let prev = -Infinity;
       return col.sort((a, b) => a.cy - b.cy).map(i => {
+        const bx = Math.min(Math.max(izquierda ? i.cx - CW - 55 : i.cx + 55, 4), 760 - CW - 4);
         let by = Math.min(Math.max(i.cy - CH / 2, 6), 903 - CH - 6);
-        if (by < prev + CH + 14) by = prev + CH + 14;
+        if (by < prev + CH + 12) by = prev + CH + 12;
         prev = by;
         return { ...i, bx, by, total };
       });
     };
     return [
-      ...colocar(items.filter(i => i.cx < 380), 4),
-      ...colocar(items.filter(i => i.cx >= 380), 760 - CW - 4),
+      ...colocar(items.filter(i => i.cx < 380), true),
+      ...colocar(items.filter(i => i.cx >= 380), false),
     ];
   })();
 
