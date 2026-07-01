@@ -41,9 +41,32 @@ const useStyles = makeStyles({
   filterItem: { display: 'flex', flexDirection: 'column', ...shorthands.gap('2px') },
   filterLabel: { fontSize: '11px', fontWeight: 600, color: tokens.colorNeutralForeground3 },
   hero: {
-    display: 'grid', gridTemplateColumns: '1.05fr 0.95fr', ...shorthands.gap('16px'),
+    display: 'grid', gridTemplateColumns: '360px 1fr', ...shorthands.gap('16px'), alignItems: 'stretch',
     [MEDIA.mobile]: { gridTemplateColumns: '1fr' },
   },
+  heroPanel: {
+    ...shorthands.padding('22px'), display: 'flex', flexDirection: 'column', ...shorthands.gap('14px'),
+    background: 'rgba(255,255,255,0.72)', backdropFilter: 'blur(12px)', borderRadius: '18px',
+    border: '1px solid rgba(255,255,255,0.7)',
+  },
+  eyebrow: { fontSize: '11px', fontWeight: 700, letterSpacing: '1px', color: tokens.colorNeutralForeground3, textTransform: 'uppercase' },
+  heroTitle: { fontSize: '30px', fontWeight: 800, color: '#003057', lineHeight: 1.05 },
+  bigCard: {
+    ...shorthands.padding('16px'), borderRadius: '14px', background: 'rgba(255,255,255,0.9)',
+    border: '1px solid rgba(0,0,0,0.05)', boxShadow: '0 4px 18px rgba(0,0,0,0.04)',
+    display: 'flex', flexDirection: 'column', ...shorthands.gap('4px'),
+  },
+  bigValue: { fontSize: '34px', fontWeight: 800, color: '#003057', lineHeight: 1 },
+  pill: { display: 'inline-flex', alignItems: 'center', ...shorthands.gap('4px'), fontSize: '12px', fontWeight: 700, ...shorthands.padding('2px', '8px'), borderRadius: '999px', width: 'fit-content' },
+  miniRow: { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', ...shorthands.gap('8px') },
+  miniKpi: { ...shorthands.padding('10px', '10px'), borderRadius: '12px', background: 'rgba(255,255,255,0.7)', border: '1px solid rgba(0,0,0,0.04)', display: 'flex', flexDirection: 'column', ...shorthands.gap('2px') },
+  miniLabel: { fontSize: '10px', fontWeight: 600, color: tokens.colorNeutralForeground3, textTransform: 'uppercase', letterSpacing: '0.2px' },
+  miniValue: { fontSize: '17px', fontWeight: 800, color: '#003057', lineHeight: 1.1 },
+  mapPanel: {
+    ...shorthands.padding('12px'), borderRadius: '18px', background: 'rgba(255,255,255,0.5)',
+    border: '1px solid rgba(255,255,255,0.6)', display: 'flex', flexDirection: 'column', minHeight: '440px', justifyContent: 'center',
+  },
+  grid3: { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', ...shorthands.gap('16px'), [MEDIA.mobile]: { gridTemplateColumns: '1fr' } },
   heroKpis: { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', ...shorthands.gap('10px'), marginBottom: '10px' },
   heroKpi: { ...shorthands.padding('12px', '14px'), borderRadius: '12px', background: 'rgba(255,255,255,0.7)', border: '1px solid rgba(255,255,255,0.8)' },
   fade: {
@@ -139,7 +162,14 @@ export const ReportesModule: React.FC = () => {
     const exposicion = exposicionPorLinea(acts);
     const heat = heatmapZonaLinea(acts);
     const conc = concentracionTop(acts, 3);
-    return { acts, resumen, compZona, compLinea, pareto, caja, proveedores, exposicion, heat, conc, mapaPorZona };
+    // Datos para el panel "Explora": top-5 rubros del ámbito seleccionado, participación
+    // nacional, nº de actividades y estaciones.
+    const top5 = pareto.filas.slice(0, 5);
+    const totalNacional = total2027(actsSinZona) || 1;
+    const participacion = (resumen.total2027 / totalNacional) * 100;
+    const nEstaciones = new Set(acts.map(a => a.estacion).filter(Boolean)).size;
+    const resumenAmbito = { participacion, nActividades: acts.length, nEstaciones, rubroTop: pareto.filas[0]?.nombre ?? '—' };
+    return { acts, resumen, compZona, compLinea, pareto, caja, proveedores, exposicion, heat, conc, mapaPorZona, top5, resumenAmbito };
   }, [actividades, filtroLinea, filtroZona, filtroTipo]);
 
   const { resumen, compZona, compLinea, pareto, caja, proveedores, exposicion, heat, conc } = R;
@@ -173,13 +203,6 @@ export const ReportesModule: React.FC = () => {
         <Select size="small" value={filtroLinea} onChange={(_, d) => setFiltroLinea(d.value)} style={{ minWidth: 170 }}>
           <option value="Todas">Todas las líneas</option>
           {opciones.lineas.map(l => <option key={l} value={l}>{l}</option>)}
-        </Select>
-      </div>
-      <div className={styles.filterItem}>
-        <span className={styles.filterLabel}>Zona</span>
-        <Select size="small" value={filtroZona} onChange={(_, d) => setFiltroZona(d.value)} style={{ minWidth: 150 }}>
-          <option value="Todas">Todas las zonas</option>
-          {opciones.zonas.map(z => <option key={z} value={z}>{z}</option>)}
         </Select>
       </div>
       <div className={styles.filterItem}>
@@ -242,45 +265,106 @@ export const ReportesModule: React.FC = () => {
       {/* Contenido que reacciona a filtros (con animación al cambiar) */}
       <div key={`${filtroLinea}|${filtroZona}|${filtroTipo}`} className={styles.fade} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
 
-      {/* A. Sección hero: total 2026 vs 2027 + desviación + mapa */}
-      <Title3 className={styles.sectionTitle}>Presupuesto {filtroZona !== 'Todas' ? `— ${filtroZona}` : 'general'} 2026 vs 2027</Title3>
+      {/* A. Hero: panel "Explora por zona" + mapa protagonista */}
       <div className={styles.hero}>
-        <Card className={styles.chartCard}>
-          <div className={styles.heroKpis}>
-            <div className={styles.heroKpi}><span className={styles.kpiLabel}>Total presupuesto 2027</span><div className={styles.kpiValue} style={{ fontSize: 26 }}>{fmtB(resumen.total2027)}</div></div>
-            <div className={styles.heroKpi}><span className={styles.kpiLabel}>Desviación vs 2026 (%)</span><div className={styles.kpiValue} style={{ fontSize: 26, color: (resumen.crecimiento ?? 0) >= 0 ? NARANJA : VERDE }}>{fmtPct(resumen.crecimiento)}</div></div>
-            <div className={styles.heroKpi}><span className={styles.kpiLabel}>Desviación en $</span><div className={styles.kpiValue} style={{ fontSize: 26, color: (resumen.delta ?? 0) >= 0 ? NARANJA : VERDE }}>{fmtB(resumen.delta)}</div></div>
+        <div className={styles.heroPanel}>
+          <span className={styles.eyebrow}>Presupuesto 2026 vs 2027</span>
+          <div className={styles.heroTitle}>Explora por zona</div>
+          <Caption1 style={{ color: tokens.colorNeutralForeground3 }}>
+            Selecciona una zona en el mapa (o en la lista) para filtrar y analizar su presupuesto.
+          </Caption1>
+
+          <div className={styles.filterItem}>
+            <span className={styles.filterLabel}>Zona seleccionada</span>
+            <Select size="medium" value={filtroZona} onChange={(_, d) => setFiltroZona(d.value)}>
+              <option value="Todas">Todas las zonas (general)</option>
+              {opciones.zonas.map(z => <option key={z} value={z}>{z}</option>)}
+            </Select>
           </div>
-          <span className={styles.chartTitle}>Total 2026 vs 2027</span>
-          <span className={styles.chartHint}>Base 2026 (línea base OPEX) frente al presupuesto 2027.</span>
-          <ResponsiveContainer width="100%" height={240}>
+
+          <div className={styles.bigCard}>
+            <span className={styles.kpiLabel}>Presupuesto 2027</span>
+            <div className={styles.bigValue}>{fmtB(resumen.total2027)} <span style={{ fontSize: 13, color: tokens.colorNeutralForeground3 }}>COP</span></div>
+            <span className={styles.pill} style={{ background: (resumen.crecimiento ?? 0) >= 0 ? '#fce9dc' : '#dcf3e4', color: (resumen.crecimiento ?? 0) >= 0 ? NARANJA : VERDE }}>
+              {(resumen.crecimiento ?? 0) >= 0 ? '↑' : '↓'} {fmtPct(resumen.crecimiento)} vs 2026
+            </span>
+            <div style={{ display: 'flex', gap: 24, marginTop: 8 }}>
+              <div><div className={styles.miniLabel}>Presupuesto 2026</div><div style={{ fontWeight: 800, color: '#003057' }}>{fmtB(resumen.total2026)}</div></div>
+              <div><div className={styles.miniLabel}>Desviación en $</div><div style={{ fontWeight: 800, color: (resumen.delta ?? 0) >= 0 ? NARANJA : VERDE }}>{fmtB(resumen.delta)}</div></div>
+            </div>
+          </div>
+
+          <div className={styles.miniRow}>
+            <div className={styles.miniKpi}><span className={styles.miniLabel}>Concentración top 3</span><span className={styles.miniValue}>{conc.toFixed(0)}%</span></div>
+            <div className={styles.miniKpi}><span className={styles.miniLabel}>Mayor mes caja</span><span className={styles.miniValue}>{caja.picoMes}</span><Caption1 style={{ fontSize: 10, color: tokens.colorNeutralForeground3 }}>{fmtB(caja.picoValor)}</Caption1></div>
+            <div className={styles.miniKpi}><span className={styles.miniLabel}>Actividades</span><span className={styles.miniValue}>{R.resumenAmbito.nActividades}</span></div>
+          </div>
+        </div>
+
+        <div className={styles.mapPanel}>
+          <ColombiaMapa presupuestoPorZona={R.mapaPorZona} zonaSel={filtroZona} onSelectZona={setFiltroZona} />
+        </div>
+      </div>
+
+      {/* Fila: evolución + top rubros + resumen (datos reales) */}
+      <div className={styles.grid3}>
+        <Card className={styles.chartCard}>
+          <span className={styles.chartTitle}>Evolución presupuesto {filtroZona !== 'Todas' ? `— ${filtroZona}` : ''}</span>
+          <span className={styles.chartHint}>Base 2026 vs 2027 (COP).</span>
+          <ResponsiveContainer width="100%" height={230}>
             <BarChart data={[{ nombre: '2026', valor: resumen.total2026 }, { nombre: '2027', valor: resumen.total2027 }]} margin={{ left: 4, right: 10 }}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} />
               <XAxis dataKey="nombre" tick={{ fontSize: 12, fontWeight: 700 }} />
               <YAxis tickFormatter={fmtAxis} tick={{ fontSize: 11 }} />
               <RTooltip content={<TT />} />
-              <Bar dataKey="valor" name="Presupuesto" radius={[6, 6, 0, 0]} barSize={90}>
-                <Cell fill="#9db8d6" />
-                <Cell fill={AZUL} />
-                <LabelList dataKey="valor" position="top" formatter={(v: any) => fmtB(Number(v))} style={{ fontSize: 12, fontWeight: 800, fill: '#003057' }} />
+              <Bar dataKey="valor" radius={[6, 6, 0, 0]} barSize={70}>
+                <Cell fill="#9db8d6" /><Cell fill={AZUL} />
+                <LabelList dataKey="valor" position="top" formatter={(v: any) => fmtB(Number(v))} style={{ fontSize: 11, fontWeight: 800, fill: '#003057' }} />
               </Bar>
             </BarChart>
           </ResponsiveContainer>
         </Card>
 
         <Card className={styles.chartCard}>
-          <span className={styles.chartTitle}>Presupuesto 2027 por zona</span>
-          <span className={styles.chartHint}>Haz clic en una zona del mapa para filtrar todo el tablero.{filtroZona !== 'Todas' ? ` (Activo: ${filtroZona})` : ''}</span>
-          <ColombiaMapa presupuestoPorZona={R.mapaPorZona} zonaSel={filtroZona} onSelectZona={setFiltroZona} />
+          <span className={styles.chartTitle}>Top 5 rubros {filtroZona !== 'Todas' ? `— ${filtroZona}` : ''}</span>
+          <span className={styles.chartHint}>Rubros con mayor presupuesto 2027.</span>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 8 }}>
+            {R.top5.map(f => {
+              const pctBar = R.top5[0] ? (f.valor / R.top5[0].valor) * 100 : 0;
+              const pctTot = pareto.total ? (f.valor / pareto.total) * 100 : 0;
+              return (
+                <div key={f.nombre}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 3 }}>
+                    <span style={{ fontWeight: 600, color: '#323130', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 150 }}>{f.nombre}</span>
+                    <span style={{ fontWeight: 700, color: '#003057' }}>{fmtB(f.valor)} <span style={{ color: tokens.colorNeutralForeground3, fontWeight: 500 }}>{pctTot.toFixed(0)}%</span></span>
+                  </div>
+                  <div style={{ height: 8, background: 'rgba(0,0,0,0.05)', borderRadius: 5 }}>
+                    <div style={{ width: `${pctBar}%`, height: '100%', background: AZUL, borderRadius: 5, transition: 'width 0.6s cubic-bezier(0.16,1,0.3,1)' }} />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </Card>
-      </div>
 
-      {/* KPIs secundarios */}
-      <div className={styles.kpiGrid}>
-        <Card className={styles.kpiCard}><span className={styles.kpiLabel}>Presupuesto 2027</span><span className={styles.kpiValue}>{fmtB(resumen.total2027)}</span><span className={styles.kpiSub}>COP</span></Card>
-        <Card className={styles.kpiCard}><span className={styles.kpiLabel}>Base 2026</span><span className={styles.kpiValue}>{fmtB(resumen.total2026)}</span><span className={styles.kpiSub}>Línea base</span></Card>
-        <Card className={styles.kpiCard}><span className={styles.kpiLabel}>Concentración top 3 rubros</span><span className={styles.kpiValue}>{conc.toFixed(0)}%</span><span className={styles.kpiSub}>prioridad de control</span></Card>
-        <Card className={styles.kpiCard}><span className={styles.kpiLabel}>Mayor mes de caja</span><span className={styles.kpiValue}>{caja.picoMes}</span><span className={styles.kpiSub}>{fmtB(caja.picoValor)}</span></Card>
+        <Card className={styles.chartCard}>
+          <span className={styles.chartTitle}>Resumen {filtroZona !== 'Todas' ? `— ${filtroZona}` : 'general'}</span>
+          <span className={styles.chartHint}>Indicadores del ámbito seleccionado (datos de la app).</span>
+          <div style={{ display: 'flex', flexDirection: 'column' }}>
+            {[
+              ['Participación nacional', `${R.resumenAmbito.participacion.toFixed(0)}%`],
+              ['Actividades planeadas', String(R.resumenAmbito.nActividades)],
+              ['Estaciones / lugares', String(R.resumenAmbito.nEstaciones)],
+              ['Rubro dominante', R.resumenAmbito.rubroTop],
+              ['Desviación vs 2026', fmtPct(resumen.crecimiento)],
+            ].map(([k, v]) => (
+              <div key={k} style={{ display: 'flex', justifyContent: 'space-between', padding: '9px 2px', borderBottom: '1px solid rgba(0,0,0,0.05)', fontSize: 13 }}>
+                <span style={{ color: tokens.colorNeutralForeground2 }}>{k}</span>
+                <span style={{ fontWeight: 700, color: '#003057' }}>{v}</span>
+              </div>
+            ))}
+          </div>
+        </Card>
       </div>
 
       {/* B. Comparación 2026 vs 2027 */}
