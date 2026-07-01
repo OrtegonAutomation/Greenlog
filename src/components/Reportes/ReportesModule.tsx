@@ -322,13 +322,6 @@ export const ReportesModule: React.FC = () => {
             </div>
           </div>
 
-          <div className={styles.miniRow} style={{ marginTop: 12 }}>
-            <div className={styles.miniKpi}><span className={styles.miniLabel}>Concentración top 3</span><span className={styles.miniValue}>{conc.toFixed(0)}%</span></div>
-            <div className={styles.miniKpi}><span className={styles.miniLabel}>Mayor mes caja</span><span className={styles.miniValue}>{caja.picoMes}</span><Caption1 style={{ fontSize: 10, color: tokens.colorNeutralForeground3 }}>{fmtB(caja.picoValor)}</Caption1></div>
-            <div className={styles.miniKpi}><span className={styles.miniLabel}>Actividades</span><span className={styles.miniValue}>{R.resumenAmbito.nActividades}</span></div>
-          </div>
-          </div>
-
           {/* Evolución 2026 vs 2027 + todas las líneas operativas, justo debajo del panel */}
           <Card className={styles.chartCard} style={{ marginTop: 12 }}>
             <span className={styles.chartTitle}>Evolución presupuesto {filtroZona !== 'Todas' ? `— ${filtroZona}` : ''}</span>
@@ -369,6 +362,7 @@ export const ReportesModule: React.FC = () => {
               })}
             </div>
           </Card>
+          </div>
         </div>
 
         {/* Título flotante en la esquina inferior derecha del mapa */}
@@ -379,28 +373,6 @@ export const ReportesModule: React.FC = () => {
             Selecciona una zona en el mapa para filtrar y analizar su presupuesto.
           </Caption1>
         </div>
-      </div>
-
-      {/* Fila: resumen del ámbito seleccionado (datos reales) */}
-      <div className={styles.grid3}>
-        <Card className={styles.chartCard}>
-          <span className={styles.chartTitle}>Resumen {filtroZona !== 'Todas' ? `— ${filtroZona}` : 'general'}</span>
-          <span className={styles.chartHint}>Indicadores del ámbito seleccionado (datos de la app).</span>
-          <div style={{ display: 'flex', flexDirection: 'column' }}>
-            {[
-              ['Participación nacional', `${R.resumenAmbito.participacion.toFixed(0)}%`],
-              ['Actividades planeadas', String(R.resumenAmbito.nActividades)],
-              ['Estaciones / lugares', String(R.resumenAmbito.nEstaciones)],
-              ['Rubro dominante', R.resumenAmbito.rubroTop],
-              ['Desviación vs 2026', fmtPct(resumen.crecimiento)],
-            ].map(([k, v]) => (
-              <div key={k} style={{ display: 'flex', justifyContent: 'space-between', padding: '9px 2px', borderBottom: '1px solid rgba(0,0,0,0.05)', fontSize: 13 }}>
-                <span style={{ color: tokens.colorNeutralForeground2 }}>{k}</span>
-                <span style={{ fontWeight: 700, color: '#003057' }}>{v}</span>
-              </div>
-            ))}
-          </div>
-        </Card>
       </div>
 
       {/* B. Comparación 2026 vs 2027 */}
@@ -565,6 +537,33 @@ export const ReportesModule: React.FC = () => {
               ))}
             </tbody>
           </table>
+        </div>
+      </Card>
+
+      {/* Indicadores rápidos del ámbito */}
+      <div className={styles.miniRow}>
+        <div className={styles.miniKpi}><span className={styles.miniLabel}>Concentración top 3</span><span className={styles.miniValue}>{conc.toFixed(0)}%</span></div>
+        <div className={styles.miniKpi}><span className={styles.miniLabel}>Mayor mes caja</span><span className={styles.miniValue}>{caja.picoMes}</span><Caption1 style={{ fontSize: 10, color: tokens.colorNeutralForeground3 }}>{fmtB(caja.picoValor)}</Caption1></div>
+        <div className={styles.miniKpi}><span className={styles.miniLabel}>Actividades</span><span className={styles.miniValue}>{R.resumenAmbito.nActividades}</span></div>
+      </div>
+
+      {/* Resumen del ámbito seleccionado (datos reales) */}
+      <Card className={styles.chartCard}>
+        <span className={styles.chartTitle}>Resumen {filtroZona !== 'Todas' ? `— ${filtroZona}` : 'general'}</span>
+        <span className={styles.chartHint}>Indicadores del ámbito seleccionado (datos de la app).</span>
+        <div style={{ display: 'flex', flexDirection: 'column' }}>
+          {[
+            ['Participación nacional', `${R.resumenAmbito.participacion.toFixed(0)}%`],
+            ['Actividades planeadas', String(R.resumenAmbito.nActividades)],
+            ['Estaciones / lugares', String(R.resumenAmbito.nEstaciones)],
+            ['Rubro dominante', R.resumenAmbito.rubroTop],
+            ['Desviación vs 2026', fmtPct(resumen.crecimiento)],
+          ].map(([k, v]) => (
+            <div key={k} style={{ display: 'flex', justifyContent: 'space-between', padding: '9px 2px', borderBottom: '1px solid rgba(0,0,0,0.05)', fontSize: 13 }}>
+              <span style={{ color: tokens.colorNeutralForeground2 }}>{k}</span>
+              <span style={{ fontWeight: 700, color: '#003057' }}>{v}</span>
+            </div>
+          ))}
         </div>
       </Card>
 
