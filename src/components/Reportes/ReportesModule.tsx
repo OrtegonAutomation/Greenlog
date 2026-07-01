@@ -1,9 +1,9 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   makeStyles, shorthands, tokens,
-  Title2, Title3, Body1, Caption1, Card, Button, Spinner,
+  Title2, Title3, Body1, Caption1, Card, Button, Spinner, Select,
 } from '@fluentui/react-components';
-import { ArrowTrendingLinesRegular, DataBarVerticalRegular } from '@fluentui/react-icons';
+import { ArrowTrendingLinesRegular, DataBarVerticalRegular, FilterRegular } from '@fluentui/react-icons';
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RTooltip,
   Cell, ReferenceLine, ComposedChart, Line, LabelList,
@@ -15,6 +15,7 @@ import {
   actividadesAnio, resumenComparacion, comparacionPorZona, comparacionPorLinea,
   paretoLineas, concentracionTop, cajaMensual, dependenciaProveedores,
   exposicionPorLinea, heatmapZonaLinea, fmtB, fmtPct,
+  baseline2026Filtrada, mapPorZona, mapPorLinea,
 } from '../../utils/reportesAggregations';
 import { exportReporteToExcel } from '../../utils/exportReporte';
 
@@ -31,6 +32,13 @@ const useStyles = makeStyles({
     [MEDIA.mobile]: { ...shorthands.padding('16px') },
   },
   headerLeft: { display: 'flex', flexDirection: 'column', ...shorthands.gap('4px') },
+  filterBar: {
+    display: 'flex', alignItems: 'center', flexWrap: 'wrap', ...shorthands.gap('10px'),
+    ...shorthands.padding('12px', '16px'), borderRadius: '12px',
+    background: 'rgba(255,255,255,0.6)', border: '1px solid rgba(255,255,255,0.6)',
+  },
+  filterItem: { display: 'flex', flexDirection: 'column', ...shorthands.gap('2px') },
+  filterLabel: { fontSize: '11px', fontWeight: 600, color: tokens.colorNeutralForeground3 },
   kpiGrid: {
     display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', ...shorthands.gap('16px'),
     [MEDIA.mobile]: { gridTemplateColumns: 'repeat(2, 1fr)', ...shorthands.gap('12px') },
@@ -77,11 +85,36 @@ export const ReportesModule: React.FC = () => {
   const styles = useStyles();
   const { actividades, cargando, errorCarga } = useActividades();
 
+  const [filtroLinea, setFiltroLinea] = useState('Todas');
+  const [filtroZona, setFiltroZona] = useState('Todas');
+  const [filtroTipo, setFiltroTipo] = useState('Todos'); // Todos | OPEX | CAPEX
+
+  // Opciones de filtro (de todas las actividades 2027, sin filtrar).
+  const opciones = useMemo(() => {
+    const base = actividadesAnio(actividades, 2027);
+    const lineas = [...new Set(base.map(a => a.lineaOperativa).filter(Boolean))].sort();
+    const zonas = [...new Set(base.map(a => a.zona).filter(Boolean))].sort();
+    const tipos = [...new Set(base.map(a => (a.fuentePresupuesto as string) || 'OPEX'))].sort();
+    return { lineas, zonas, tipos };
+  }, [actividades]);
+
   const R = useMemo(() => {
-    const acts = actividadesAnio(actividades, 2027);
-    const resumen = resumenComparacion(acts);
-    const compZona = comparacionPorZona(acts);
-    const compLinea = comparacionPorLinea(acts);
+    const acts = actividadesAnio(actividades, 2027).filter(a =>
+      (filtroLinea === 'Todas' || a.lineaOperativa === filtroLinea) &&
+      (filtroZona === 'Todas' || a.zona === filtroZona) &&
+      (filtroTipo === 'Todos' || ((a.fuentePresupuesto as string) || 'OPEX') === filtroTipo));
+
+    // Base 2026 filtrada por zona/línea. El tipo CAPEX/OPEX no aplica a la base (es OPEX):
+    // si se filtra CAPEX, no hay base 2026 comparable -> base vacía.
+    const baseAplica = filtroTipo !== 'CAPEX';
+    const baseCeldas = baseAplica ? baseline2026Filtrada(filtroZona, filtroLinea) : [];
+    const baseZona = mapPorZona(baseCeldas);
+    const baseLinea = mapPorLinea(baseCeldas);
+    const totalBase = baseCeldas.reduce((s, c) => s + c.valor, 0);
+
+    const resumen = resumenComparacion(acts, totalBase);
+    const compZona = comparacionPorZona(acts, baseZona);
+    const compLinea = comparacionPorLinea(acts, baseLinea);
     const pareto = paretoLineas(acts);
     const caja = cajaMensual(acts);
     const proveedores = dependenciaProveedores(acts);
@@ -89,7 +122,7 @@ export const ReportesModule: React.FC = () => {
     const heat = heatmapZonaLinea(acts);
     const conc = concentracionTop(acts, 3);
     return { acts, resumen, compZona, compLinea, pareto, caja, proveedores, exposicion, heat, conc };
-  }, [actividades]);
+  }, [actividades, filtroLinea, filtroZona, filtroTipo]);
 
   const { resumen, compZona, compLinea, pareto, caja, proveedores, exposicion, heat, conc } = R;
 
@@ -113,6 +146,42 @@ export const ReportesModule: React.FC = () => {
     </div>
   );
 
+  // Barra de filtros (Línea, Zona, Tipo de presupuesto).
+  const Filtros = (
+    <div className={styles.filterBar}>
+      <FilterRegular style={{ color: tokens.colorNeutralForeground3 }} />
+      <div className={styles.filterItem}>
+        <span className={styles.filterLabel}>Línea operativa</span>
+        <Select size="small" value={filtroLinea} onChange={(_, d) => setFiltroLinea(d.value)} style={{ minWidth: 170 }}>
+          <option value="Todas">Todas las líneas</option>
+          {opciones.lineas.map(l => <option key={l} value={l}>{l}</option>)}
+        </Select>
+      </div>
+      <div className={styles.filterItem}>
+        <span className={styles.filterLabel}>Zona</span>
+        <Select size="small" value={filtroZona} onChange={(_, d) => setFiltroZona(d.value)} style={{ minWidth: 150 }}>
+          <option value="Todas">Todas las zonas</option>
+          {opciones.zonas.map(z => <option key={z} value={z}>{z}</option>)}
+        </Select>
+      </div>
+      <div className={styles.filterItem}>
+        <span className={styles.filterLabel}>Tipo de presupuesto</span>
+        <Select size="small" value={filtroTipo} onChange={(_, d) => setFiltroTipo(d.value)} style={{ minWidth: 120 }}>
+          <option value="Todos">Todos</option>
+          {opciones.tipos.map(t => <option key={t} value={t}>{t}</option>)}
+        </Select>
+      </div>
+      {(filtroLinea !== 'Todas' || filtroZona !== 'Todas' || filtroTipo !== 'Todos') && (
+        <Button size="small" appearance="subtle" onClick={() => { setFiltroLinea('Todas'); setFiltroZona('Todas'); setFiltroTipo('Todos'); }}>
+          Limpiar
+        </Button>
+      )}
+      {filtroTipo === 'CAPEX' && (
+        <Caption1 style={{ color: '#c05a1e' }}>La línea base 2026 es OPEX; la comparación no aplica para CAPEX.</Caption1>
+      )}
+    </div>
+  );
+
   // Estado de carga: NO mostrar cifras hasta tener los datos reales (evita el "flash" de datos sin sentido).
   if (cargando) {
     return (
@@ -133,6 +202,7 @@ export const ReportesModule: React.FC = () => {
     return (
       <div className={styles.root}>
         {Header}
+        {Filtros}
         <Card className={styles.chartCard} style={{ alignItems: 'center', padding: '64px 24px', gap: 8 }}>
           <DataBarVerticalRegular fontSize={40} color={tokens.colorNeutralForeground3} />
           <Title3 style={{ color: '#003057' }}>Sin datos para el análisis</Title3>
@@ -149,6 +219,7 @@ export const ReportesModule: React.FC = () => {
   return (
     <div className={styles.root}>
       {Header}
+      {Filtros}
 
       {/* A. KPIs */}
       <div className={styles.kpiGrid}>

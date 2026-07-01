@@ -5,8 +5,25 @@
 // ============================================================
 import { ActividadAmbiental } from '../types';
 import {
-  BASELINE_2026, TOTAL_2026, baseline2026PorZona, baseline2026PorLinea,
+  BASELINE_2026, TOTAL_2026, baseline2026PorZona, baseline2026PorLinea, Baseline2026Cell,
 } from '../data/baseline2026';
+
+/** Filtra la línea base 2026 por zona/línea (el tipo CAPEX/OPEX no aplica: la base es OPEX). */
+export function baseline2026Filtrada(zona?: string, linea?: string): Baseline2026Cell[] {
+  return BASELINE_2026.filter(c =>
+    (!zona || zona === 'Todas' || c.zona === zona) &&
+    (!linea || linea === 'Todas' || c.linea === linea));
+}
+export function mapPorZona(celdas: Baseline2026Cell[]): Record<string, number> {
+  const m: Record<string, number> = {};
+  for (const c of celdas) m[c.zona] = (m[c.zona] ?? 0) + c.valor;
+  return m;
+}
+export function mapPorLinea(celdas: Baseline2026Cell[]): Record<string, number> {
+  const m: Record<string, number> = {};
+  for (const c of celdas) m[c.linea] = (m[c.linea] ?? 0) + c.valor;
+  return m;
+}
 
 export const MESES_LABEL = [
   'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
@@ -54,13 +71,18 @@ const buildComp = (m2026: Record<string, number>, m2027: Record<string, number>)
   }).sort((a, b) => b.delta - a.delta);
 };
 
-export const comparacionPorZona = (acts: ActividadAmbiental[]) => buildComp(baseline2026PorZona(), porZona2027(acts));
-export const comparacionPorLinea = (acts: ActividadAmbiental[]) => buildComp(baseline2026PorLinea(), porLinea2027(acts));
+// Los parámetros de base 2026 son opcionales: por defecto usan el baseline completo,
+// pero el módulo puede pasar una base ya filtrada (por zona/línea/tipo) para que la
+// comparación 2026 vs 2027 sea consistente con los filtros aplicados.
+export const comparacionPorZona = (acts: ActividadAmbiental[], base2026Zona: Record<string, number> = baseline2026PorZona()) =>
+  buildComp(base2026Zona, porZona2027(acts));
+export const comparacionPorLinea = (acts: ActividadAmbiental[], base2026Linea: Record<string, number> = baseline2026PorLinea()) =>
+  buildComp(base2026Linea, porLinea2027(acts));
 
-export function resumenComparacion(acts: ActividadAmbiental[]) {
+export function resumenComparacion(acts: ActividadAmbiental[], total2026 = TOTAL_2026) {
   const t2027 = total2027(acts);
-  const crecimiento = TOTAL_2026 > 0 ? (t2027 - TOTAL_2026) / TOTAL_2026 : null;
-  return { total2026: TOTAL_2026, total2027: t2027, delta: t2027 - TOTAL_2026, crecimiento };
+  const crecimiento = total2026 > 0 ? (t2027 - total2026) / total2026 : null;
+  return { total2026, total2027: t2027, delta: t2027 - total2026, crecimiento };
 }
 
 // ---- Pareto de líneas (rubros) ----
