@@ -3,7 +3,7 @@ import {
   makeStyles, mergeClasses, shorthands, tokens,
   Title2, Title3, Body1, Caption1, Card, Button, Spinner, Select,
 } from '@fluentui/react-components';
-import { ArrowTrendingLinesRegular, DataBarVerticalRegular, FilterRegular } from '@fluentui/react-icons';
+import { ArrowTrendingLinesRegular, DataBarVerticalRegular, FilterRegular, ChevronLeftRegular, ChevronRightRegular } from '@fluentui/react-icons';
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RTooltip,
   Cell, ReferenceLine, ComposedChart, Line, LabelList,
@@ -48,7 +48,7 @@ const useStyles = makeStyles({
     [MEDIA.mobile]: { minHeight: 'auto' },
   },
   heroMapBg: {
-    position: 'absolute', top: '84px', right: '4%', width: '58%', height: '680px',
+    position: 'absolute', top: '36px', right: '4%', width: '58%', height: '640px',
     display: 'flex', alignItems: 'flex-start', justifyContent: 'center',
     pointerEvents: 'none', zIndex: 0,
     [MEDIA.mobile]: { position: 'relative', width: '100%', height: 'auto', right: 0, marginTop: '16px', order: 2 },
@@ -104,6 +104,32 @@ const useStyles = makeStyles({
     animationName: { from: { opacity: '0', transform: 'translateY(6px)' }, to: { opacity: '1', transform: 'translateY(0)' } },
     animationDuration: '0.4s', animationFillMode: 'both', animationTimingFunction: 'cubic-bezier(0.16,1,0.3,1)',
   },
+  // --- Navegación por vistas (hero → comparación → composición) ---
+  navRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', ...shorthands.gap('10px') },
+  navDot: { width: '8px', height: '8px', borderRadius: '50%', background: 'rgba(0,48,87,0.2)', transition: 'all 0.3s ease', cursor: 'pointer' },
+  navDotActiva: { width: '22px', borderRadius: '99px', background: '#264b96' },
+  // Slide: entra deslizándose con un resorte suave.
+  slide: {
+    animationName: { from: { opacity: '0', transform: 'translateX(36px) scale(0.985)' }, to: { opacity: '1', transform: 'translateX(0) scale(1)' } },
+    animationDuration: '0.5s', animationFillMode: 'both', animationTimingFunction: 'cubic-bezier(0.22,1,0.36,1)',
+    display: 'flex', flexDirection: 'column', ...shorthands.gap('16px'),
+  },
+  slideBack: {
+    animationName: { from: { opacity: '0', transform: 'translateX(-36px) scale(0.985)' }, to: { opacity: '1', transform: 'translateX(0) scale(1)' } },
+    animationDuration: '0.5s', animationFillMode: 'both', animationTimingFunction: 'cubic-bezier(0.22,1,0.36,1)',
+    display: 'flex', flexDirection: 'column', ...shorthands.gap('16px'),
+  },
+  // Mini-mapa clicable (esquina superior izquierda en las vistas 2 y 3).
+  miniMapa: {
+    width: '250px', cursor: 'pointer', ...shorthands.padding('10px', '12px'), borderRadius: '14px',
+    background: 'rgba(255,255,255,0.85)', border: '1px solid rgba(0,0,0,0.06)',
+    boxShadow: '0 6px 20px rgba(0,0,0,0.06)',
+    transition: 'transform 0.25s cubic-bezier(0.34,1.56,0.64,1), box-shadow 0.25s ease',
+    ':hover': { transform: 'scale(1.05)', boxShadow: '0 12px 32px rgba(0,48,87,0.15)' },
+    ':active': { transform: 'scale(0.97)' },
+    animationName: { from: { opacity: '0', transform: 'scale(0.7) translateY(-8px)' }, to: { opacity: '1', transform: 'scale(1) translateY(0)' } },
+    animationDuration: '0.5s', animationFillMode: 'both', animationTimingFunction: 'cubic-bezier(0.34,1.56,0.64,1)',
+  },
   kpiGrid: {
     display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', ...shorthands.gap('16px'),
     [MEDIA.mobile]: { gridTemplateColumns: 'repeat(2, 1fr)', ...shorthands.gap('12px') },
@@ -133,7 +159,9 @@ const useStyles = makeStyles({
   td: { padding: '8px 10px', borderBottom: '1px solid rgba(0,0,0,0.04)' },
 });
 
-const fmtAxis = (v: number) => `$${(v / 1e9).toFixed(1)} MM`;
+const fmtAxis = (v: number) => `$${(v / 1e9).toFixed(1)}*`;
+// Vistas del reporte (navegación por flechas).
+const VISTAS = ['Explora por zona', 'Comparación 2026 vs 2027', 'Composición y control del OPEX 2027'];
 // Etiqueta sobre la barra en una sola línea (el LabelList por defecto envuelve
 // el texto al ancho de la barra y se corta contra el borde superior).
 const BarLabel = ({ x, y, width, value }: any) => (
@@ -158,6 +186,11 @@ export const ReportesModule: React.FC = () => {
 
   const [filtroLinea, setFiltroLinea] = useState('Todas');
   const [filtroZona, setFiltroZona] = useState('Todas');
+  // Vista actual del reporte (0=Explora por zona, 1=Comparación, 2=Composición y control)
+  // y dirección del último cambio para animar el slide.
+  const [vista, setVista] = useState(0);
+  const [dirAtras, setDirAtras] = useState(false);
+  const irAVista = (v: number) => { setDirAtras(v < vista); setVista(v); };
   const [filtroTipo, setFiltroTipo] = useState('Todos'); // Todos | OPEX | CAPEX
 
   // Opciones de filtro (de todas las actividades 2027, sin filtrar).
@@ -307,10 +340,36 @@ export const ReportesModule: React.FC = () => {
       {Header}
       {Filtros}
 
-      {/* Contenido que reacciona a filtros (con animación al cambiar) */}
-      <div key={`${filtroLinea}|${filtroZona}|${filtroTipo}`} className={styles.fade} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+      {/* Navegación por vistas: hero → comparación → composición */}
+      <div className={styles.navRow}>
+        <Button appearance="subtle" icon={<ChevronLeftRegular />} disabled={vista === 0} onClick={() => irAVista(vista - 1)}>Anterior</Button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          {VISTAS.map((t, i) => (
+            <span key={t} className={mergeClasses(styles.navDot, vista === i && styles.navDotActiva)} title={t} onClick={() => irAVista(i)} />
+          ))}
+          <Caption1 style={{ marginLeft: 6, color: '#003057', fontWeight: 600 }}>{VISTAS[vista]}</Caption1>
+        </div>
+        <Button appearance="subtle" icon={<ChevronRightRegular />} iconPosition="after" disabled={vista === VISTAS.length - 1} onClick={() => irAVista(vista + 1)}>Siguiente</Button>
+      </div>
+
+      {/* Contenido que reacciona a filtros y a la vista (slide animado) */}
+      <div key={`${filtroLinea}|${filtroZona}|${filtroTipo}|${vista}`} className={dirAtras ? styles.slideBack : styles.slide}>
+
+      {/* Mini-mapa clicable: vuelve al hero con animación */}
+      {vista > 0 && (
+        <div className={styles.miniMapa} onClick={() => irAVista(0)} title="Volver al mapa">
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+            <span style={{ fontSize: 11, fontWeight: 700, color: '#003057' }}>← Volver al mapa</span>
+            <span style={{ fontSize: 10, color: tokens.colorNeutralForeground3 }}>{filtroZona !== 'Todas' ? filtroZona : 'Todas las zonas'}</span>
+          </div>
+          <div style={{ pointerEvents: 'none' }}>
+            <ColombiaMapa presupuestoPorZona={R.mapaPorZona} crecimientoPorZona={R.crecimientoPorZona} zonaSel={filtroZona} onSelectZona={() => { }} />
+          </div>
+        </div>
+      )}
 
       {/* A. Hero overlay: mapa de fondo + contenido flotando encima (estilo diseño) */}
+      {vista === 0 && (
       <div className={styles.heroOverlay}>
         {/* Mapa de fondo, a la derecha, ocupando el alto */}
         <div className={styles.heroMapBg}>
@@ -386,8 +445,10 @@ export const ReportesModule: React.FC = () => {
           </Caption1>
         </div>
       </div>
+      )}
 
-      {/* B. Comparación 2026 vs 2027 */}
+      {/* B. Comparación 2026 vs 2027 (vista 1) */}
+      {vista === 1 && (<>
       <Title3 className={styles.sectionTitle}>Comparación 2026 vs 2027</Title3>
       <div className={styles.grid2}>
         {/* B1. Brecha por zona */}
@@ -447,8 +508,10 @@ export const ReportesModule: React.FC = () => {
           </table>
         </div>
       </Card>
+      </>)}
 
-      {/* C. Composición y control 2027 */}
+      {/* C. Composición y control 2027 (vista 2) */}
+      {vista === 2 && (<>
       <Title3 className={styles.sectionTitle}>Composición y control del OPEX 2027</Title3>
       <div className={styles.grid2}>
         {/* C1. Pareto */}
@@ -526,7 +589,7 @@ export const ReportesModule: React.FC = () => {
       {/* C5. Heatmap Zona × Rubro */}
       <Card className={styles.chartCard}>
         <span className={styles.chartTitle}>8. Concentración Zona × Rubro (2027)</span>
-        <span className={styles.chartHint}>Dónde poner controles de gasto y dueños de presupuesto. Valores en miles de millones (B).</span>
+        <span className={styles.chartHint}>Dónde poner controles de gasto y dueños de presupuesto. Valores en miles de millones de pesos (*).</span>
         <div style={{ overflowX: 'auto' }}>
           <table className={styles.table} style={{ minWidth: 560 }}>
             <thead>
@@ -596,11 +659,14 @@ export const ReportesModule: React.FC = () => {
           </table>
         </div>
       </Card>
+      </>)}
 
-      </div>{/* fin bloque animado por filtros */}
+      </div>{/* fin bloque animado por filtros/vista */}
 
       <div style={{ textAlign: 'center' }}>
-        <Caption1 style={{ color: tokens.colorNeutralForeground3 }}>Valores en COP. 2027 en vivo desde la app; 2026 línea base (Plantilla OPEX).</Caption1>
+        <Caption1 style={{ color: tokens.colorNeutralForeground3 }}>
+          * Miles de millones de pesos (COP). 2027 en vivo desde la app; 2026 línea base (Plantilla OPEX).
+        </Caption1>
       </div>
     </div>
   );
