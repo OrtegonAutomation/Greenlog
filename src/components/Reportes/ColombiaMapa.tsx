@@ -52,6 +52,27 @@ export const ColombiaMapa: React.FC<Props> = ({ presupuestoPorZona, crecimientoP
   // Zona cuya etiqueta se muestra: la seleccionada, o la que tiene hover.
   const etiquetaZona = zonaSel !== 'Todas' ? zonaSel : hover;
 
+  // Callouts por defecto (estilo tarjetas con línea conectora): todas las zonas
+  // a los lados del mapa cuando no hay selección ni hover.
+  const CW = 168, CH = 46;
+  const callouts = (() => {
+    const total = zonas.reduce((s, z) => s + (presupuestoPorZona[z] ?? 0), 0) || 1;
+    const items = zonas.map(z => ({ z, ...ZONA_CIUDAD[z], v: presupuestoPorZona[z] ?? 0 }));
+    const colocar = (col: typeof items, bx: number) => {
+      let prev = -Infinity;
+      return col.sort((a, b) => a.cy - b.cy).map(i => {
+        let by = Math.min(Math.max(i.cy - CH / 2, 6), 903 - CH - 6);
+        if (by < prev + CH + 14) by = prev + CH + 14;
+        prev = by;
+        return { ...i, bx, by, total };
+      });
+    };
+    return [
+      ...colocar(items.filter(i => i.cx < 380), 4),
+      ...colocar(items.filter(i => i.cx >= 380), 760 - CW - 4),
+    ];
+  })();
+
   return (
     <div className={styles.wrap}>
       <svg viewBox={MAPA_VIEWBOX} className={styles.svg} role="img" aria-label="Mapa de zonas por departamento">
@@ -80,6 +101,20 @@ export const ColombiaMapa: React.FC<Props> = ({ presupuestoPorZona, crecimientoP
             </g>
           );
         })}
+        {/* Callouts de todas las zonas (vista por defecto, sin selección ni hover) */}
+        {zonaSel === 'Todas' && !hover && callouts.map(c => (
+          <g key={c.z} onClick={() => toggle(c.z)} onMouseEnter={() => setHover(c.z)} style={{ cursor: 'pointer' }}>
+            <line x1={c.bx < c.cx ? c.bx + CW : c.bx} y1={c.by + CH / 2} x2={c.cx} y2={c.cy}
+              stroke="#9fb3c8" strokeWidth={1.3} />
+            <circle cx={c.cx} cy={c.cy} r={3} fill={VERDE} />
+            <rect x={c.bx} y={c.by} width={CW} height={CH} rx={10} fill="rgba(255,255,255,0.95)"
+              stroke="rgba(0,0,0,0.07)" filter="drop-shadow(0 4px 10px rgba(0,0,0,0.08))" />
+            <text x={c.bx + 12} y={c.by + 18} fontSize={11} fontWeight={700} fill={VERDE} letterSpacing="0.5">{c.z.toUpperCase()}</text>
+            <text x={c.bx + 12} y={c.by + 37} fontSize={14.5} fontWeight={800} fill="#112240">{fmtB(c.v)}</text>
+            <text x={c.bx + CW - 12} y={c.by + 37} fontSize={11} fontWeight={700} fill="#64748b" textAnchor="end">{((c.v / c.total) * 100).toFixed(0)}%</text>
+          </g>
+        ))}
+
         {/* Etiqueta flotante de la zona activa (seleccionada u hover) */}
         {etiquetaZona && ZONA_CIUDAD[etiquetaZona] && (() => {
           const c = ZONA_CIUDAD[etiquetaZona]; const w = 150, h = 52;

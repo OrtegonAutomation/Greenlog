@@ -48,7 +48,7 @@ const useStyles = makeStyles({
     [MEDIA.mobile]: { minHeight: 'auto' },
   },
   heroMapBg: {
-    position: 'absolute', top: '36px', right: '4%', width: '58%', height: '640px',
+    position: 'absolute', top: '-16px', right: '4%', width: '58%', height: '640px',
     display: 'flex', alignItems: 'flex-start', justifyContent: 'center',
     pointerEvents: 'none', zIndex: 0,
     [MEDIA.mobile]: { position: 'relative', width: '100%', height: 'auto', right: 0, marginTop: '16px', order: 2 },
