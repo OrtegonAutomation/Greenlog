@@ -20,7 +20,9 @@ import {
 import { exportReporteToExcel } from '../../utils/exportReporte';
 import { ColombiaMapa } from './ColombiaMapa';
 
-const AZUL = '#0f5fbf', NARANJA = '#c05a1e', VERDE = '#1f7a3d', ROJO = '#e02424', MORADO = '#5b3fd6';
+// Paleta alineada al diseño AIDesigner.
+const AZUL = '#264b96', NARANJA = '#c05a1e', VERDE = '#48946e', ROJO = '#d64545', MORADO = '#5b3fd6';
+const AZUL_OSCURO = '#112240', GREENLIGHT = '#ebf6f0';
 
 const useStyles = makeStyles({
   root: { display: 'flex', flexDirection: 'column', ...shorthands.gap(tokens.spacingVerticalL) },
@@ -167,9 +169,17 @@ export const ReportesModule: React.FC = () => {
     const top5 = pareto.filas.slice(0, 5);
     const totalNacional = total2027(actsSinZona) || 1;
     const participacion = (resumen.total2027 / totalNacional) * 100;
+    // Crecimiento por zona para la etiqueta del mapa (2027 vs base 2026, respeta línea/tipo).
+    const baseMapaCeldas = filtroTipo !== 'CAPEX' ? baseline2026Filtrada('Todas', filtroLinea) : [];
+    const base2026Zona = mapPorZona(baseMapaCeldas);
+    const crecimientoPorZona: Record<string, number | null> = {};
+    for (const z of Object.keys(mapaPorZona)) {
+      const b = base2026Zona[z] ?? 0;
+      crecimientoPorZona[z] = b > 0 ? (mapaPorZona[z] - b) / b : null;
+    }
     const nEstaciones = new Set(acts.map(a => a.estacion).filter(Boolean)).size;
     const resumenAmbito = { participacion, nActividades: acts.length, nEstaciones, rubroTop: pareto.filas[0]?.nombre ?? '—' };
-    return { acts, resumen, compZona, compLinea, pareto, caja, proveedores, exposicion, heat, conc, mapaPorZona, top5, resumenAmbito };
+    return { acts, resumen, compZona, compLinea, pareto, caja, proveedores, exposicion, heat, conc, mapaPorZona, top5, resumenAmbito, crecimientoPorZona };
   }, [actividades, filtroLinea, filtroZona, filtroTipo]);
 
   const { resumen, compZona, compLinea, pareto, caja, proveedores, exposicion, heat, conc } = R;
@@ -186,11 +196,17 @@ export const ReportesModule: React.FC = () => {
           Comparación presupuestal 2026 vs 2027, concentración, caja, riesgo contractual y proveedores.
         </Body1>
       </div>
-      <Button appearance="subtle" icon={<ArrowTrendingLinesRegular />}
-        disabled={cargando || R.acts.length === 0}
-        onClick={() => exportReporteToExcel(actividades, 2027)}>
-        Exportar Informe
-      </Button>
+      <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+        <span style={{ fontSize: 13, fontWeight: 500, color: tokens.colorNeutralForeground2, background: 'rgba(255,255,255,0.8)', border: '1px solid rgba(0,0,0,0.08)', borderRadius: 8, padding: '7px 12px' }}>
+          Comparar con 2026
+        </span>
+        <Button appearance="secondary" icon={<ArrowTrendingLinesRegular />}
+          disabled={cargando || R.acts.length === 0}
+          style={{ borderRadius: 8 }}
+          onClick={() => exportReporteToExcel(actividades, 2027)}>
+          Descargar reporte
+        </Button>
+      </div>
     </div>
   );
 
@@ -285,12 +301,12 @@ export const ReportesModule: React.FC = () => {
           <div className={styles.bigCard}>
             <span className={styles.kpiLabel}>Presupuesto 2027</span>
             <div className={styles.bigValue}>{fmtB(resumen.total2027)} <span style={{ fontSize: 13, color: tokens.colorNeutralForeground3 }}>COP</span></div>
-            <span className={styles.pill} style={{ background: (resumen.crecimiento ?? 0) >= 0 ? '#fce9dc' : '#dcf3e4', color: (resumen.crecimiento ?? 0) >= 0 ? NARANJA : VERDE }}>
+            <span className={styles.pill} style={{ background: GREENLIGHT, color: VERDE }}>
               {(resumen.crecimiento ?? 0) >= 0 ? '↑' : '↓'} {fmtPct(resumen.crecimiento)} vs 2026
             </span>
             <div style={{ display: 'flex', gap: 24, marginTop: 8 }}>
-              <div><div className={styles.miniLabel}>Presupuesto 2026</div><div style={{ fontWeight: 800, color: '#003057' }}>{fmtB(resumen.total2026)}</div></div>
-              <div><div className={styles.miniLabel}>Desviación en $</div><div style={{ fontWeight: 800, color: (resumen.delta ?? 0) >= 0 ? NARANJA : VERDE }}>{fmtB(resumen.delta)}</div></div>
+              <div><div className={styles.miniLabel}>Presupuesto 2026</div><div style={{ fontWeight: 800, color: AZUL_OSCURO }}>{fmtB(resumen.total2026)}</div></div>
+              <div><div className={styles.miniLabel}>Desviación en $</div><div style={{ fontWeight: 800, color: VERDE }}>{fmtB(resumen.delta)}</div></div>
             </div>
           </div>
 
@@ -302,7 +318,7 @@ export const ReportesModule: React.FC = () => {
         </div>
 
         <div className={styles.mapPanel}>
-          <ColombiaMapa presupuestoPorZona={R.mapaPorZona} zonaSel={filtroZona} onSelectZona={setFiltroZona} />
+          <ColombiaMapa presupuestoPorZona={R.mapaPorZona} crecimientoPorZona={R.crecimientoPorZona} zonaSel={filtroZona} onSelectZona={setFiltroZona} />
         </div>
       </div>
 

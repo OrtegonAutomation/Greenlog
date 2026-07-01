@@ -1,89 +1,108 @@
 // ============================================================
-// ColombiaMapa — mapa de Colombia; solo los 7 departamentos ancla (uno por zona)
-// están coloreados y son clicables para filtrar. El resto queda en gris.
+// ColombiaMapa — mapa de Colombia estilo verde monocromático (diseño AIDesigner).
+// Solo los 7 departamentos ancla (uno por zona) son clicables; el seleccionado
+// se resalta en verde con marcador pulsante. Etiqueta al pasar el cursor o al
+// seleccionar. El resto del país en gris (silueta).
 // ============================================================
 import React, { useState } from 'react';
 import { makeStyles, shorthands, tokens } from '@fluentui/react-components';
 import { DEPARTAMENTOS, ZONA_CIUDAD, MAPA_VIEWBOX } from '../../data/colombiaMapa';
-import { fmtB } from '../../utils/reportesAggregations';
+import { fmtB, fmtPct } from '../../utils/reportesAggregations';
 
-export const ZONA_COLOR: Record<string, string> = {
-  Occidente: '#2f6fb0', Centro: '#e08a1e', Oriente: '#d64545', Norte: '#2b9c8f',
-  CLC: '#b07d33', Coveñas: '#7a52c9', Llanos: '#3f9b52', Transversal: '#8a94a6', '': '#dbe3ec',
-};
-const GRIS = '#e6ebf1';
+const VERDE = '#48946e', VERDE_SUAVE = '#bfe0cf', VERDE_HOVER = '#8fc7ab', GRIS = '#e7edf3';
 
 const useStyles = makeStyles({
   wrap: { position: 'relative', width: '100%' },
-  svg: { width: '100%', height: 'auto', display: 'block' },
-  depto: { transition: 'opacity 0.3s ease, filter 0.2s ease', stroke: '#ffffff', strokeWidth: 0.8 },
-  anchor: { cursor: 'pointer', ':hover': { filter: 'brightness(1.1) drop-shadow(0 2px 4px rgba(0,0,0,0.2))' } },
-  leyenda: { display: 'flex', flexWrap: 'wrap', ...shorthands.gap('6px', '12px'), justifyContent: 'center', marginTop: '8px' },
-  leyendaItem: { display: 'flex', alignItems: 'center', ...shorthands.gap('6px'), fontSize: '11.5px', color: tokens.colorNeutralForeground2, cursor: 'pointer', ...shorthands.padding('2px', '6px'), borderRadius: '6px' },
-  swatch: { width: '11px', height: '11px', borderRadius: '3px' },
+  svg: { width: '100%', height: 'auto', display: 'block', overflow: 'visible' },
+  depto: { transition: 'fill 0.3s ease, opacity 0.3s ease', stroke: '#ffffff', strokeWidth: 0.8 },
+  anchor: { cursor: 'pointer' },
+  pulse: {
+    transformOrigin: 'center', transformBox: 'fill-box',
+    animationName: { '0%,100%': { transform: 'scale(1)', opacity: 0.55 }, '50%': { transform: 'scale(2.4)', opacity: 0 } },
+    animationDuration: '2.6s', animationIterationCount: 'infinite', animationTimingFunction: 'ease-out',
+  },
+  leyenda: { display: 'flex', flexWrap: 'wrap', ...shorthands.gap('4px', '10px'), justifyContent: 'center', marginTop: '6px' },
+  chip: {
+    display: 'flex', alignItems: 'center', ...shorthands.gap('5px'), fontSize: '11px', cursor: 'pointer',
+    ...shorthands.padding('3px', '9px'), borderRadius: '999px', color: tokens.colorNeutralForeground2,
+    transition: 'all 0.2s ease',
+  },
+  dot: { width: '8px', height: '8px', borderRadius: '50%' },
 });
 
 interface Props {
   presupuestoPorZona: Record<string, number>;
+  crecimientoPorZona?: Record<string, number | null>;
   zonaSel: string;
   onSelectZona: (zona: string) => void;
 }
 
-export const ColombiaMapa: React.FC<Props> = ({ presupuestoPorZona, zonaSel, onSelectZona }) => {
+export const ColombiaMapa: React.FC<Props> = ({ presupuestoPorZona, crecimientoPorZona, zonaSel, onSelectZona }) => {
   const styles = useStyles();
   const [hover, setHover] = useState<string>('');
   const zonas = Object.keys(ZONA_CIUDAD);
   const toggle = (z: string) => onSelectZona(zonaSel === z ? 'Todas' : z);
+  const activa = (z: string) => zonaSel === z || (zonaSel === 'Todas' && hover === z);
 
-  const opacidadAncla = (z: string) => {
-    if (zonaSel !== 'Todas' && zonaSel !== z) return 0.3;
-    if (hover && hover !== z) return 0.75;
-    return 1;
+  const fillAncla = (z: string) => {
+    if (activa(z)) return VERDE;
+    if (hover === z) return VERDE_HOVER;
+    return VERDE_SUAVE;
   };
+  // Zona cuya etiqueta se muestra: la seleccionada, o la que tiene hover.
+  const etiquetaZona = zonaSel !== 'Todas' ? zonaSel : hover;
 
   return (
     <div className={styles.wrap}>
       <svg viewBox={MAPA_VIEWBOX} className={styles.svg} role="img" aria-label="Mapa de zonas por departamento">
-        {/* Departamentos sin zona: gris de fondo (silueta de Colombia) */}
+        {/* Silueta (departamentos sin zona) en gris */}
         {DEPARTAMENTOS.filter(d => !d.zona).map(d => (
-          <path key={d.code} d={d.path} className={styles.depto} fill={GRIS} opacity={0.9}>
-            <title>{d.nombre}</title>
-          </path>
+          <path key={d.code} d={d.path} className={styles.depto} fill={GRIS} opacity={0.85}><title>{d.nombre}</title></path>
         ))}
-        {/* Departamentos ancla (coloreados, clicables) */}
+        {/* Departamentos ancla (verde monocromático, clicables) */}
         {DEPARTAMENTOS.filter(d => d.zona).map(d => (
           <path key={d.code} d={d.path} className={`${styles.depto} ${styles.anchor}`}
-            fill={ZONA_COLOR[d.zona]} opacity={opacidadAncla(d.zona)}
-            onClick={() => toggle(d.zona)}
-            onMouseEnter={() => setHover(d.zona)} onMouseLeave={() => setHover('')}>
+            fill={fillAncla(d.zona)} opacity={zonaSel !== 'Todas' && zonaSel !== d.zona ? 0.55 : 1}
+            style={{ filter: activa(d.zona) ? 'drop-shadow(0 3px 8px rgba(72,148,110,0.4))' : undefined }}
+            onClick={() => toggle(d.zona)} onMouseEnter={() => setHover(d.zona)} onMouseLeave={() => setHover('')}>
             <title>{d.zona} ({d.nombre}): {fmtB(presupuestoPorZona[d.zona] ?? 0)}</title>
           </path>
         ))}
-        {/* Etiquetas de presupuesto por zona */}
+        {/* Marcadores en cada ancla; pulso en la activa */}
         {zonas.map(z => {
           const c = ZONA_CIUDAD[z];
-          const activo = zonaSel === 'Todas' || zonaSel === z;
-          const w = 118, h = 36;
-          const derecha = c.cx < 560;
-          const bx = derecha ? c.cx + 7 : c.cx - w - 7;
+          const act = activa(z);
           return (
-            <g key={z} opacity={activo ? 1 : 0.35} style={{ transition: 'opacity 0.3s ease', cursor: 'pointer' }}
-              onClick={() => toggle(z)} onMouseEnter={() => setHover(z)} onMouseLeave={() => setHover('')}>
-              <circle cx={c.cx} cy={c.cy} r={4.5} fill={ZONA_COLOR[z]} stroke="#fff" strokeWidth={1.5} />
-              <rect x={bx} y={c.cy - h / 2} width={w} height={h} rx={8} fill="#fff" stroke={ZONA_COLOR[z]} strokeWidth={zonaSel === z ? 2 : 1.2}
-                filter="drop-shadow(0 2px 5px rgba(0,0,0,0.12))" />
-              <text x={bx + 10} y={c.cy - 4} fontSize={10.5} fontWeight={700} fill={ZONA_COLOR[z]}>{z}</text>
-              <text x={bx + 10} y={c.cy + 11} fontSize={11.5} fontWeight={800} fill="#003057">{fmtB(presupuestoPorZona[z] ?? 0)}</text>
+            <g key={z} onClick={() => toggle(z)} onMouseEnter={() => setHover(z)} onMouseLeave={() => setHover('')} style={{ cursor: 'pointer' }}>
+              {act && <circle cx={c.cx} cy={c.cy} r={7} fill={VERDE} className={styles.pulse} />}
+              <circle cx={c.cx} cy={c.cy} r={5} fill="#fff" stroke={VERDE} strokeWidth={act ? 2.5 : 1.5} />
+              <circle cx={c.cx} cy={c.cy} r={2} fill={VERDE} />
             </g>
           );
         })}
+        {/* Etiqueta flotante de la zona activa (seleccionada u hover) */}
+        {etiquetaZona && ZONA_CIUDAD[etiquetaZona] && (() => {
+          const c = ZONA_CIUDAD[etiquetaZona]; const w = 150, h = 52;
+          const der = c.cx < 560; const bx = der ? c.cx + 12 : c.cx - w - 12; const by = c.cy - h - 8;
+          const crec = crecimientoPorZona?.[etiquetaZona];
+          return (
+            <g style={{ pointerEvents: 'none' }}>
+              <rect x={bx} y={by} width={w} height={h} rx={11} fill="#fff" stroke="rgba(0,0,0,0.06)"
+                filter="drop-shadow(0 10px 24px rgba(0,0,0,0.14))" />
+              <circle cx={bx + 13} cy={by + 15} r={3} fill={VERDE} />
+              <text x={bx + 22} y={by + 18} fontSize={10} fontWeight={700} fill="#112240" letterSpacing="0.5">{etiquetaZona.toUpperCase()}</text>
+              <text x={bx + 12} y={by + 36} fontSize={17} fontWeight={800} fill="#112240">{fmtB(presupuestoPorZona[etiquetaZona] ?? 0)}</text>
+              {crec != null && <text x={bx + w - 12} y={by + 36} fontSize={11} fontWeight={700} fill={crec >= 0 ? VERDE : '#d64545'} textAnchor="end">{fmtPct(crec)}</text>}
+            </g>
+          );
+        })()}
       </svg>
 
       <div className={styles.leyenda}>
         {zonas.map(z => (
-          <span key={z} className={styles.leyendaItem} onClick={() => toggle(z)}
-            style={{ fontWeight: zonaSel === z ? 700 : 400, background: zonaSel === z ? `${ZONA_COLOR[z]}18` : undefined, color: zonaSel === z ? ZONA_COLOR[z] : undefined }}>
-            <span className={styles.swatch} style={{ background: ZONA_COLOR[z] }} /> {z} · {ZONA_CIUDAD[z].depto}
+          <span key={z} className={styles.chip} onClick={() => toggle(z)}
+            style={{ fontWeight: zonaSel === z ? 700 : 400, background: zonaSel === z ? '#ebf6f0' : undefined, color: zonaSel === z ? VERDE : undefined }}>
+            <span className={styles.dot} style={{ background: zonaSel === z ? VERDE : VERDE_SUAVE }} /> {z}
           </span>
         ))}
       </div>
