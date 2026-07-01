@@ -115,7 +115,7 @@ export const ColombiaMapa: React.FC<Props> = ({ presupuestoPorZona, crecimientoP
         })}
         {/* Callouts de todas las zonas (vista por defecto, sin selección ni hover) */}
         {zonaSel === 'Todas' && !hover && callouts.map(c => (
-          <g key={c.z} onClick={() => toggle(c.z)} onMouseEnter={() => setHover(c.z)} style={{ cursor: 'pointer' }}>
+          <g key={c.z} style={{ pointerEvents: 'none' }}>
             <line
               x1={c.by + CH < c.cy ? c.cx : (c.bx < c.cx ? c.bx + CW : c.bx)}
               y1={c.by + CH < c.cy ? c.by + CH : c.by + CH / 2}
