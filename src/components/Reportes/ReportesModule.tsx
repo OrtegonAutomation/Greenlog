@@ -44,24 +44,28 @@ const useStyles = makeStyles({
   filterLabel: { fontSize: '11px', fontWeight: 600, color: tokens.colorNeutralForeground3 },
   // --- Layout overlay tipo diseño AIDesigner: mapa de fondo + contenido flotando ---
   heroOverlay: {
-    position: 'relative', minHeight: '560px', ...shorthands.padding('4px'),
+    position: 'relative', minHeight: '640px', ...shorthands.padding('4px'),
     [MEDIA.mobile]: { minHeight: 'auto' },
   },
   heroMapBg: {
-    position: 'absolute', top: 0, right: '-2%', width: '52%', height: '620px',
+    position: 'absolute', top: '84px', right: '4%', width: '58%', height: '680px',
     display: 'flex', alignItems: 'flex-start', justifyContent: 'center',
     pointerEvents: 'none', zIndex: 0,
     [MEDIA.mobile]: { position: 'relative', width: '100%', height: 'auto', right: 0, marginTop: '16px', order: 2 },
   },
-  heroMapInner: { width: '100%', maxWidth: '620px', pointerEvents: 'auto' },
+  heroMapInner: { width: '100%', maxWidth: '700px', pointerEvents: 'auto' },
   heroContent: {
     position: 'relative', zIndex: 2, width: '52%', maxWidth: '560px', display: 'flex', flexDirection: 'column',
     [MEDIA.mobile]: { width: '100%', maxWidth: '100%' },
   },
-  heroTopCard: { maxWidth: '400px' },
-  // Bloque de título flotante en la esquina inferior derecha del mapa
+  // Fila superior: tarjeta de presupuesto a la izquierda y Evolución a la derecha.
+  heroTopRow: {
+    display: 'grid', gridTemplateColumns: '1fr 1fr', ...shorthands.gap('12px'), alignItems: 'stretch',
+    [MEDIA.mobile]: { gridTemplateColumns: '1fr' },
+  },
+  // Bloque de título flotante en la esquina superior derecha del mapa
   heroCaption: {
-    position: 'absolute', right: '2%', top: '560px', zIndex: 2, maxWidth: '300px', textAlign: 'right',
+    position: 'absolute', right: '2%', top: 0, zIndex: 2, maxWidth: '300px', textAlign: 'right',
     pointerEvents: 'none',
     [MEDIA.mobile]: { position: 'relative', right: 0, top: 0, textAlign: 'left', maxWidth: '100%', marginTop: '12px', order: 3 },
   },
@@ -315,9 +319,9 @@ export const ReportesModule: React.FC = () => {
           </div>
         </div>
 
-        {/* Contenido flotante (izquierda) */}
+        {/* Contenido flotante (izquierda): fila presupuesto + evolución, y líneas debajo */}
         <div className={styles.heroContent}>
-          <div className={styles.heroTopCard}>
+          <div className={styles.heroTopRow}>
           <div className={styles.bigCard}>
             <span className={styles.kpiLabel}>Presupuesto 2027</span>
             <div className={styles.bigValue}>{fmtB(resumen.total2027)} <span style={{ fontSize: 13, color: tokens.colorNeutralForeground3 }}>COP</span></div>
@@ -330,8 +334,8 @@ export const ReportesModule: React.FC = () => {
             </div>
           </div>
 
-          {/* Evolución 2026 vs 2027 + todas las líneas operativas, justo debajo del panel */}
-          <Card className={mergeClasses(styles.chartCard, styles.heroChartCard)} style={{ marginTop: 10 }}>
+          {/* Evolución 2026 vs 2027, al lado derecho de la tarjeta de presupuesto */}
+          <Card className={mergeClasses(styles.chartCard, styles.heroChartCard)}>
             <span className={styles.chartTitle} style={{ fontSize: 14 }}>Evolución presupuesto {filtroZona !== 'Todas' ? `— ${filtroZona}` : ''}</span>
             <span className={styles.chartHint} style={{ marginBottom: 4 }}>Base 2026 vs 2027 (miles de millones COP).</span>
             <ResponsiveContainer width="100%" height={150}>
@@ -347,6 +351,7 @@ export const ReportesModule: React.FC = () => {
               </BarChart>
             </ResponsiveContainer>
           </Card>
+          </div>
 
           <Card className={mergeClasses(styles.chartCard, styles.heroChartCard)} style={{ marginTop: 10 }}>
             <span className={styles.chartTitle} style={{ fontSize: 14 }}>Líneas operativas {filtroZona !== 'Todas' ? `— ${filtroZona}` : ''}</span>
@@ -370,10 +375,9 @@ export const ReportesModule: React.FC = () => {
               })}
             </div>
           </Card>
-          </div>
         </div>
 
-        {/* Título flotante en la esquina inferior derecha del mapa */}
+        {/* Título flotante en la esquina superior derecha del mapa */}
         <div className={styles.heroCaption}>
           <span className={styles.eyebrow}>Presupuesto 2026 vs 2027</span>
           <div className={styles.heroTitle} style={{ margin: '4px 0 6px' }}>Explora por zona</div>
