@@ -15,9 +15,10 @@ import {
   actividadesAnio, resumenComparacion, comparacionPorZona, comparacionPorLinea,
   paretoLineas, concentracionTop, cajaMensual, dependenciaProveedores,
   exposicionPorLinea, heatmapZonaLinea, fmtB, fmtPct,
-  baseline2026Filtrada, mapPorZona, mapPorLinea,
+  baseline2026Filtrada, mapPorZona, mapPorLinea, porZona2027, total2027,
 } from '../../utils/reportesAggregations';
 import { exportReporteToExcel } from '../../utils/exportReporte';
+import { ColombiaMapa } from './ColombiaMapa';
 
 const AZUL = '#0f5fbf', NARANJA = '#c05a1e', VERDE = '#1f7a3d', ROJO = '#e02424', MORADO = '#5b3fd6';
 
@@ -39,6 +40,16 @@ const useStyles = makeStyles({
   },
   filterItem: { display: 'flex', flexDirection: 'column', ...shorthands.gap('2px') },
   filterLabel: { fontSize: '11px', fontWeight: 600, color: tokens.colorNeutralForeground3 },
+  hero: {
+    display: 'grid', gridTemplateColumns: '1.05fr 0.95fr', ...shorthands.gap('16px'),
+    [MEDIA.mobile]: { gridTemplateColumns: '1fr' },
+  },
+  heroKpis: { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', ...shorthands.gap('10px'), marginBottom: '10px' },
+  heroKpi: { ...shorthands.padding('12px', '14px'), borderRadius: '12px', background: 'rgba(255,255,255,0.7)', border: '1px solid rgba(255,255,255,0.8)' },
+  fade: {
+    animationName: { from: { opacity: '0', transform: 'translateY(6px)' }, to: { opacity: '1', transform: 'translateY(0)' } },
+    animationDuration: '0.4s', animationFillMode: 'both', animationTimingFunction: 'cubic-bezier(0.16,1,0.3,1)',
+  },
   kpiGrid: {
     display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', ...shorthands.gap('16px'),
     [MEDIA.mobile]: { gridTemplateColumns: 'repeat(2, 1fr)', ...shorthands.gap('12px') },
@@ -112,6 +123,13 @@ export const ReportesModule: React.FC = () => {
     const baseLinea = mapPorLinea(baseCeldas);
     const totalBase = baseCeldas.reduce((s, c) => s + c.valor, 0);
 
+    // Presupuesto por zona para el MAPA: respeta filtros de línea/tipo pero NO el de zona,
+    // para que el mapa siempre muestre todas las zonas y se pueda clicar cualquiera.
+    const actsSinZona = actividadesAnio(actividades, 2027).filter(a =>
+      (filtroLinea === 'Todas' || a.lineaOperativa === filtroLinea) &&
+      (filtroTipo === 'Todos' || ((a.fuentePresupuesto as string) || 'OPEX') === filtroTipo));
+    const mapaPorZona = porZona2027(actsSinZona);
+
     const resumen = resumenComparacion(acts, totalBase);
     const compZona = comparacionPorZona(acts, baseZona);
     const compLinea = comparacionPorLinea(acts, baseLinea);
@@ -121,7 +139,7 @@ export const ReportesModule: React.FC = () => {
     const exposicion = exposicionPorLinea(acts);
     const heat = heatmapZonaLinea(acts);
     const conc = concentracionTop(acts, 3);
-    return { acts, resumen, compZona, compLinea, pareto, caja, proveedores, exposicion, heat, conc };
+    return { acts, resumen, compZona, compLinea, pareto, caja, proveedores, exposicion, heat, conc, mapaPorZona };
   }, [actividades, filtroLinea, filtroZona, filtroTipo]);
 
   const { resumen, compZona, compLinea, pareto, caja, proveedores, exposicion, heat, conc } = R;
@@ -221,11 +239,46 @@ export const ReportesModule: React.FC = () => {
       {Header}
       {Filtros}
 
-      {/* A. KPIs */}
+      {/* Contenido que reacciona a filtros (con animación al cambiar) */}
+      <div key={`${filtroLinea}|${filtroZona}|${filtroTipo}`} className={styles.fade} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+
+      {/* A. Sección hero: total 2026 vs 2027 + desviación + mapa */}
+      <Title3 className={styles.sectionTitle}>Presupuesto {filtroZona !== 'Todas' ? `— ${filtroZona}` : 'general'} 2026 vs 2027</Title3>
+      <div className={styles.hero}>
+        <Card className={styles.chartCard}>
+          <div className={styles.heroKpis}>
+            <div className={styles.heroKpi}><span className={styles.kpiLabel}>Total presupuesto 2027</span><div className={styles.kpiValue} style={{ fontSize: 26 }}>{fmtB(resumen.total2027)}</div></div>
+            <div className={styles.heroKpi}><span className={styles.kpiLabel}>Desviación vs 2026 (%)</span><div className={styles.kpiValue} style={{ fontSize: 26, color: (resumen.crecimiento ?? 0) >= 0 ? NARANJA : VERDE }}>{fmtPct(resumen.crecimiento)}</div></div>
+            <div className={styles.heroKpi}><span className={styles.kpiLabel}>Desviación en $</span><div className={styles.kpiValue} style={{ fontSize: 26, color: (resumen.delta ?? 0) >= 0 ? NARANJA : VERDE }}>{fmtB(resumen.delta)}</div></div>
+          </div>
+          <span className={styles.chartTitle}>Total 2026 vs 2027</span>
+          <span className={styles.chartHint}>Base 2026 (línea base OPEX) frente al presupuesto 2027.</span>
+          <ResponsiveContainer width="100%" height={240}>
+            <BarChart data={[{ nombre: '2026', valor: resumen.total2026 }, { nombre: '2027', valor: resumen.total2027 }]} margin={{ left: 4, right: 10 }}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} />
+              <XAxis dataKey="nombre" tick={{ fontSize: 12, fontWeight: 700 }} />
+              <YAxis tickFormatter={fmtAxis} tick={{ fontSize: 11 }} />
+              <RTooltip content={<TT />} />
+              <Bar dataKey="valor" name="Presupuesto" radius={[6, 6, 0, 0]} barSize={90}>
+                <Cell fill="#9db8d6" />
+                <Cell fill={AZUL} />
+                <LabelList dataKey="valor" position="top" formatter={(v: any) => fmtB(Number(v))} style={{ fontSize: 12, fontWeight: 800, fill: '#003057' }} />
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </Card>
+
+        <Card className={styles.chartCard}>
+          <span className={styles.chartTitle}>Presupuesto 2027 por zona</span>
+          <span className={styles.chartHint}>Haz clic en una zona del mapa para filtrar todo el tablero.{filtroZona !== 'Todas' ? ` (Activo: ${filtroZona})` : ''}</span>
+          <ColombiaMapa presupuestoPorZona={R.mapaPorZona} zonaSel={filtroZona} onSelectZona={setFiltroZona} />
+        </Card>
+      </div>
+
+      {/* KPIs secundarios */}
       <div className={styles.kpiGrid}>
         <Card className={styles.kpiCard}><span className={styles.kpiLabel}>Presupuesto 2027</span><span className={styles.kpiValue}>{fmtB(resumen.total2027)}</span><span className={styles.kpiSub}>COP</span></Card>
         <Card className={styles.kpiCard}><span className={styles.kpiLabel}>Base 2026</span><span className={styles.kpiValue}>{fmtB(resumen.total2026)}</span><span className={styles.kpiSub}>Línea base</span></Card>
-        <Card className={styles.kpiCard}><span className={styles.kpiLabel}>Crecimiento vs 2026</span><span className={styles.kpiValue} style={{ color: VERDE }}>{fmtPct(resumen.crecimiento)}</span><span className={styles.kpiSub}>Δ {fmtB(resumen.delta)}</span></Card>
         <Card className={styles.kpiCard}><span className={styles.kpiLabel}>Concentración top 3 rubros</span><span className={styles.kpiValue}>{conc.toFixed(0)}%</span><span className={styles.kpiSub}>prioridad de control</span></Card>
         <Card className={styles.kpiCard}><span className={styles.kpiLabel}>Mayor mes de caja</span><span className={styles.kpiValue}>{caja.picoMes}</span><span className={styles.kpiSub}>{fmtB(caja.picoValor)}</span></Card>
       </div>
@@ -412,6 +465,8 @@ export const ReportesModule: React.FC = () => {
           </table>
         </div>
       </Card>
+
+      </div>{/* fin bloque animado por filtros */}
 
       <div style={{ textAlign: 'center' }}>
         <Caption1 style={{ color: tokens.colorNeutralForeground3 }}>Valores en COP. 2027 en vivo desde la app; 2026 línea base (Plantilla OPEX).</Caption1>
