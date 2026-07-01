@@ -48,7 +48,7 @@ const useStyles = makeStyles({
     [MEDIA.mobile]: { minHeight: 'auto', overflow: 'visible' },
   },
   heroMapBg: {
-    position: 'absolute', top: '-90px', right: '4%', width: '58%', height: '640px',
+    position: 'absolute', top: '-60px', right: '4%', width: '58%', height: '640px',
     display: 'flex', alignItems: 'flex-start', justifyContent: 'center',
     pointerEvents: 'none', zIndex: 0,
     [MEDIA.mobile]: { position: 'relative', width: '100%', height: 'auto', right: 0, marginTop: '16px', order: 2 },
@@ -161,7 +161,7 @@ const useStyles = makeStyles({
 
 const fmtAxis = (v: number) => `$${(v / 1e9).toFixed(1)} MM`;
 // Vistas del reporte (navegación por flechas).
-const VISTAS = ['Explora por zona', 'Comparación 2026 vs 2027', 'Composición y control del OPEX 2027'];
+const VISTAS = ['Explora por zona', 'Comparación 2026 vs 2027', 'Análisis por zona'];
 // Etiqueta sobre la barra en una sola línea (el LabelList por defecto envuelve
 // el texto al ancho de la barra y se corta contra el borde superior).
 const BarLabel = ({ x, y, width, value }: any) => (
@@ -240,13 +240,15 @@ export const ReportesModule: React.FC = () => {
     const baseMapaCeldas = filtroTipo !== 'CAPEX' ? baseline2026Filtrada('Todas', filtroLinea) : [];
     const base2026Zona = mapPorZona(baseMapaCeldas);
     const crecimientoPorZona: Record<string, number | null> = {};
+    const deltaPorZona: Record<string, number> = {};
     for (const z of Object.keys(mapaPorZona)) {
       const b = base2026Zona[z] ?? 0;
       crecimientoPorZona[z] = b > 0 ? (mapaPorZona[z] - b) / b : null;
+      deltaPorZona[z] = mapaPorZona[z] - b;
     }
     const nEstaciones = new Set(acts.map(a => a.estacion).filter(Boolean)).size;
     const resumenAmbito = { participacion, nActividades: acts.length, nEstaciones, rubroTop: pareto.filas[0]?.nombre ?? '—' };
-    return { acts, resumen, compZona, compLinea, pareto, caja, proveedores, exposicion, heat, conc, mapaPorZona, lineasOrdenadas, resumenAmbito, crecimientoPorZona };
+    return { acts, resumen, compZona, compLinea, pareto, caja, proveedores, exposicion, heat, conc, mapaPorZona, lineasOrdenadas, resumenAmbito, crecimientoPorZona, deltaPorZona };
   }, [actividades, filtroLinea, filtroZona, filtroTipo]);
 
   const { resumen, compZona, compLinea, pareto, caja, proveedores, exposicion, heat, conc } = R;
@@ -361,7 +363,7 @@ export const ReportesModule: React.FC = () => {
         {/* Mapa de fondo, a la derecha, ocupando el alto */}
         <div className={styles.heroMapBg}>
           <div className={styles.heroMapInner}>
-            <ColombiaMapa presupuestoPorZona={R.mapaPorZona} crecimientoPorZona={R.crecimientoPorZona} zonaSel={filtroZona} onSelectZona={setFiltroZona} />
+            <ColombiaMapa presupuestoPorZona={R.mapaPorZona} crecimientoPorZona={R.crecimientoPorZona} deltaPorZona={R.deltaPorZona} zonaSel={filtroZona} onSelectZona={setFiltroZona} />
           </div>
         </div>
 
@@ -440,7 +442,7 @@ export const ReportesModule: React.FC = () => {
         {/* Mapa de fondo, idéntico al del hero */}
         <div className={styles.heroMapBg}>
           <div className={styles.heroMapInner}>
-            <ColombiaMapa presupuestoPorZona={R.mapaPorZona} crecimientoPorZona={R.crecimientoPorZona} zonaSel={filtroZona} onSelectZona={setFiltroZona} />
+            <ColombiaMapa presupuestoPorZona={R.mapaPorZona} crecimientoPorZona={R.crecimientoPorZona} deltaPorZona={R.deltaPorZona} zonaSel={filtroZona} onSelectZona={setFiltroZona} />
           </div>
         </div>
 
@@ -484,68 +486,31 @@ export const ReportesModule: React.FC = () => {
       </div>
       )}
 
-      {/* C. Composición y control 2027 (vista 2) */}
+      {/* C. Análisis por zona (vista 2): barras horizontales (30%) + mapa de calor (60%) */}
       {vista === 2 && (<>
-      <Title3 className={styles.sectionTitle}>Composición y control del OPEX 2027</Title3>
-      <div className={styles.grid2}>
-        {/* C1. Pareto */}
+      <Title3 className={styles.sectionTitle}>Análisis por zona</Title3>
+      <div style={{ display: 'grid', gridTemplateColumns: '3fr 6fr', gap: 16, alignItems: 'start' }}>
+        {/* Planeado por zona (barras horizontales, mayor a menor) */}
         <Card className={styles.chartCard}>
-          <span className={styles.chartTitle}>4. Pareto de líneas operativas controlables</span>
-          <span className={styles.chartHint}>Dónde negociar, limitar alcance o blindar presupuesto (línea = acumulado %).</span>
-          <ResponsiveContainer width="100%" height={300}>
-            <ComposedChart data={pareto.filas.map(f => ({ nombre: f.nombre, valor: f.valor, acum: f.acumPct }))} margin={{ top: 14, left: 4, right: 10, bottom: 46 }}>
-              <CartesianGrid strokeDasharray="3 3" vertical={false} />
-              <XAxis dataKey="nombre" angle={-30} textAnchor="end" interval={0} tick={{ fontSize: 9.5 }} height={60} />
-              <YAxis yAxisId="l" tickFormatter={fmtAxis} tick={{ fontSize: 11 }} width={68} />
-              <YAxis yAxisId="r" orientation="right" domain={[0, 100]} tickFormatter={(v) => `${v}%`} tick={{ fontSize: 11 }} />
-              <RTooltip content={<TT />} />
-              <Bar yAxisId="l" dataKey="valor" name="Presupuesto" fill={AZUL} radius={[3, 3, 0, 0]} />
-              <Line yAxisId="r" dataKey="acum" name="Acumulado %" stroke="#111" strokeWidth={2} dot={{ r: 3 }} />
-              <ReferenceLine yAxisId="r" y={80} stroke={ROJO} strokeDasharray="4 4" />
-            </ComposedChart>
-          </ResponsiveContainer>
-        </Card>
-
-      </div>
-
-      <div className={styles.grid2}>
-        {/* C3. Exposición contractual */}
-        <Card className={styles.chartCard}>
-          <span className={styles.chartTitle}>6. Exposición por definir o cerrar</span>
-          <span className={styles.chartHint}>Rojo = presupuesto sin contrato definido (riesgo contractual). Total por definir: {fmtB(exposicion.totalPorDefinir)}.</span>
-          <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={exposicion.filas} layout="vertical" margin={{ left: 10, right: 20 }}>
+          <span className={styles.chartTitle}>Planeado por zona</span>
+          <span className={styles.chartHint}>Presupuesto 2027 por zona, de mayor a menor.</span>
+          <ResponsiveContainer width="100%" height={340}>
+            <BarChart data={Object.entries(R.mapaPorZona).sort((a, b) => b[1] - a[1]).map(([nombre, valor]) => ({ nombre, valor }))}
+              layout="vertical" margin={{ left: 4, right: 54 }}>
               <CartesianGrid strokeDasharray="3 3" horizontal={false} />
-              <XAxis type="number" tickFormatter={fmtAxis} tick={{ fontSize: 11 }} />
-              <YAxis type="category" dataKey="linea" width={110} tick={{ fontSize: 10 }} />
+              <XAxis type="number" tickFormatter={fmtAxis} tick={{ fontSize: 10 }} />
+              <YAxis type="category" dataKey="nombre" width={76} tick={{ fontSize: 11 }} interval={0} />
               <RTooltip content={<TT />} />
-              <Bar dataKey="base" name="Base ejecutable" stackId="a" fill="#8fbce8" radius={[0, 0, 0, 0]} />
-              <Bar dataKey="porDefinir" name="Por definir / cerrar" stackId="a" fill={ROJO} radius={[0, 4, 4, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
-        </Card>
-
-        {/* C4. Dependencia de proveedores */}
-        <Card className={styles.chartCard}>
-          <span className={styles.chartTitle}>7. Dependencia de proveedores</span>
-          <span className={styles.chartHint}>Identificar concentración para negociación y continuidad.</span>
-          <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={proveedores.map(p => ({ nombre: p.nombre.length > 22 ? p.nombre.slice(0, 22) + '…' : p.nombre, valor: p.valor, pct: p.pct }))} layout="vertical" margin={{ left: 10, right: 44 }}>
-              <CartesianGrid strokeDasharray="3 3" horizontal={false} />
-              <XAxis type="number" tickFormatter={fmtAxis} tick={{ fontSize: 11 }} />
-              <YAxis type="category" dataKey="nombre" width={130} tick={{ fontSize: 9.5 }} />
-              <RTooltip content={<TT />} />
-              <Bar dataKey="valor" name="Monto" fill={MORADO} radius={[0, 4, 4, 0]}>
-                <LabelList dataKey="pct" position="right" formatter={(v: any) => `${Number(v).toFixed(0)}%`} style={{ fontSize: 10, fontWeight: 700 }} />
+              <Bar dataKey="valor" name="Planeado 2027" fill={AZUL} radius={[0, 4, 4, 0]}>
+                <LabelList dataKey="valor" position="right" formatter={(v: any) => fmtB(Number(v))} style={{ fontSize: 10, fontWeight: 700 }} />
               </Bar>
             </BarChart>
           </ResponsiveContainer>
         </Card>
-      </div>
 
-      {/* C5. Heatmap Zona × Rubro */}
+      {/* Mapa de calor por zona */}
       <Card className={styles.chartCard}>
-        <span className={styles.chartTitle}>8. Concentración Zona × Línea operativa (2027)</span>
+        <span className={styles.chartTitle}>Mapa de calor por zona</span>
         <span className={styles.chartHint}>Dónde poner controles de gasto y dueños de presupuesto. Valores en miles de millones (MM).</span>
         <div style={{ overflowX: 'auto' }}>
           <table className={styles.table} style={{ minWidth: 560 }}>
@@ -571,51 +536,7 @@ export const ReportesModule: React.FC = () => {
           </table>
         </div>
       </Card>
-
-      {/* Indicadores rápidos del ámbito */}
-      <div className={styles.miniRow}>
-        <div className={styles.miniKpi}><span className={styles.miniLabel}>Concentración top 3</span><span className={styles.miniValue}>{conc.toFixed(0)}%</span></div>
-        <div className={styles.miniKpi}><span className={styles.miniLabel}>Mayor mes caja</span><span className={styles.miniValue}>{caja.picoMes}</span><Caption1 style={{ fontSize: 10, color: tokens.colorNeutralForeground3 }}>{fmtB(caja.picoValor)}</Caption1></div>
-        <div className={styles.miniKpi}><span className={styles.miniLabel}>Actividades</span><span className={styles.miniValue}>{R.resumenAmbito.nActividades}</span></div>
       </div>
-
-      {/* Resumen del ámbito seleccionado (datos reales) */}
-      <Card className={styles.chartCard}>
-        <span className={styles.chartTitle}>Resumen {filtroZona !== 'Todas' ? `— ${filtroZona}` : 'general'}</span>
-        <span className={styles.chartHint}>Indicadores del ámbito seleccionado (datos de la app).</span>
-        <div style={{ display: 'flex', flexDirection: 'column' }}>
-          {[
-            ['Participación nacional', `${R.resumenAmbito.participacion.toFixed(0)}%`],
-            ['Actividades planeadas', String(R.resumenAmbito.nActividades)],
-            ['Estaciones / lugares', String(R.resumenAmbito.nEstaciones)],
-            ['Línea operativa dominante', R.resumenAmbito.rubroTop],
-            ['Desviación vs 2026', fmtPct(resumen.crecimiento)],
-          ].map(([k, v]) => (
-            <div key={k} style={{ display: 'flex', justifyContent: 'space-between', padding: '9px 2px', borderBottom: '1px solid rgba(0,0,0,0.05)', fontSize: 13 }}>
-              <span style={{ color: tokens.colorNeutralForeground2 }}>{k}</span>
-              <span style={{ fontWeight: 700, color: '#003057' }}>{v}</span>
-            </div>
-          ))}
-        </div>
-      </Card>
-
-      {/* D. Mapa de decisiones */}
-      <Title3 className={styles.sectionTitle}>Mapa de decisiones financieras sugeridas</Title3>
-      <Card className={styles.chartCard}>
-        <span className={styles.chartHint}>Guion para comité: qué decisión tomar, con qué indicador y qué acción seguir.</span>
-        <div style={{ overflowX: 'auto' }}>
-          <table className={styles.table}>
-            <thead><tr><th className={styles.th}>Decisión</th><th className={styles.th}>Indicador que la dispara</th><th className={styles.th}>Acción sugerida</th><th className={styles.th}>Responsable</th></tr></thead>
-            <tbody>
-              <tr><td className={styles.td}>Revisar incremento</td><td className={styles.td}>{zonaMayor?.nombre}: {fmtB(zonaMayor?.delta ?? 0)} vs 2026</td><td className={styles.td}>Sustentar drivers y validar reserva.</td><td className={styles.td}>Finanzas + dueño de zona</td></tr>
-              <tr><td className={styles.td}>Controlar línea operativa dominante</td><td className={styles.td}>{rubroDominante?.nombre}: {fmtB(rubroDominante?.valor ?? 0)} ({((rubroDominante?.valor ?? 0) / (pareto.total || 1) * 100).toFixed(0)}%)</td><td className={styles.td}>Negociar alcance y definir techo de ejecución.</td><td className={styles.td}>Finanzas + área técnica</td></tr>
-              <tr><td className={styles.td}>Asegurar caja</td><td className={styles.td}>{caja.picoMes}: {fmtB(caja.picoValor)} (pico mensual)</td><td className={styles.td}>Programar aprobaciones antes del pico.</td><td className={styles.td}>Tesorería + planeación</td></tr>
-              <tr><td className={styles.td}>Cerrar riesgo contractual</td><td className={styles.td}>Por definir/cerrar: {fmtB(exposicion.totalPorDefinir)}</td><td className={styles.td}>Asignar fecha de cierre y ruta de abastecimiento.</td><td className={styles.td}>Abastecimiento + contrato</td></tr>
-              <tr><td className={styles.td}>Gestionar concentración</td><td className={styles.td}>{proveedores[0]?.nombre}: {proveedores[0] ? proveedores[0].pct.toFixed(0) : 0}% del gasto</td><td className={styles.td}>Evaluar dependencia y alternativas comerciales.</td><td className={styles.td}>Abastecimiento</td></tr>
-            </tbody>
-          </table>
-        </div>
-      </Card>
       </>)}
 
       </div>{/* fin bloque animado por filtros/vista */}
