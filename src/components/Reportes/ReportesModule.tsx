@@ -159,7 +159,7 @@ const useStyles = makeStyles({
   td: { padding: '8px 10px', borderBottom: '1px solid rgba(0,0,0,0.04)' },
 });
 
-const fmtAxis = (v: number) => `$${(v / 1e9).toFixed(1)}*`;
+const fmtAxis = (v: number) => `$${(v / 1e9).toFixed(1)} MM`;
 // Vistas del reporte (navegación por flechas).
 const VISTAS = ['Explora por zona', 'Comparación 2026 vs 2027', 'Composición y control del OPEX 2027'];
 // Etiqueta sobre la barra en una sola línea (el LabelList por defecto envuelve
@@ -589,7 +589,7 @@ export const ReportesModule: React.FC = () => {
       {/* C5. Heatmap Zona × Rubro */}
       <Card className={styles.chartCard}>
         <span className={styles.chartTitle}>8. Concentración Zona × Línea operativa (2027)</span>
-        <span className={styles.chartHint}>Dónde poner controles de gasto y dueños de presupuesto. Valores en miles de millones de pesos (*).</span>
+        <span className={styles.chartHint}>Dónde poner controles de gasto y dueños de presupuesto. Valores en miles de millones (MM).</span>
         <div style={{ overflowX: 'auto' }}>
           <table className={styles.table} style={{ minWidth: 560 }}>
             <thead>
@@ -665,7 +665,7 @@ export const ReportesModule: React.FC = () => {
 
       <div style={{ textAlign: 'center' }}>
         <Caption1 style={{ color: tokens.colorNeutralForeground3 }}>
-          * Miles de millones de pesos (COP). 2027 en vivo desde la app; 2026 línea base (Plantilla OPEX).
+          Valores en COP (MM = miles de millones). 2027 en vivo desde la app; 2026 línea base (Plantilla OPEX).
         </Caption1>
       </div>
     </div>

@@ -185,11 +185,10 @@ export function heatmapZonaLinea(acts: ActividadAmbiental[], topLineas = 6): Hea
 }
 
 // ---- Formato ----
-// Formato en miles de millones de COP; el asterisco se explica en la nota al pie
-// del reporte ("* miles de millones de pesos"). Ej: $30.0*
+// Formato en miles de millones (MM) de COP. Ej: $30.0 MM.
 export function fmtB(v: number): string {
   const mm = v / 1_000_000_000;
-  if (Math.abs(mm) >= 1) return `$${mm.toFixed(1)}*`;
+  if (Math.abs(mm) >= 1) return `$${mm.toFixed(1)} MM`;
   const m = v / 1_000_000;
   return `$${m.toFixed(0)} M`;
 }
