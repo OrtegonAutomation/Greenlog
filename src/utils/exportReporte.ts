@@ -38,7 +38,7 @@ export function exportReporteToExcel(actividades: ActividadAmbiental[], anio = 2
     { Indicador: 'Base 2026', Valor: Math.round(resumen.total2026) },
     { Indicador: 'Crecimiento vs 2026 (%)', Valor: resumen.crecimiento !== null ? +(resumen.crecimiento * 100).toFixed(1) : '' },
     { Indicador: 'Delta absoluto', Valor: Math.round(resumen.delta) },
-    { Indicador: 'Concentración top 3 rubros (%)', Valor: +concentracionTop(acts, 3).toFixed(1) },
+    { Indicador: 'Concentración top 3 líneas operativas (%)', Valor: +concentracionTop(acts, 3).toFixed(1) },
     { Indicador: 'Mayor mes de caja', Valor: cajaMensual(acts).picoMes },
   ], [34, 20]);
 
@@ -55,7 +55,7 @@ export function exportReporteToExcel(actividades: ActividadAmbiental[], anio = 2
   })), [30, 18, 18, 18, 10]);
 
   // 4. Pareto
-  hoja(wb, 'Pareto Rubros', paretoLineas(acts).filas.map(f => ({
+  hoja(wb, 'Pareto Líneas Operativas', paretoLineas(acts).filas.map(f => ({
     'Línea Operativa': f.nombre, Valor: Math.round(f.valor), 'Acumulado %': +f.acumPct.toFixed(1),
   })), [30, 18, 14]);
 
@@ -80,7 +80,7 @@ export function exportReporteToExcel(actividades: ActividadAmbiental[], anio = 2
 
   // 8. Heatmap Zona × Rubro
   const heat = heatmapZonaLinea(acts, 8);
-  hoja(wb, 'Zona x Rubro', heat.zonas.map(z => {
+  hoja(wb, 'Zona x Línea Operativa', heat.zonas.map(z => {
     const row: Record<string, any> = { Zona: z };
     for (const l of heat.lineas) row[l] = Math.round(heat.valores[z]?.[l] ?? 0);
     return row;

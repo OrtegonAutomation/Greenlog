@@ -473,9 +473,9 @@ export const ReportesModule: React.FC = () => {
         {/* B2. Comparación por línea */}
         <Card className={styles.chartCard}>
           <span className={styles.chartTitle}>2. Comparación por línea operativa</span>
-          <span className={styles.chartHint}>Presupuesto por rubro: 2026 (base) vs 2027.</span>
+          <span className={styles.chartHint}>Presupuesto por línea operativa: 2026 (base) vs 2027, de mayor a menor 2027.</span>
           <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={compLinea.map(c => ({ nombre: c.nombre, '2026': c.y2026, '2027': c.y2027 }))} margin={{ top: 14, left: 4, right: 10, bottom: 46 }}>
+            <BarChart data={[...compLinea].sort((a, b) => b.y2027 - a.y2027).map(c => ({ nombre: c.nombre, '2026': c.y2026, '2027': c.y2027 }))} margin={{ top: 14, left: 4, right: 10, bottom: 46 }}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} />
               <XAxis dataKey="nombre" angle={-30} textAnchor="end" interval={0} tick={{ fontSize: 9.5 }} height={60} />
               <YAxis tickFormatter={fmtAxis} tick={{ fontSize: 11 }} width={68} />
@@ -516,7 +516,7 @@ export const ReportesModule: React.FC = () => {
       <div className={styles.grid2}>
         {/* C1. Pareto */}
         <Card className={styles.chartCard}>
-          <span className={styles.chartTitle}>4. Pareto de rubros controlables</span>
+          <span className={styles.chartTitle}>4. Pareto de líneas operativas controlables</span>
           <span className={styles.chartHint}>Dónde negociar, limitar alcance o blindar presupuesto (línea = acumulado %).</span>
           <ResponsiveContainer width="100%" height={300}>
             <ComposedChart data={pareto.filas.map(f => ({ nombre: f.nombre, valor: f.valor, acum: f.acumPct }))} margin={{ top: 14, left: 4, right: 10, bottom: 46 }}>
@@ -588,7 +588,7 @@ export const ReportesModule: React.FC = () => {
 
       {/* C5. Heatmap Zona × Rubro */}
       <Card className={styles.chartCard}>
-        <span className={styles.chartTitle}>8. Concentración Zona × Rubro (2027)</span>
+        <span className={styles.chartTitle}>8. Concentración Zona × Línea operativa (2027)</span>
         <span className={styles.chartHint}>Dónde poner controles de gasto y dueños de presupuesto. Valores en miles de millones de pesos (*).</span>
         <div style={{ overflowX: 'auto' }}>
           <table className={styles.table} style={{ minWidth: 560 }}>
@@ -631,7 +631,7 @@ export const ReportesModule: React.FC = () => {
             ['Participación nacional', `${R.resumenAmbito.participacion.toFixed(0)}%`],
             ['Actividades planeadas', String(R.resumenAmbito.nActividades)],
             ['Estaciones / lugares', String(R.resumenAmbito.nEstaciones)],
-            ['Rubro dominante', R.resumenAmbito.rubroTop],
+            ['Línea operativa dominante', R.resumenAmbito.rubroTop],
             ['Desviación vs 2026', fmtPct(resumen.crecimiento)],
           ].map(([k, v]) => (
             <div key={k} style={{ display: 'flex', justifyContent: 'space-between', padding: '9px 2px', borderBottom: '1px solid rgba(0,0,0,0.05)', fontSize: 13 }}>
@@ -651,7 +651,7 @@ export const ReportesModule: React.FC = () => {
             <thead><tr><th className={styles.th}>Decisión</th><th className={styles.th}>Indicador que la dispara</th><th className={styles.th}>Acción sugerida</th><th className={styles.th}>Responsable</th></tr></thead>
             <tbody>
               <tr><td className={styles.td}>Revisar incremento</td><td className={styles.td}>{zonaMayor?.nombre}: {fmtB(zonaMayor?.delta ?? 0)} vs 2026</td><td className={styles.td}>Sustentar drivers y validar reserva.</td><td className={styles.td}>Finanzas + dueño de zona</td></tr>
-              <tr><td className={styles.td}>Controlar rubro dominante</td><td className={styles.td}>{rubroDominante?.nombre}: {fmtB(rubroDominante?.valor ?? 0)} ({((rubroDominante?.valor ?? 0) / (pareto.total || 1) * 100).toFixed(0)}%)</td><td className={styles.td}>Negociar alcance y definir techo de ejecución.</td><td className={styles.td}>Finanzas + área técnica</td></tr>
+              <tr><td className={styles.td}>Controlar línea operativa dominante</td><td className={styles.td}>{rubroDominante?.nombre}: {fmtB(rubroDominante?.valor ?? 0)} ({((rubroDominante?.valor ?? 0) / (pareto.total || 1) * 100).toFixed(0)}%)</td><td className={styles.td}>Negociar alcance y definir techo de ejecución.</td><td className={styles.td}>Finanzas + área técnica</td></tr>
               <tr><td className={styles.td}>Asegurar caja</td><td className={styles.td}>{caja.picoMes}: {fmtB(caja.picoValor)} (pico mensual)</td><td className={styles.td}>Programar aprobaciones antes del pico.</td><td className={styles.td}>Tesorería + planeación</td></tr>
               <tr><td className={styles.td}>Cerrar riesgo contractual</td><td className={styles.td}>Por definir/cerrar: {fmtB(exposicion.totalPorDefinir)}</td><td className={styles.td}>Asignar fecha de cierre y ruta de abastecimiento.</td><td className={styles.td}>Abastecimiento + contrato</td></tr>
               <tr><td className={styles.td}>Gestionar concentración</td><td className={styles.td}>{proveedores[0]?.nombre}: {proveedores[0] ? proveedores[0].pct.toFixed(0) : 0}% del gasto</td><td className={styles.td}>Evaluar dependencia y alternativas comerciales.</td><td className={styles.td}>Abastecimiento</td></tr>
