@@ -70,9 +70,18 @@ export const ColombiaMapa: React.FC<Props> = ({ presupuestoPorZona, crecimientoP
         return { ...i, bx, by, total };
       });
     };
+    // Norte va con su tarjeta hacia arriba (cerca del departamento), el resto a los lados.
+    const norte = items.filter(i => i.z === 'Norte').map(i => ({
+      ...i,
+      bx: Math.min(Math.max(i.cx - CW / 2, 4), 760 - CW - 4),
+      by: Math.max(i.cy - CH - 42, 6),
+      total,
+    }));
+    const resto = items.filter(i => i.z !== 'Norte');
     return [
-      ...colocar(items.filter(i => i.cx < 380), true),
-      ...colocar(items.filter(i => i.cx >= 380), false),
+      ...norte,
+      ...colocar(resto.filter(i => i.cx < 380), true),
+      ...colocar(resto.filter(i => i.cx >= 380), false),
     ];
   })();
 
@@ -107,8 +116,10 @@ export const ColombiaMapa: React.FC<Props> = ({ presupuestoPorZona, crecimientoP
         {/* Callouts de todas las zonas (vista por defecto, sin selección ni hover) */}
         {zonaSel === 'Todas' && !hover && callouts.map(c => (
           <g key={c.z} onClick={() => toggle(c.z)} onMouseEnter={() => setHover(c.z)} style={{ cursor: 'pointer' }}>
-            <line x1={c.bx < c.cx ? c.bx + CW : c.bx} y1={c.by + CH / 2} x2={c.cx} y2={c.cy}
-              stroke="#9fb3c8" strokeWidth={1.3} />
+            <line
+              x1={c.by + CH < c.cy ? c.cx : (c.bx < c.cx ? c.bx + CW : c.bx)}
+              y1={c.by + CH < c.cy ? c.by + CH : c.by + CH / 2}
+              x2={c.cx} y2={c.cy} stroke="#9fb3c8" strokeWidth={1.3} />
             <circle cx={c.cx} cy={c.cy} r={3} fill={VERDE} />
             <rect x={c.bx} y={c.by} width={CW} height={CH} rx={10} fill="rgba(255,255,255,0.95)"
               stroke="rgba(0,0,0,0.07)" filter="drop-shadow(0 4px 10px rgba(0,0,0,0.08))" />
