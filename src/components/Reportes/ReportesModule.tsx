@@ -1,9 +1,9 @@
 import React, { useMemo } from 'react';
 import {
   makeStyles, shorthands, tokens,
-  Title2, Title3, Body1, Caption1, Card, Button,
+  Title2, Title3, Body1, Caption1, Card, Button, Spinner,
 } from '@fluentui/react-components';
-import { ArrowTrendingLinesRegular } from '@fluentui/react-icons';
+import { ArrowTrendingLinesRegular, DataBarVerticalRegular } from '@fluentui/react-icons';
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RTooltip,
   Cell, ReferenceLine, ComposedChart, Line, LabelList,
@@ -75,7 +75,7 @@ const TT = ({ active, payload, label }: any) => {
 
 export const ReportesModule: React.FC = () => {
   const styles = useStyles();
-  const { actividades } = useActividades();
+  const { actividades, cargando, errorCarga } = useActividades();
 
   const R = useMemo(() => {
     const acts = actividadesAnio(actividades, 2027);
@@ -96,21 +96,59 @@ export const ReportesModule: React.FC = () => {
   const rubroDominante = pareto.filas[0];
   const zonaMayor = [...compZona].sort((a, b) => b.delta - a.delta)[0];
 
+  // Encabezado común (siempre visible).
+  const Header = (
+    <div className={styles.header}>
+      <div className={styles.headerLeft}>
+        <Title2 style={{ color: '#003057', fontWeight: 700 }}>Reportes — Análisis financiero OPEX</Title2>
+        <Body1 style={{ color: tokens.colorNeutralForeground2 }}>
+          Comparación presupuestal 2026 vs 2027, concentración, caja, riesgo contractual y proveedores.
+        </Body1>
+      </div>
+      <Button appearance="subtle" icon={<ArrowTrendingLinesRegular />}
+        disabled={cargando || R.acts.length === 0}
+        onClick={() => exportReporteToExcel(actividades, 2027)}>
+        Exportar Informe
+      </Button>
+    </div>
+  );
+
+  // Estado de carga: NO mostrar cifras hasta tener los datos reales (evita el "flash" de datos sin sentido).
+  if (cargando) {
+    return (
+      <div className={styles.root}>
+        {Header}
+        <Card className={styles.chartCard} style={{ alignItems: 'center', padding: '64px 24px' }}>
+          <Spinner size="large" label="Cargando información del presupuesto…" />
+          <Caption1 style={{ color: tokens.colorNeutralForeground3, marginTop: 12 }}>
+            Preparando la comparación 2026 vs 2027 con los datos actuales.
+          </Caption1>
+        </Card>
+      </div>
+    );
+  }
+
+  // Sin actividades del año: mensaje claro (no cifras engañosas).
+  if (R.acts.length === 0) {
+    return (
+      <div className={styles.root}>
+        {Header}
+        <Card className={styles.chartCard} style={{ alignItems: 'center', padding: '64px 24px', gap: 8 }}>
+          <DataBarVerticalRegular fontSize={40} color={tokens.colorNeutralForeground3} />
+          <Title3 style={{ color: '#003057' }}>Sin datos para el análisis</Title3>
+          <Caption1 style={{ color: tokens.colorNeutralForeground3, textAlign: 'center', maxWidth: 460 }}>
+            {errorCarga
+              ? errorCarga
+              : 'Aún no hay planeaciones registradas para 2027. El análisis financiero se mostrará cuando existan actividades.'}
+          </Caption1>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div className={styles.root}>
-      <div className={styles.header}>
-        <div className={styles.headerLeft}>
-          <Title2 style={{ color: '#003057', fontWeight: 700 }}>Reportes — Análisis financiero OPEX</Title2>
-          <Body1 style={{ color: tokens.colorNeutralForeground2 }}>
-            Comparación presupuestal 2026 vs 2027, concentración, caja, riesgo contractual y proveedores.
-          </Body1>
-        </div>
-        <Button appearance="subtle" icon={<ArrowTrendingLinesRegular />}
-          disabled={R.acts.length === 0}
-          onClick={() => exportReporteToExcel(actividades, 2027)}>
-          Exportar Informe
-        </Button>
-      </div>
+      {Header}
 
       {/* A. KPIs */}
       <div className={styles.kpiGrid}>
