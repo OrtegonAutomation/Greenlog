@@ -130,6 +130,12 @@ const useStyles = makeStyles({
 });
 
 const fmtAxis = (v: number) => `$${(v / 1e9).toFixed(1)} MM`;
+// Etiqueta sobre la barra en una sola línea (el LabelList por defecto envuelve
+// el texto al ancho de la barra y se corta contra el borde superior).
+const BarLabel = ({ x, y, width, value }: any) => (
+  <text x={Number(x) + Number(width) / 2} y={Number(y) - 6} textAnchor="middle"
+    fontSize={10} fontWeight={800} fill="#003057">{fmtB(Number(value))}</text>
+);
 const TT = ({ active, payload, label }: any) => {
   if (!active || !payload?.length) return null;
   return (
@@ -336,7 +342,7 @@ export const ReportesModule: React.FC = () => {
                 <RTooltip content={<TT />} />
                 <Bar dataKey="valor" radius={[6, 6, 0, 0]} barSize={48}>
                   <Cell fill="#9db8d6" /><Cell fill={AZUL} />
-                  <LabelList dataKey="valor" position="top" formatter={(v: any) => fmtB(Number(v))} style={{ fontSize: 10, fontWeight: 800, fill: '#003057' }} />
+                  <LabelList dataKey="valor" content={<BarLabel />} />
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
@@ -385,7 +391,7 @@ export const ReportesModule: React.FC = () => {
           <span className={styles.chartTitle}>1. Brecha presupuestal por zona</span>
           <span className={styles.chartHint}>Δ 2027 − 2026 por zona. Verde = disminuye, naranja = aumenta.</span>
           <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={compZona.map(c => ({ nombre: c.nombre, delta: c.delta }))} layout="vertical" margin={{ left: 10, right: 40 }}>
+            <BarChart data={compZona.map(c => ({ nombre: c.nombre, delta: c.delta }))} layout="vertical" margin={{ left: 10, right: 58 }}>
               <CartesianGrid strokeDasharray="3 3" horizontal={false} />
               <XAxis type="number" tickFormatter={fmtAxis} tick={{ fontSize: 11 }} />
               <YAxis type="category" dataKey="nombre" width={78} tick={{ fontSize: 11 }} />
