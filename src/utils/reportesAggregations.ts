@@ -185,11 +185,12 @@ export function heatmapZonaLinea(acts: ActividadAmbiental[], topLineas = 6): Hea
 }
 
 // ---- Formato ----
+// Formato en miles de millones (MM) de COP. Ej: $30.0 MM. Bajo $1.000 MM usa MM con decimales.
 export function fmtB(v: number): string {
-  const b = v / 1_000_000_000;
-  if (Math.abs(b) >= 1) return `$${b.toFixed(1)}B`;
+  const mm = v / 1_000_000_000;
+  if (Math.abs(mm) >= 1) return `$${mm.toFixed(1)} MM`;
   const m = v / 1_000_000;
-  return `$${m.toFixed(0)}M`;
+  return `$${m.toFixed(0)} M`;
 }
 export function fmtPct(v: number | null): string {
   if (v === null) return '—';

@@ -48,21 +48,22 @@ const useStyles = makeStyles({
     [MEDIA.mobile]: { minHeight: 'auto' },
   },
   heroMapBg: {
-    position: 'absolute', top: 0, right: '-4%', bottom: 0, width: '64%',
-    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    position: 'absolute', top: 0, right: '-2%', width: '52%', height: '620px',
+    display: 'flex', alignItems: 'flex-start', justifyContent: 'center',
     pointerEvents: 'none', zIndex: 0,
-    [MEDIA.mobile]: { position: 'relative', width: '100%', right: 0, marginTop: '16px', order: 2 },
+    [MEDIA.mobile]: { position: 'relative', width: '100%', height: 'auto', right: 0, marginTop: '16px', order: 2 },
   },
   heroMapInner: { width: '100%', maxWidth: '620px', pointerEvents: 'auto' },
   heroContent: {
-    position: 'relative', zIndex: 2, maxWidth: '400px', display: 'flex', flexDirection: 'column',
-    [MEDIA.mobile]: { maxWidth: '100%' },
+    position: 'relative', zIndex: 2, width: '52%', maxWidth: '560px', display: 'flex', flexDirection: 'column',
+    [MEDIA.mobile]: { width: '100%', maxWidth: '100%' },
   },
+  heroTopCard: { maxWidth: '400px' },
   // Bloque de título flotante en la esquina inferior derecha del mapa
   heroCaption: {
-    position: 'absolute', right: '2%', bottom: '4px', zIndex: 2, maxWidth: '320px', textAlign: 'right',
+    position: 'absolute', right: '2%', top: '560px', zIndex: 2, maxWidth: '300px', textAlign: 'right',
     pointerEvents: 'none',
-    [MEDIA.mobile]: { position: 'relative', right: 0, bottom: 0, textAlign: 'left', maxWidth: '100%', marginTop: '12px', order: 3 },
+    [MEDIA.mobile]: { position: 'relative', right: 0, top: 0, textAlign: 'left', maxWidth: '100%', marginTop: '12px', order: 3 },
   },
   hero: {
     display: 'grid', gridTemplateColumns: '360px 1fr', ...shorthands.gap('16px'), alignItems: 'stretch',
@@ -126,7 +127,7 @@ const useStyles = makeStyles({
   td: { padding: '8px 10px', borderBottom: '1px solid rgba(0,0,0,0.04)' },
 });
 
-const fmtAxis = (v: number) => `$${(v / 1e9).toFixed(1)}B`;
+const fmtAxis = (v: number) => `$${(v / 1e9).toFixed(1)} MM`;
 const TT = ({ active, payload, label }: any) => {
   if (!active || !payload?.length) return null;
   return (
@@ -186,9 +187,8 @@ export const ReportesModule: React.FC = () => {
     const exposicion = exposicionPorLinea(acts);
     const heat = heatmapZonaLinea(acts);
     const conc = concentracionTop(acts, 3);
-    // Datos para el panel "Explora": top-5 rubros del ámbito seleccionado, participación
-    // nacional, nº de actividades y estaciones.
-    const top5 = pareto.filas.slice(0, 5);
+    // Todas las líneas operativas del ámbito, ordenadas de mayor a menor presupuesto.
+    const lineasOrdenadas = pareto.filas;
     const totalNacional = total2027(actsSinZona) || 1;
     const participacion = (resumen.total2027 / totalNacional) * 100;
     // Crecimiento por zona para la etiqueta del mapa (2027 vs base 2026, respeta línea/tipo).
@@ -201,7 +201,7 @@ export const ReportesModule: React.FC = () => {
     }
     const nEstaciones = new Set(acts.map(a => a.estacion).filter(Boolean)).size;
     const resumenAmbito = { participacion, nActividades: acts.length, nEstaciones, rubroTop: pareto.filas[0]?.nombre ?? '—' };
-    return { acts, resumen, compZona, compLinea, pareto, caja, proveedores, exposicion, heat, conc, mapaPorZona, top5, resumenAmbito, crecimientoPorZona };
+    return { acts, resumen, compZona, compLinea, pareto, caja, proveedores, exposicion, heat, conc, mapaPorZona, lineasOrdenadas, resumenAmbito, crecimientoPorZona };
   }, [actividades, filtroLinea, filtroZona, filtroTipo]);
 
   const { resumen, compZona, compLinea, pareto, caja, proveedores, exposicion, heat, conc } = R;
@@ -309,6 +309,7 @@ export const ReportesModule: React.FC = () => {
 
         {/* Contenido flotante (izquierda) */}
         <div className={styles.heroContent}>
+          <div className={styles.heroTopCard}>
           <div className={styles.bigCard}>
             <span className={styles.kpiLabel}>Presupuesto 2027</span>
             <div className={styles.bigValue}>{fmtB(resumen.total2027)} <span style={{ fontSize: 13, color: tokens.colorNeutralForeground3 }}>COP</span></div>
@@ -326,6 +327,48 @@ export const ReportesModule: React.FC = () => {
             <div className={styles.miniKpi}><span className={styles.miniLabel}>Mayor mes caja</span><span className={styles.miniValue}>{caja.picoMes}</span><Caption1 style={{ fontSize: 10, color: tokens.colorNeutralForeground3 }}>{fmtB(caja.picoValor)}</Caption1></div>
             <div className={styles.miniKpi}><span className={styles.miniLabel}>Actividades</span><span className={styles.miniValue}>{R.resumenAmbito.nActividades}</span></div>
           </div>
+          </div>
+
+          {/* Evolución 2026 vs 2027 + todas las líneas operativas, justo debajo del panel */}
+          <Card className={styles.chartCard} style={{ marginTop: 12 }}>
+            <span className={styles.chartTitle}>Evolución presupuesto {filtroZona !== 'Todas' ? `— ${filtroZona}` : ''}</span>
+            <span className={styles.chartHint}>Base 2026 vs 2027 (miles de millones COP).</span>
+            <ResponsiveContainer width="100%" height={200}>
+              <BarChart data={[{ nombre: '2026', valor: resumen.total2026 }, { nombre: '2027', valor: resumen.total2027 }]} margin={{ left: 4, right: 10 }}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                <XAxis dataKey="nombre" tick={{ fontSize: 12, fontWeight: 700 }} />
+                <YAxis tickFormatter={fmtAxis} tick={{ fontSize: 11 }} />
+                <RTooltip content={<TT />} />
+                <Bar dataKey="valor" radius={[6, 6, 0, 0]} barSize={64}>
+                  <Cell fill="#9db8d6" /><Cell fill={AZUL} />
+                  <LabelList dataKey="valor" position="top" formatter={(v: any) => fmtB(Number(v))} style={{ fontSize: 11, fontWeight: 800, fill: '#003057' }} />
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </Card>
+
+          <Card className={styles.chartCard} style={{ marginTop: 12 }}>
+            <span className={styles.chartTitle}>Líneas operativas {filtroZona !== 'Todas' ? `— ${filtroZona}` : ''}</span>
+            <span className={styles.chartHint}>Presupuesto 2027 por línea operativa.</span>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 9, marginTop: 8 }}>
+              {R.lineasOrdenadas.map(f => {
+                const mayor = R.lineasOrdenadas[0]?.valor || 1;
+                const pctBar = (f.valor / mayor) * 100;
+                const pctTot = pareto.total ? (f.valor / pareto.total) * 100 : 0;
+                return (
+                  <div key={f.nombre}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 3 }}>
+                      <span style={{ fontWeight: 600, color: '#323130', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 180 }}>{f.nombre}</span>
+                      <span style={{ fontWeight: 700, color: '#003057' }}>{fmtB(f.valor)} <span style={{ color: tokens.colorNeutralForeground3, fontWeight: 500 }}>{pctTot.toFixed(0)}%</span></span>
+                    </div>
+                    <div style={{ height: 8, background: 'rgba(0,0,0,0.05)', borderRadius: 5 }}>
+                      <div style={{ width: `${pctBar}%`, height: '100%', background: AZUL, borderRadius: 5, transition: 'width 0.6s cubic-bezier(0.16,1,0.3,1)' }} />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </Card>
         </div>
 
         {/* Título flotante en la esquina inferior derecha del mapa */}
@@ -338,47 +381,8 @@ export const ReportesModule: React.FC = () => {
         </div>
       </div>
 
-      {/* Fila: evolución + top rubros + resumen (datos reales) */}
+      {/* Fila: resumen del ámbito seleccionado (datos reales) */}
       <div className={styles.grid3}>
-        <Card className={styles.chartCard}>
-          <span className={styles.chartTitle}>Evolución presupuesto {filtroZona !== 'Todas' ? `— ${filtroZona}` : ''}</span>
-          <span className={styles.chartHint}>Base 2026 vs 2027 (COP).</span>
-          <ResponsiveContainer width="100%" height={230}>
-            <BarChart data={[{ nombre: '2026', valor: resumen.total2026 }, { nombre: '2027', valor: resumen.total2027 }]} margin={{ left: 4, right: 10 }}>
-              <CartesianGrid strokeDasharray="3 3" vertical={false} />
-              <XAxis dataKey="nombre" tick={{ fontSize: 12, fontWeight: 700 }} />
-              <YAxis tickFormatter={fmtAxis} tick={{ fontSize: 11 }} />
-              <RTooltip content={<TT />} />
-              <Bar dataKey="valor" radius={[6, 6, 0, 0]} barSize={70}>
-                <Cell fill="#9db8d6" /><Cell fill={AZUL} />
-                <LabelList dataKey="valor" position="top" formatter={(v: any) => fmtB(Number(v))} style={{ fontSize: 11, fontWeight: 800, fill: '#003057' }} />
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
-        </Card>
-
-        <Card className={styles.chartCard}>
-          <span className={styles.chartTitle}>Top 5 rubros {filtroZona !== 'Todas' ? `— ${filtroZona}` : ''}</span>
-          <span className={styles.chartHint}>Rubros con mayor presupuesto 2027.</span>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 8 }}>
-            {R.top5.map(f => {
-              const pctBar = R.top5[0] ? (f.valor / R.top5[0].valor) * 100 : 0;
-              const pctTot = pareto.total ? (f.valor / pareto.total) * 100 : 0;
-              return (
-                <div key={f.nombre}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 3 }}>
-                    <span style={{ fontWeight: 600, color: '#323130', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 150 }}>{f.nombre}</span>
-                    <span style={{ fontWeight: 700, color: '#003057' }}>{fmtB(f.valor)} <span style={{ color: tokens.colorNeutralForeground3, fontWeight: 500 }}>{pctTot.toFixed(0)}%</span></span>
-                  </div>
-                  <div style={{ height: 8, background: 'rgba(0,0,0,0.05)', borderRadius: 5 }}>
-                    <div style={{ width: `${pctBar}%`, height: '100%', background: AZUL, borderRadius: 5, transition: 'width 0.6s cubic-bezier(0.16,1,0.3,1)' }} />
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </Card>
-
         <Card className={styles.chartCard}>
           <span className={styles.chartTitle}>Resumen {filtroZona !== 'Todas' ? `— ${filtroZona}` : 'general'}</span>
           <span className={styles.chartHint}>Indicadores del ámbito seleccionado (datos de la app).</span>
