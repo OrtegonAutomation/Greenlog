@@ -410,10 +410,10 @@ export const ReportesModule: React.FC = () => {
           <span className={styles.chartTitle}>2. Comparación por línea operativa</span>
           <span className={styles.chartHint}>Presupuesto por rubro: 2026 (base) vs 2027.</span>
           <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={compLinea.map(c => ({ nombre: c.nombre, '2026': c.y2026, '2027': c.y2027 }))} margin={{ left: 4, right: 10, bottom: 46 }}>
+            <BarChart data={compLinea.map(c => ({ nombre: c.nombre, '2026': c.y2026, '2027': c.y2027 }))} margin={{ top: 14, left: 4, right: 10, bottom: 46 }}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} />
               <XAxis dataKey="nombre" angle={-30} textAnchor="end" interval={0} tick={{ fontSize: 9.5 }} height={60} />
-              <YAxis tickFormatter={fmtAxis} tick={{ fontSize: 11 }} />
+              <YAxis tickFormatter={fmtAxis} tick={{ fontSize: 11 }} width={68} />
               <RTooltip content={<TT />} />
               <Bar dataKey="2026" fill="#9db8d6" radius={[3, 3, 0, 0]} />
               <Bar dataKey="2027" fill={AZUL} radius={[3, 3, 0, 0]} />
@@ -452,10 +452,10 @@ export const ReportesModule: React.FC = () => {
           <span className={styles.chartTitle}>4. Pareto de rubros controlables</span>
           <span className={styles.chartHint}>Dónde negociar, limitar alcance o blindar presupuesto (línea = acumulado %).</span>
           <ResponsiveContainer width="100%" height={300}>
-            <ComposedChart data={pareto.filas.map(f => ({ nombre: f.nombre, valor: f.valor, acum: f.acumPct }))} margin={{ left: 4, right: 10, bottom: 46 }}>
+            <ComposedChart data={pareto.filas.map(f => ({ nombre: f.nombre, valor: f.valor, acum: f.acumPct }))} margin={{ top: 14, left: 4, right: 10, bottom: 46 }}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} />
               <XAxis dataKey="nombre" angle={-30} textAnchor="end" interval={0} tick={{ fontSize: 9.5 }} height={60} />
-              <YAxis yAxisId="l" tickFormatter={fmtAxis} tick={{ fontSize: 11 }} />
+              <YAxis yAxisId="l" tickFormatter={fmtAxis} tick={{ fontSize: 11 }} width={68} />
               <YAxis yAxisId="r" orientation="right" domain={[0, 100]} tickFormatter={(v) => `${v}%`} tick={{ fontSize: 11 }} />
               <RTooltip content={<TT />} />
               <Bar yAxisId="l" dataKey="valor" name="Presupuesto" fill={AZUL} radius={[3, 3, 0, 0]} />
@@ -470,10 +470,10 @@ export const ReportesModule: React.FC = () => {
           <span className={styles.chartTitle}>5. Presión mensual de caja</span>
           <span className={styles.chartHint}>Programar desembolsos y aprobaciones por picos (línea = promedio).</span>
           <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={caja.filas} margin={{ left: 4, right: 10 }}>
+            <BarChart data={caja.filas} margin={{ top: 14, left: 4, right: 10 }}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} />
               <XAxis dataKey="mes" tick={{ fontSize: 10 }} />
-              <YAxis tickFormatter={fmtAxis} tick={{ fontSize: 11 }} />
+              <YAxis tickFormatter={fmtAxis} tick={{ fontSize: 11 }} width={68} />
               <RTooltip content={<TT />} />
               <ReferenceLine y={caja.promedio} stroke="#111" strokeDasharray="4 4" />
               <Bar dataKey="valor" name="Caja" radius={[3, 3, 0, 0]}>
