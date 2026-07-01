@@ -42,6 +42,22 @@ const useStyles = makeStyles({
   },
   filterItem: { display: 'flex', flexDirection: 'column', ...shorthands.gap('2px') },
   filterLabel: { fontSize: '11px', fontWeight: 600, color: tokens.colorNeutralForeground3 },
+  // --- Layout overlay tipo diseño AIDesigner: mapa de fondo + contenido flotando ---
+  heroOverlay: {
+    position: 'relative', minHeight: '560px', ...shorthands.padding('4px'),
+    [MEDIA.mobile]: { minHeight: 'auto' },
+  },
+  heroMapBg: {
+    position: 'absolute', top: 0, right: '-4%', bottom: 0, width: '64%',
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    pointerEvents: 'none', zIndex: 0,
+    [MEDIA.mobile]: { position: 'relative', width: '100%', right: 0, marginTop: '16px', order: 2 },
+  },
+  heroMapInner: { width: '100%', maxWidth: '620px', pointerEvents: 'auto' },
+  heroContent: {
+    position: 'relative', zIndex: 2, maxWidth: '400px', display: 'flex', flexDirection: 'column',
+    [MEDIA.mobile]: { maxWidth: '100%' },
+  },
   hero: {
     display: 'grid', gridTemplateColumns: '360px 1fr', ...shorthands.gap('16px'), alignItems: 'stretch',
     [MEDIA.mobile]: { gridTemplateColumns: '1fr' },
@@ -196,17 +212,12 @@ export const ReportesModule: React.FC = () => {
           Comparación presupuestal 2026 vs 2027, concentración, caja, riesgo contractual y proveedores.
         </Body1>
       </div>
-      <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-        <span style={{ fontSize: 13, fontWeight: 500, color: tokens.colorNeutralForeground2, background: 'rgba(255,255,255,0.8)', border: '1px solid rgba(0,0,0,0.08)', borderRadius: 8, padding: '7px 12px' }}>
-          Comparar con 2026
-        </span>
-        <Button appearance="secondary" icon={<ArrowTrendingLinesRegular />}
-          disabled={cargando || R.acts.length === 0}
-          style={{ borderRadius: 8 }}
-          onClick={() => exportReporteToExcel(actividades, 2027)}>
-          Descargar reporte
-        </Button>
-      </div>
+      <Button appearance="secondary" icon={<ArrowTrendingLinesRegular />}
+        disabled={cargando || R.acts.length === 0}
+        style={{ borderRadius: 8 }}
+        onClick={() => exportReporteToExcel(actividades, 2027)}>
+        Descargar reporte
+      </Button>
     </div>
   );
 
@@ -281,16 +292,24 @@ export const ReportesModule: React.FC = () => {
       {/* Contenido que reacciona a filtros (con animación al cambiar) */}
       <div key={`${filtroLinea}|${filtroZona}|${filtroTipo}`} className={styles.fade} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
 
-      {/* A. Hero: panel "Explora por zona" + mapa protagonista */}
-      <div className={styles.hero}>
-        <div className={styles.heroPanel}>
+      {/* A. Hero overlay: mapa de fondo + contenido flotando encima (estilo diseño) */}
+      <div className={styles.heroOverlay}>
+        {/* Mapa de fondo, a la derecha, ocupando el alto */}
+        <div className={styles.heroMapBg}>
+          <div className={styles.heroMapInner}>
+            <ColombiaMapa presupuestoPorZona={R.mapaPorZona} crecimientoPorZona={R.crecimientoPorZona} zonaSel={filtroZona} onSelectZona={setFiltroZona} />
+          </div>
+        </div>
+
+        {/* Contenido flotante (izquierda) */}
+        <div className={styles.heroContent}>
           <span className={styles.eyebrow}>Presupuesto 2026 vs 2027</span>
-          <div className={styles.heroTitle}>Explora por zona</div>
-          <Caption1 style={{ color: tokens.colorNeutralForeground3 }}>
+          <div className={styles.heroTitle} style={{ margin: '4px 0 6px' }}>Explora por zona</div>
+          <Caption1 style={{ color: tokens.colorNeutralForeground3, marginBottom: 14, maxWidth: 320 }}>
             Selecciona una zona en el mapa (o en la lista) para filtrar y analizar su presupuesto.
           </Caption1>
 
-          <div className={styles.filterItem}>
+          <div className={styles.filterItem} style={{ marginBottom: 12 }}>
             <span className={styles.filterLabel}>Zona seleccionada</span>
             <Select size="medium" value={filtroZona} onChange={(_, d) => setFiltroZona(d.value)}>
               <option value="Todas">Todas las zonas (general)</option>
@@ -310,15 +329,11 @@ export const ReportesModule: React.FC = () => {
             </div>
           </div>
 
-          <div className={styles.miniRow}>
+          <div className={styles.miniRow} style={{ marginTop: 12 }}>
             <div className={styles.miniKpi}><span className={styles.miniLabel}>Concentración top 3</span><span className={styles.miniValue}>{conc.toFixed(0)}%</span></div>
             <div className={styles.miniKpi}><span className={styles.miniLabel}>Mayor mes caja</span><span className={styles.miniValue}>{caja.picoMes}</span><Caption1 style={{ fontSize: 10, color: tokens.colorNeutralForeground3 }}>{fmtB(caja.picoValor)}</Caption1></div>
             <div className={styles.miniKpi}><span className={styles.miniLabel}>Actividades</span><span className={styles.miniValue}>{R.resumenAmbito.nActividades}</span></div>
           </div>
-        </div>
-
-        <div className={styles.mapPanel}>
-          <ColombiaMapa presupuestoPorZona={R.mapaPorZona} crecimientoPorZona={R.crecimientoPorZona} zonaSel={filtroZona} onSelectZona={setFiltroZona} />
         </div>
       </div>
 
