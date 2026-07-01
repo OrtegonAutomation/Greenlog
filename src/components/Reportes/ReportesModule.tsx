@@ -16,6 +16,7 @@ import {
   paretoLineas, concentracionTop, cajaMensual, dependenciaProveedores,
   exposicionPorLinea, heatmapZonaLinea, fmtB, fmtPct,
 } from '../../utils/reportesAggregations';
+import { exportReporteToExcel } from '../../utils/exportReporte';
 
 const AZUL = '#0f5fbf', NARANJA = '#c05a1e', VERDE = '#1f7a3d', ROJO = '#e02424', MORADO = '#5b3fd6';
 
@@ -104,7 +105,11 @@ export const ReportesModule: React.FC = () => {
             Comparación presupuestal 2026 vs 2027, concentración, caja, riesgo contractual y proveedores.
           </Body1>
         </div>
-        <Button appearance="subtle" icon={<ArrowTrendingLinesRegular />}>Exportar Informe</Button>
+        <Button appearance="subtle" icon={<ArrowTrendingLinesRegular />}
+          disabled={R.acts.length === 0}
+          onClick={() => exportReporteToExcel(actividades, 2027)}>
+          Exportar Informe
+        </Button>
       </div>
 
       {/* A. KPIs */}
