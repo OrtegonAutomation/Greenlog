@@ -44,8 +44,8 @@ const useStyles = makeStyles({
   filterLabel: { fontSize: '11px', fontWeight: 600, color: tokens.colorNeutralForeground3 },
   // --- Layout overlay tipo diseño AIDesigner: mapa de fondo + contenido flotando ---
   heroOverlay: {
-    position: 'relative', minHeight: '640px', ...shorthands.padding('4px'),
-    [MEDIA.mobile]: { minHeight: 'auto' },
+    position: 'relative', minHeight: '640px', ...shorthands.padding('4px'), overflow: 'hidden',
+    [MEDIA.mobile]: { minHeight: 'auto', overflow: 'visible' },
   },
   heroMapBg: {
     position: 'absolute', top: '-90px', right: '4%', width: '58%', height: '640px',
@@ -355,19 +355,6 @@ export const ReportesModule: React.FC = () => {
       {/* Contenido que reacciona a filtros y a la vista (slide animado) */}
       <div key={`${filtroLinea}|${filtroZona}|${filtroTipo}|${vista}`} className={dirAtras ? styles.slideBack : styles.slide}>
 
-      {/* Mini-mapa clicable: vuelve al hero con animación */}
-      {vista > 0 && (
-        <div className={styles.miniMapa} onClick={() => irAVista(0)} title="Volver al mapa">
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
-            <span style={{ fontSize: 11, fontWeight: 700, color: '#003057' }}>← Volver al mapa</span>
-            <span style={{ fontSize: 10, color: tokens.colorNeutralForeground3 }}>{filtroZona !== 'Todas' ? filtroZona : 'Todas las zonas'}</span>
-          </div>
-          <div style={{ pointerEvents: 'none' }}>
-            <ColombiaMapa presupuestoPorZona={R.mapaPorZona} crecimientoPorZona={R.crecimientoPorZona} zonaSel={filtroZona} onSelectZona={() => { }} />
-          </div>
-        </div>
-      )}
-
       {/* A. Hero overlay: mapa de fondo + contenido flotando encima (estilo diseño) */}
       {vista === 0 && (
       <div className={styles.heroOverlay}>
@@ -447,68 +434,55 @@ export const ReportesModule: React.FC = () => {
       </div>
       )}
 
-      {/* B. Comparación 2026 vs 2027 (vista 1) */}
-      {vista === 1 && (<>
-      <Title3 className={styles.sectionTitle}>Comparación 2026 vs 2027</Title3>
-      <div className={styles.grid2}>
-        {/* B1. Brecha por zona */}
-        <Card className={styles.chartCard}>
-          <span className={styles.chartTitle}>1. Brecha presupuestal por zona</span>
-          <span className={styles.chartHint}>Δ 2027 − 2026 por zona. Verde = disminuye, naranja = aumenta.</span>
-          <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={compZona.map(c => ({ nombre: c.nombre, delta: c.delta }))} layout="vertical" margin={{ left: 10, right: 58 }}>
-              <CartesianGrid strokeDasharray="3 3" horizontal={false} />
-              <XAxis type="number" tickFormatter={fmtAxis} tick={{ fontSize: 11 }} />
-              <YAxis type="category" dataKey="nombre" width={78} tick={{ fontSize: 11 }} />
-              <RTooltip content={<TT />} />
-              <ReferenceLine x={0} stroke="#999" />
-              <Bar dataKey="delta" name="Δ vs 2026" radius={[0, 4, 4, 0]}>
-                {compZona.map((c, i) => <Cell key={i} fill={c.delta >= 0 ? NARANJA : VERDE} />)}
-                <LabelList dataKey="delta" position="right" formatter={(v: any) => fmtB(Number(v))} style={{ fontSize: 10, fontWeight: 700 }} />
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
-        </Card>
-
-        {/* B2. Comparación por línea */}
-        <Card className={styles.chartCard}>
-          <span className={styles.chartTitle}>2. Comparación por línea operativa</span>
-          <span className={styles.chartHint}>Presupuesto por línea operativa: 2026 (base) vs 2027, de mayor a menor 2027.</span>
-          <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={[...compLinea].sort((a, b) => b.y2027 - a.y2027).map(c => ({ nombre: c.nombre, '2026': c.y2026, '2027': c.y2027 }))} margin={{ top: 14, left: 4, right: 10, bottom: 46 }}>
-              <CartesianGrid strokeDasharray="3 3" vertical={false} />
-              <XAxis dataKey="nombre" angle={-30} textAnchor="end" interval={0} tick={{ fontSize: 9.5 }} height={60} />
-              <YAxis tickFormatter={fmtAxis} tick={{ fontSize: 11 }} width={68} />
-              <RTooltip content={<TT />} />
-              <Bar dataKey="2026" fill="#9db8d6" radius={[3, 3, 0, 0]} />
-              <Bar dataKey="2027" fill={AZUL} radius={[3, 3, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
-        </Card>
-      </div>
-
-      {/* B3. Variación % (tabla) */}
-      <Card className={styles.chartCard}>
-        <span className={styles.chartTitle}>3. Variación por zona (drivers de crecimiento)</span>
-        <span className={styles.chartHint}>Dónde revisar incrementos y sustentar frente al año base.</span>
-        <div style={{ overflowX: 'auto' }}>
-          <table className={styles.table}>
-            <thead><tr><th className={styles.th}>Zona</th><th className={styles.th}>2026</th><th className={styles.th}>2027</th><th className={styles.th}>Δ</th><th className={styles.th}>Var %</th></tr></thead>
-            <tbody>
-              {compZona.map(c => (
-                <tr key={c.nombre}>
-                  <td className={styles.td} style={{ fontWeight: 600 }}>{c.nombre}</td>
-                  <td className={styles.td}>{fmtB(c.y2026)}</td>
-                  <td className={styles.td}>{fmtB(c.y2027)}</td>
-                  <td className={styles.td} style={{ color: c.delta >= 0 ? NARANJA : VERDE, fontWeight: 700 }}>{fmtB(c.delta)}</td>
-                  <td className={styles.td} style={{ color: (c.varPct ?? 0) >= 0 ? NARANJA : VERDE, fontWeight: 700 }}>{fmtPct(c.varPct)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      {/* B. Comparación 2026 vs 2027 (vista 1): mismo mapa + 2 gráficas */}
+      {vista === 1 && (
+      <div className={styles.heroOverlay}>
+        {/* Mapa de fondo, idéntico al del hero */}
+        <div className={styles.heroMapBg}>
+          <div className={styles.heroMapInner}>
+            <ColombiaMapa presupuestoPorZona={R.mapaPorZona} crecimientoPorZona={R.crecimientoPorZona} zonaSel={filtroZona} onSelectZona={setFiltroZona} />
+          </div>
         </div>
-      </Card>
-      </>)}
+
+        {/* Gráficas de comparación a la izquierda */}
+        <div className={styles.heroContent}>
+          <Card className={mergeClasses(styles.chartCard, styles.heroChartCard)}>
+            <span className={styles.chartTitle} style={{ fontSize: 14 }}>Comparación por línea operativa</span>
+            <span className={styles.chartHint} style={{ marginBottom: 4 }}>2026 (base) vs 2027 y brecha (Δ), de mayor a menor 2027.</span>
+            <ResponsiveContainer width="100%" height={330}>
+              <BarChart data={[...compLinea].sort((a, b) => b.y2027 - a.y2027).map(c => ({ nombre: c.nombre, '2026': c.y2026, '2027': c.y2027, 'Brecha': c.delta }))}
+                layout="vertical" margin={{ left: 4, right: 14 }} barGap={1}>
+                <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+                <XAxis type="number" tickFormatter={fmtAxis} tick={{ fontSize: 10 }} />
+                <YAxis type="category" dataKey="nombre" width={118} tick={{ fontSize: 9.5 }} interval={0} />
+                <RTooltip content={<TT />} />
+                <ReferenceLine x={0} stroke="#999" />
+                <Bar dataKey="2026" fill="#9db8d6" radius={[0, 3, 3, 0]} barSize={7} />
+                <Bar dataKey="2027" fill={AZUL} radius={[0, 3, 3, 0]} barSize={7} />
+                <Bar dataKey="Brecha" fill={NARANJA} radius={[0, 3, 3, 0]} barSize={7} />
+              </BarChart>
+            </ResponsiveContainer>
+          </Card>
+
+          <Card className={mergeClasses(styles.chartCard, styles.heroChartCard)} style={{ marginTop: 10 }}>
+            <span className={styles.chartTitle} style={{ fontSize: 14 }}>Mensualización</span>
+            <span className={styles.chartHint} style={{ marginBottom: 4 }}>Programar desembolsos y aprobaciones por picos (línea = promedio).</span>
+            <ResponsiveContainer width="100%" height={230}>
+              <BarChart data={caja.filas} margin={{ top: 14, left: 4, right: 10 }}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                <XAxis dataKey="mes" tick={{ fontSize: 10 }} />
+                <YAxis tickFormatter={fmtAxis} tick={{ fontSize: 11 }} width={68} />
+                <RTooltip content={<TT />} />
+                <ReferenceLine y={caja.promedio} stroke="#111" strokeDasharray="4 4" />
+                <Bar dataKey="valor" name="Caja" radius={[3, 3, 0, 0]}>
+                  {caja.filas.map((f, i) => <Cell key={i} fill={f.valor > caja.promedio ? NARANJA : AZUL} />)}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </Card>
+        </div>
+      </div>
+      )}
 
       {/* C. Composición y control 2027 (vista 2) */}
       {vista === 2 && (<>
@@ -532,23 +506,6 @@ export const ReportesModule: React.FC = () => {
           </ResponsiveContainer>
         </Card>
 
-        {/* C2. Caja mensual */}
-        <Card className={styles.chartCard}>
-          <span className={styles.chartTitle}>5. Presión mensual de caja</span>
-          <span className={styles.chartHint}>Programar desembolsos y aprobaciones por picos (línea = promedio).</span>
-          <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={caja.filas} margin={{ top: 14, left: 4, right: 10 }}>
-              <CartesianGrid strokeDasharray="3 3" vertical={false} />
-              <XAxis dataKey="mes" tick={{ fontSize: 10 }} />
-              <YAxis tickFormatter={fmtAxis} tick={{ fontSize: 11 }} width={68} />
-              <RTooltip content={<TT />} />
-              <ReferenceLine y={caja.promedio} stroke="#111" strokeDasharray="4 4" />
-              <Bar dataKey="valor" name="Caja" radius={[3, 3, 0, 0]}>
-                {caja.filas.map((f, i) => <Cell key={i} fill={f.valor > caja.promedio ? NARANJA : AZUL} />)}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
-        </Card>
       </div>
 
       <div className={styles.grid2}>
