@@ -56,7 +56,7 @@ export const ColombiaMapa: React.FC<Props> = ({ presupuestoPorZona, crecimientoP
 
   // Callouts por defecto (estilo tarjetas con línea conectora): todas las zonas
   // a los lados del mapa cuando no hay selección ni hover.
-  const CW = 168, CH = 62;
+  const CW = 168, CH = 56;
   const callouts = (() => {
     const total = zonas.reduce((s, z) => s + (presupuestoPorZona[z] ?? 0), 0) || 1;
     const items = zonas.map(z => ({ z, ...ZONA_CIUDAD[z], v: presupuestoPorZona[z] ?? 0 }));
@@ -126,18 +126,17 @@ export const ColombiaMapa: React.FC<Props> = ({ presupuestoPorZona, crecimientoP
             <rect x={c.bx} y={c.by} width={CW} height={CH} rx={10} fill="rgba(255,255,255,0.95)"
               stroke="rgba(0,0,0,0.07)" filter="drop-shadow(0 4px 10px rgba(0,0,0,0.08))" />
             <text x={c.bx + 12} y={c.by + 17} fontSize={11} fontWeight={700} fill={VERDE} letterSpacing="0.5">{c.z.toUpperCase()}</text>
-            <text x={c.bx + 12} y={c.by + 36} fontSize={14.5} fontWeight={800} fill="#112240">{fmtB(c.v)}</text>
-            <text x={c.bx + CW - 12} y={c.by + 36} fontSize={11} fontWeight={700} fill="#64748b" textAnchor="end">{((c.v / c.total) * 100).toFixed(0)}%</text>
+            <text x={c.bx + 12} y={c.by + 42} fontSize={15} fontWeight={800} fill="#112240">{fmtB(c.v)}</text>
             {(() => {
               const crec = crecimientoPorZona?.[c.z];
               const delta = deltaPorZona?.[c.z];
               if (delta == null) return null;
-              const sube = delta >= 0;
-              const color = sube ? VERDE : '#d64545';
+              const color = delta >= 0 ? VERDE : '#d64545';
               return (
-                <text x={c.bx + 12} y={c.by + 53} fontSize={10.5} fontWeight={700} fill={color}>
-                  {sube ? '↑' : '↓'} {crec != null ? `${fmtPct(crec)} · ` : ''}{fmtB(delta)} vs 2026
-                </text>
+                <>
+                  {crec != null && <text x={c.bx + CW - 12} y={c.by + 34} fontSize={11} fontWeight={700} fill={color} textAnchor="end">{fmtPct(crec)}</text>}
+                  <text x={c.bx + CW - 12} y={c.by + 48} fontSize={10} fontWeight={700} fill={color} textAnchor="end">{fmtB(delta)}</text>
+                </>
               );
             })()}
           </g>
@@ -145,24 +144,20 @@ export const ColombiaMapa: React.FC<Props> = ({ presupuestoPorZona, crecimientoP
 
         {/* Etiqueta flotante de la zona activa (seleccionada u hover) */}
         {etiquetaZona && ZONA_CIUDAD[etiquetaZona] && (() => {
-          const c = ZONA_CIUDAD[etiquetaZona]; const w = 170, h = 68;
+          const c = ZONA_CIUDAD[etiquetaZona]; const w = 170, h = 58;
           const der = c.cx < 560; const bx = der ? c.cx + 12 : c.cx - w - 12; const by = c.cy - h - 8;
           const crec = crecimientoPorZona?.[etiquetaZona];
           const delta = deltaPorZona?.[etiquetaZona];
-          const sube = (delta ?? 0) >= 0;
+          const color = (delta ?? 0) >= 0 ? VERDE : '#d64545';
           return (
             <g style={{ pointerEvents: 'none' }}>
               <rect x={bx} y={by} width={w} height={h} rx={11} fill="#fff" stroke="rgba(0,0,0,0.06)"
                 filter="drop-shadow(0 10px 24px rgba(0,0,0,0.14))" />
               <circle cx={bx + 13} cy={by + 15} r={3} fill={VERDE} />
               <text x={bx + 22} y={by + 18} fontSize={10} fontWeight={700} fill="#112240" letterSpacing="0.5">{etiquetaZona.toUpperCase()}</text>
-              <text x={bx + 12} y={by + 38} fontSize={17} fontWeight={800} fill="#112240">{fmtB(presupuestoPorZona[etiquetaZona] ?? 0)}</text>
-              {crec != null && <text x={bx + w - 12} y={by + 38} fontSize={11} fontWeight={700} fill={crec >= 0 ? VERDE : '#d64545'} textAnchor="end">{fmtPct(crec)}</text>}
-              {delta != null && (
-                <text x={bx + 12} y={by + 57} fontSize={11} fontWeight={700} fill={sube ? VERDE : '#d64545'}>
-                  {sube ? '↑' : '↓'} {fmtB(delta)} vs 2026
-                </text>
-              )}
+              <text x={bx + 12} y={by + 42} fontSize={17} fontWeight={800} fill="#112240">{fmtB(presupuestoPorZona[etiquetaZona] ?? 0)}</text>
+              {crec != null && <text x={bx + w - 12} y={by + 34} fontSize={11} fontWeight={700} fill={color} textAnchor="end">{fmtPct(crec)}</text>}
+              {delta != null && <text x={bx + w - 12} y={by + 48} fontSize={10} fontWeight={700} fill={color} textAnchor="end">{fmtB(delta)}</text>}
             </g>
           );
         })()}

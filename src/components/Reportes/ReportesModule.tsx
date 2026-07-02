@@ -148,8 +148,8 @@ const useStyles = makeStyles({
     [MEDIA.mobile]: { gridTemplateColumns: '1fr' },
   },
   chartCard: {
-    ...shorthands.padding('20px'), background: 'rgba(255,255,255,0.65)', backdropFilter: 'blur(12px)',
-    borderRadius: '18px', border: '1px solid rgba(255,255,255,0.5)', boxShadow: '0 4px 24px rgba(0,0,0,0.02)',
+    ...shorthands.padding('16px'), background: 'transparent',
+    borderRadius: '18px', border: 'none', boxShadow: 'none',
     display: 'flex', flexDirection: 'column', ...shorthands.gap('4px'),
   },
   chartTitle: { color: '#003057', fontWeight: 700, fontSize: '15px' },
@@ -160,8 +160,20 @@ const useStyles = makeStyles({
 });
 
 const fmtAxis = (v: number) => `$${(v / 1e9).toFixed(1)} MM`;
+// Escala de 3 colores para el mapa de calor (verde → amarillo → rojo, estilo Excel).
+const colorCalor = (t: number): string => {
+  const lerp = (a: number[], b: number[], k: number) => a.map((x, i) => Math.round(x + (b[i] - x) * k));
+  const VERDE_C = [99, 190, 123], AMARILLO_C = [255, 235, 132], ROJO_C = [248, 105, 107];
+  const c = t <= 0.5 ? lerp(VERDE_C, AMARILLO_C, t * 2) : lerp(AMARILLO_C, ROJO_C, (t - 0.5) * 2);
+  return `rgb(${c[0]},${c[1]},${c[2]})`;
+};
 // Vistas del reporte (navegación por flechas).
-const VISTAS = ['Explora por zona', 'Comparación 2026 vs 2027', 'Análisis por zona'];
+const VISTAS = ['Explora por zona', 'Comparación 2026 vs 2027', 'Análisis por zona', 'Dependencia de proveedores'];
+// Umbrales de riesgo de concentración por proveedor (% del gasto).
+const UMBRAL_ALTO = 20, UMBRAL_MEDIO = 5;
+const riesgoProveedor = (pct: number) => pct > UMBRAL_ALTO
+  ? { nivel: 'ALTO', color: '#d64545' }
+  : pct > UMBRAL_MEDIO ? { nivel: 'MEDIO', color: '#e8a412' } : { nivel: 'BAJO', color: '#48946e' };
 // Etiqueta sobre la barra en una sola línea (el LabelList por defecto envuelve
 // el texto al ancho de la barra y se corta contra el borde superior).
 const BarLabel = ({ x, y, width, value }: any) => (
@@ -451,7 +463,7 @@ export const ReportesModule: React.FC = () => {
           <Card className={mergeClasses(styles.chartCard, styles.heroChartCard)}>
             <span className={styles.chartTitle} style={{ fontSize: 14 }}>Comparación por línea operativa</span>
             <span className={styles.chartHint} style={{ marginBottom: 4 }}>2026 (base) vs 2027 y brecha (Δ), de mayor a menor 2027.</span>
-            <ResponsiveContainer width="100%" height={330}>
+            <ResponsiveContainer width="100%" height={290}>
               <BarChart data={[...compLinea].sort((a, b) => b.y2027 - a.y2027).map(c => ({ nombre: c.nombre, '2026': c.y2026, '2027': c.y2027, 'Brecha': c.delta }))}
                 layout="vertical" margin={{ left: 4, right: 14 }} barGap={1}>
                 <CartesianGrid strokeDasharray="3 3" horizontal={false} />
@@ -469,7 +481,7 @@ export const ReportesModule: React.FC = () => {
           <Card className={mergeClasses(styles.chartCard, styles.heroChartCard)} style={{ marginTop: 10 }}>
             <span className={styles.chartTitle} style={{ fontSize: 14 }}>Mensualización</span>
             <span className={styles.chartHint} style={{ marginBottom: 4 }}>Programar desembolsos y aprobaciones por picos (línea = promedio).</span>
-            <ResponsiveContainer width="100%" height={230}>
+            <ResponsiveContainer width="100%" height={190}>
               <BarChart data={caja.filas} margin={{ top: 14, left: 4, right: 10 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} />
                 <XAxis dataKey="mes" tick={{ fontSize: 10 }} />
@@ -513,9 +525,9 @@ export const ReportesModule: React.FC = () => {
         <span className={styles.chartTitle}>Mapa de calor por zona</span>
         <span className={styles.chartHint}>Dónde poner controles de gasto y dueños de presupuesto. Valores en miles de millones (MM).</span>
         <div style={{ overflowX: 'auto' }}>
-          <table className={styles.table} style={{ minWidth: 560 }}>
+          <table className={styles.table} style={{ minWidth: 560, tableLayout: 'fixed' }}>
             <thead>
-              <tr><th className={styles.th}>Zona</th>{heat.lineas.map(l => <th key={l} className={styles.th} style={{ textAlign: 'right' }}>{l}</th>)}</tr>
+              <tr><th className={styles.th}>Zona</th>{heat.lineas.map(l => <th key={l} className={styles.th} style={{ textAlign: 'center', overflow: 'hidden', textOverflow: 'ellipsis' }}>{l}</th>)}</tr>
             </thead>
             <tbody>
               {heat.zonas.map(z => (
@@ -525,7 +537,7 @@ export const ReportesModule: React.FC = () => {
                     const v = heat.valores[z]?.[l] ?? 0;
                     const intensidad = heat.max > 0 ? v / heat.max : 0;
                     return (
-                      <td key={l} className={styles.td} style={{ textAlign: 'right', background: v > 0 ? `rgba(15,95,191,${0.08 + intensidad * 0.7})` : 'transparent', color: intensidad > 0.55 ? '#fff' : '#111', fontWeight: v > 0 ? 600 : 400 }}>
+                      <td key={l} className={styles.td} style={{ textAlign: 'center', background: v > 0 ? colorCalor(intensidad) : 'transparent', color: '#1f2937', fontWeight: v > 0 ? 700 : 400 }}>
                         {v > 0 ? (v / 1e9).toFixed(1) : '—'}
                       </td>
                     );
@@ -538,6 +550,82 @@ export const ReportesModule: React.FC = () => {
       </Card>
       </div>
       </>)}
+
+      {/* D. Dependencia de proveedores (vista 3) */}
+      {vista === 3 && (() => {
+        const nAlto = proveedores.filter(p => p.pct > UMBRAL_ALTO).length;
+        const indice = nAlto >= 2 ? { nivel: 'ALTO', color: ROJO } : nAlto === 1 ? { nivel: 'MEDIO', color: '#e8a412' } : { nivel: 'BAJO', color: VERDE };
+        const topN = Math.min(2, proveedores.length);
+        const topPct = proveedores.slice(0, topN).reduce((s, p) => s + p.pct, 0);
+        const escala = Math.max(40, Math.ceil(Math.max(...proveedores.map(p => p.pct), UMBRAL_ALTO) / 10) * 10);
+        return (<>
+        <div>
+          <Title3 className={styles.sectionTitle}>Dependencia de proveedores</Title3>
+          <Caption1 style={{ color: tokens.colorNeutralForeground3, display: 'block', letterSpacing: 0.5, textTransform: 'uppercase' }}>
+            Concentración del gasto y riesgo de dependencia
+          </Caption1>
+        </div>
+
+        {/* KPIs de concentración */}
+        <div className={styles.grid3}>
+          <div style={{ background: AZUL_OSCURO, color: '#fff', borderRadius: 14, padding: '16px 18px', textAlign: 'center' }}>
+            <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 0.5 }}>LOS {topN} PRINCIPALES PROVEEDORES CONCENTRAN EL</div>
+            <div style={{ fontSize: 38, fontWeight: 800, lineHeight: 1.1 }}>{topPct.toFixed(0)}%</div>
+            <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 0.5 }}>DEL PRESUPUESTO TOTAL</div>
+          </div>
+          <div style={{ background: 'rgba(255,255,255,0.75)', borderRadius: 14, padding: '16px 18px', textAlign: 'center', border: '1px solid rgba(0,0,0,0.05)' }}>
+            <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 0.5, color: '#003057' }}>ÍNDICE DE CONCENTRACIÓN</div>
+            <div style={{ fontSize: 34, fontWeight: 800, color: indice.color, lineHeight: 1.2 }}>{indice.nivel}</div>
+            <Caption1 style={{ color: tokens.colorNeutralForeground3 }}>
+              {nAlto >= 2 ? `${nAlto} proveedores superan` : nAlto === 1 ? '1 proveedor supera' : 'Ningún proveedor supera'} el umbral recomendado ({UMBRAL_ALTO}%)
+            </Caption1>
+          </div>
+          <div style={{ background: 'rgba(255,255,255,0.75)', borderRadius: 14, padding: '16px 18px', textAlign: 'center', border: '1px solid rgba(0,0,0,0.05)' }}>
+            <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 0.5, color: '#003057' }}>UMBRALES DE RIESGO</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 8, fontSize: 12, textAlign: 'left' }}>
+              <span><span style={{ color: '#d64545', fontWeight: 700 }}>● ALTO</span> — más del {UMBRAL_ALTO}%</span>
+              <span><span style={{ color: '#e8a412', fontWeight: 700 }}>● MEDIO</span> — {UMBRAL_MEDIO}.1% a {UMBRAL_ALTO}%</span>
+              <span><span style={{ color: '#48946e', fontWeight: 700 }}>● BAJO</span> — {UMBRAL_MEDIO}% o menos</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Participación del gasto por proveedor con umbral y nivel de riesgo */}
+        <Card className={styles.chartCard}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', flexWrap: 'wrap' }}>
+            <span className={styles.chartTitle}>Participación del gasto por proveedor</span>
+            <span style={{ fontSize: 11, fontWeight: 700, color: ROJO }}>UMBRAL RECOMENDADO {UMBRAL_ALTO}%</span>
+            <span style={{ fontSize: 11, fontWeight: 700, color: '#003057' }}>NIVEL DE RIESGO</span>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 10 }}>
+            {proveedores.map(p => {
+              const r = riesgoProveedor(p.pct);
+              return (
+                <div key={p.nombre} style={{ display: 'grid', gridTemplateColumns: '150px 1fr 80px', gap: 12, alignItems: 'center' }}>
+                  <span style={{ fontSize: 12, fontWeight: 600, color: '#323130', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={p.nombre}>{p.nombre}</span>
+                  <div style={{ position: 'relative', height: 18 }}>
+                    <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.05)', borderRadius: 4 }} />
+                    <div style={{ position: 'absolute', top: 0, bottom: 0, left: 0, width: `${(p.pct / escala) * 100}%`, background: AZUL, borderRadius: 4, transition: 'width 0.6s cubic-bezier(0.16,1,0.3,1)' }} />
+                    <span style={{ position: 'absolute', left: `calc(${(p.pct / escala) * 100}% + 6px)`, top: 1, fontSize: 12, fontWeight: 700, color: '#003057' }}>{p.pct.toFixed(0)}%</span>
+                    {/* Línea del umbral */}
+                    <div style={{ position: 'absolute', top: -3, bottom: -3, left: `${(UMBRAL_ALTO / escala) * 100}%`, borderLeft: `2px dashed ${ROJO}` }} />
+                  </div>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: r.color, textAlign: 'right' }}>● {r.nivel}</span>
+                </div>
+              );
+            })}
+          </div>
+        </Card>
+
+        {/* Mensaje clave */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14, background: GREENLIGHT, borderRadius: 12, padding: '12px 18px' }}>
+          <span style={{ fontSize: 12, fontWeight: 800, color: VERDE, letterSpacing: 0.5, whiteSpace: 'nowrap' }}>★ MENSAJE CLAVE</span>
+          <Caption1 style={{ color: '#1f2937' }}>
+            Reducir la concentración de gasto en los principales proveedores fortalecerá la resiliencia, el poder de negociación y la continuidad operativa.
+          </Caption1>
+        </div>
+        </>);
+      })()}
 
       </div>{/* fin bloque animado por filtros/vista */}
 
