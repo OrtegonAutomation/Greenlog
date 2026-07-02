@@ -233,6 +233,16 @@ export const ReportesModule: React.FC = () => {
   const irAVista = (v: number) => { setDirAtras(v < vista); setVista(v); };
   // Filtro por línea operativa clicando las gráficas (segundo clic en la misma línea lo quita).
   const toggleLinea = (l: string) => setFiltroLinea(prev => (prev === l ? 'Todas' : l));
+
+  // Permite que el tour guiado cambie de vista (evento global).
+  React.useEffect(() => {
+    const h = (e: Event) => {
+      const v = Number((e as CustomEvent).detail);
+      if (!Number.isNaN(v) && v >= 0 && v < VISTAS.length) { setDirAtras(v < vista); setVista(v); }
+    };
+    window.addEventListener('greenlog:reportes-vista', h);
+    return () => window.removeEventListener('greenlog:reportes-vista', h);
+  }, [vista]);
   const [filtroTipo, setFiltroTipo] = useState('Todos'); // Todos | OPEX | CAPEX
 
   // Opciones de filtro (de todas las actividades 2027, sin filtrar).
@@ -307,7 +317,7 @@ export const ReportesModule: React.FC = () => {
           Comparación presupuestal 2026 vs 2027, concentración, caja, riesgo contractual y proveedores.
         </Body1>
       </div>
-      <Button appearance="secondary" icon={<ArrowTrendingLinesRegular />}
+      <Button appearance="secondary" icon={<ArrowTrendingLinesRegular />} id="reportes-descargar"
         disabled={cargando || R.acts.length === 0}
         style={{ borderRadius: 8 }}
         onClick={() => exportReporteToExcel(actividades, 2027)}>
@@ -385,7 +395,7 @@ export const ReportesModule: React.FC = () => {
       {Filtros}
 
       {/* Navegación por vistas: hero → comparación → composición */}
-      <div className={styles.navRow}>
+      <div className={styles.navRow} id="reportes-nav">
         <Button appearance="subtle" icon={<ChevronLeftRegular />} disabled={vista === 0} onClick={() => irAVista(vista - 1)}>
           <span className={styles.navBtnText}>Anterior</span>
         </Button>
@@ -405,7 +415,7 @@ export const ReportesModule: React.FC = () => {
 
       {/* A. Hero overlay: mapa de fondo + contenido flotando encima (estilo diseño) */}
       {vista === 0 && (
-      <div className={styles.heroOverlay}>
+      <div className={styles.heroOverlay} id="reportes-mapa">
         {/* Mapa de fondo, a la derecha, ocupando el alto */}
         <div className={styles.heroMapBg}>
           <div className={styles.heroMapInner}>
@@ -485,7 +495,7 @@ export const ReportesModule: React.FC = () => {
 
       {/* B. Comparación 2026 vs 2027 (vista 1): mismo mapa + 2 gráficas */}
       {vista === 1 && (
-      <div className={styles.heroOverlay}>
+      <div className={styles.heroOverlay} id="reportes-vista-comparacion">
         {/* Mapa de fondo, idéntico al del hero (etiquetas con variación vs 2026) */}
         <div className={styles.heroMapBg}>
           <div className={styles.heroMapInner}>
@@ -537,7 +547,7 @@ export const ReportesModule: React.FC = () => {
       {/* C. Análisis por zona (vista 2): barras horizontales (30%) + mapa de calor (60%) */}
       {vista === 2 && (<>
       <Title3 className={styles.sectionTitle}>Análisis por zona</Title3>
-      <div className={styles.zonaGrid}>
+      <div className={styles.zonaGrid} id="reportes-vista-zona">
         {/* Planeado por zona (barras horizontales, mayor a menor) */}
         <Card className={styles.chartCard}>
           <span className={styles.chartTitle}>Planeado por zona</span>
@@ -642,7 +652,7 @@ export const ReportesModule: React.FC = () => {
         </div>
 
         {/* Participación del gasto por proveedor con umbral y nivel de riesgo */}
-        <Card className={styles.chartCard}>
+        <Card className={styles.chartCard} id="reportes-vista-proveedores">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', flexWrap: 'wrap' }}>
             <span className={styles.chartTitle}>Participación del gasto por proveedor</span>
             <span style={{ fontSize: 11, fontWeight: 700, color: ROJO }}>UMBRAL RECOMENDADO {UMBRAL_ALTO}%</span>
