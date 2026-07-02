@@ -49,7 +49,8 @@ const useStyles = makeStyles({
   // --- Layout overlay tipo diseño AIDesigner: mapa de fondo + contenido flotando ---
   heroOverlay: {
     position: 'relative', minHeight: '640px', ...shorthands.padding('4px'), overflow: 'hidden',
-    [MEDIA.mobile]: { minHeight: 'auto', overflow: 'visible' },
+    // En móvil se apila: contenido → mapa → título (flex + order en los hijos).
+    [MEDIA.mobile]: { minHeight: 'auto', overflow: 'visible', display: 'flex', flexDirection: 'column', rowGap: '12px' },
   },
   heroMapBg: {
     position: 'absolute', top: '-40px', right: '4%', width: '58%', height: '640px',
@@ -83,7 +84,7 @@ const useStyles = makeStyles({
     border: '1px solid rgba(255,255,255,0.7)',
   },
   eyebrow: { fontSize: '11px', fontWeight: 700, letterSpacing: '1px', color: tokens.colorNeutralForeground3, textTransform: 'uppercase' },
-  heroTitle: { fontSize: '30px', fontWeight: 800, color: '#003057', lineHeight: 1.05 },
+  heroTitle: { fontSize: '30px', fontWeight: 800, color: '#003057', lineHeight: 1.05, [MEDIA.mobile]: { fontSize: '22px' } },
   bigCard: {
     ...shorthands.padding('12px', '14px'), borderRadius: '14px', background: 'rgba(255,255,255,0.9)',
     border: '1px solid rgba(0,0,0,0.05)', boxShadow: '0 4px 18px rgba(0,0,0,0.04)',
@@ -109,7 +110,20 @@ const useStyles = makeStyles({
     animationDuration: '0.4s', animationFillMode: 'both', animationTimingFunction: 'cubic-bezier(0.16,1,0.3,1)',
   },
   // --- Navegación por vistas (hero → comparación → composición) ---
-  navRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', ...shorthands.gap('10px') },
+  navRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', ...shorthands.gap('10px'), flexWrap: 'wrap' },
+  // En móvil las flechas quedan solo con icono (se oculta el texto).
+  navBtnText: { [MEDIA.mobile]: { display: 'none' } },
+  navTitulo: { marginLeft: '6px', color: '#003057', fontWeight: 600, [MEDIA.mobile]: { display: 'none' } },
+  // Grid de la vista "Análisis por zona": 30/60 en escritorio, apilado en móvil.
+  zonaGrid: {
+    display: 'grid', gridTemplateColumns: '3fr 6fr', ...shorthands.gap('16px'), alignItems: 'start',
+    [MEDIA.mobile]: { gridTemplateColumns: '1fr' },
+  },
+  // Fila de proveedor: nombre | barra | riesgo. En móvil columnas más angostas.
+  provRow: {
+    display: 'grid', gridTemplateColumns: '180px 1fr 80px', ...shorthands.gap('12px'), alignItems: 'center',
+    [MEDIA.mobile]: { gridTemplateColumns: '96px 1fr 54px', ...shorthands.gap('6px') },
+  },
   navDot: { width: '8px', height: '8px', borderRadius: '50%', background: 'rgba(0,48,87,0.2)', transition: 'all 0.3s ease', cursor: 'pointer' },
   navDotActiva: { width: '22px', borderRadius: '99px', background: '#264b96' },
   // Slide: entra deslizándose con un resorte suave.
@@ -372,14 +386,18 @@ export const ReportesModule: React.FC = () => {
 
       {/* Navegación por vistas: hero → comparación → composición */}
       <div className={styles.navRow}>
-        <Button appearance="subtle" icon={<ChevronLeftRegular />} disabled={vista === 0} onClick={() => irAVista(vista - 1)}>Anterior</Button>
+        <Button appearance="subtle" icon={<ChevronLeftRegular />} disabled={vista === 0} onClick={() => irAVista(vista - 1)}>
+          <span className={styles.navBtnText}>Anterior</span>
+        </Button>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           {VISTAS.map((t, i) => (
             <span key={t} className={mergeClasses(styles.navDot, vista === i && styles.navDotActiva)} title={t} onClick={() => irAVista(i)} />
           ))}
-          <Caption1 style={{ marginLeft: 6, color: '#003057', fontWeight: 600 }}>{VISTAS[vista]}</Caption1>
+          <Caption1 className={styles.navTitulo}>{VISTAS[vista]}</Caption1>
         </div>
-        <Button appearance="subtle" icon={<ChevronRightRegular />} iconPosition="after" disabled={vista === VISTAS.length - 1} onClick={() => irAVista(vista + 1)}>Siguiente</Button>
+        <Button appearance="subtle" icon={<ChevronRightRegular />} iconPosition="after" disabled={vista === VISTAS.length - 1} onClick={() => irAVista(vista + 1)}>
+          <span className={styles.navBtnText}>Siguiente</span>
+        </Button>
       </div>
 
       {/* Contenido que reacciona a filtros y a la vista (slide animado) */}
@@ -518,7 +536,7 @@ export const ReportesModule: React.FC = () => {
       {/* C. Análisis por zona (vista 2): barras horizontales (30%) + mapa de calor (60%) */}
       {vista === 2 && (<>
       <Title3 className={styles.sectionTitle}>Análisis por zona</Title3>
-      <div style={{ display: 'grid', gridTemplateColumns: '3fr 6fr', gap: 16, alignItems: 'start' }}>
+      <div className={styles.zonaGrid}>
         {/* Planeado por zona (barras horizontales, mayor a menor) */}
         <Card className={styles.chartCard}>
           <span className={styles.chartTitle}>Planeado por zona</span>
@@ -633,7 +651,7 @@ export const ReportesModule: React.FC = () => {
             {proveedores.map(p => {
               const r = riesgoProveedor(p.pct);
               return (
-                <div key={p.nombre} style={{ display: 'grid', gridTemplateColumns: '180px 1fr 80px', gap: 12, alignItems: 'center' }}>
+                <div key={p.nombre} className={styles.provRow}>
                   <span style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
                     <span style={{ flexShrink: 0, width: 26, height: 26, borderRadius: '50%', background: 'rgba(38,75,150,0.1)', color: AZUL, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 14 }}>
                       {iconoProveedor(p.nombre)}
