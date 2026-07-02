@@ -500,7 +500,8 @@ export const ReportesModule: React.FC = () => {
             <span className={styles.chartHint} style={{ marginBottom: 4 }}>2026 (base) vs 2027 y brecha (Δ), de mayor a menor 2027. Clic en una barra para filtrar.</span>
             <ResponsiveContainer width="100%" height={290}>
               <BarChart data={[...compLinea].sort((a, b) => b.y2027 - a.y2027).map(c => ({ nombre: c.nombre, '2026': c.y2026, '2027': c.y2027, 'Brecha': c.delta }))}
-                layout="vertical" margin={{ left: 4, right: 14 }} barGap={1}>
+                layout="vertical" margin={{ left: 4, right: 14 }} barGap={1} style={{ cursor: 'pointer' }}
+                onClick={(st: any) => { const n = st?.activeLabel; if (n) toggleLinea(String(n)); }}>
                 <CartesianGrid stroke="#dbe2ea" horizontal={true} vertical={true} />
                 <XAxis type="number" tickFormatter={fmtAxis} tick={{ fontSize: 10 }} />
                 <YAxis type="category" dataKey="nombre" width={118} tick={{ fontSize: 9.5 }} interval={0} />

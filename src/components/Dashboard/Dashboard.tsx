@@ -11,7 +11,9 @@ import { useActividades } from '../../hooks/useActividades';
 import { CENIT_COLORS } from '../../theme/cenitTheme';
 import { StatCard } from '../common/StatCard';
 import { FeatureCard } from '../common/FeatureCard';
-import { SeccionApp, PRESUPUESTO_RESUMEN, PRESUPUESTO_ZONAS } from '../../types';
+import { SeccionApp } from '../../types';
+import { actividadesAnio, total2027, fmtB, fmtPct } from '../../utils/reportesAggregations';
+import { TOTAL_2026 } from '../../data/baseline2026';
 import { MEDIA } from '../../hooks/useResponsive';
 
 // ── Estilos ───────────────────────────────────────────────────
@@ -168,18 +170,15 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
   const styles = useStyles();
   const { actividades } = useActividades();
 
+  // KPIs con datos reales de la planeación 2027 (misma fuente que Reportes).
   const stats = useMemo(() => {
-    const total = actividades.length;
-    const ejecucion = actividades.filter((a) => a.estado === 'En Ejecución').length;
-    const cerradas = actividades.filter((a) => a.estado === 'Cerrada').length;
-    const cumplimiento = total > 0 ? Math.round((cerradas / total) * 100) : 0;
-
-    // Budget
-    const fmtBillions = (n: number) => `$${(n / 1e9).toFixed(1)}B`;
-    const totalPresupuesto = fmtBillions(PRESUPUESTO_RESUMEN.totalPlan2026);
-    const totalZonas = PRESUPUESTO_ZONAS.reduce((s, z) => s + z.totalEstaciones, 0);
-
-    return { total, ejecucion, cumplimiento, totalPresupuesto, totalZonas };
+    const acts = actividadesAnio(actividades, 2027);
+    const presupuesto2027 = total2027(acts);
+    const crecimiento = TOTAL_2026 > 0 ? (presupuesto2027 - TOTAL_2026) / TOTAL_2026 : null;
+    const zonas = new Set(acts.map(a => a.zona).filter(Boolean)).size;
+    const estaciones = new Set(acts.map(a => a.estacion).filter(Boolean)).size;
+    const lineas = new Set(acts.map(a => a.lineaOperativa).filter(Boolean)).size;
+    return { total: acts.length, presupuesto2027, crecimiento, zonas, estaciones, lineas };
   }, [actividades]);
 
   return (
@@ -222,23 +221,23 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
       <div className={styles.statsRow} id="dashboard-kpis">
         <StatCard
           value={stats.total.toString()}
-          label="Gestión Total"
-          sub="Actividades ambientales registradas en el sistema"
+          label="Actividades planeadas"
+          sub="Actividades ambientales de la planeación 2027"
         />
         <StatCard
-          value={stats.ejecucion.toString()}
-          label="En Campo"
-          sub="Actividades actualmente en ejecución y seguimiento"
+          value={fmtB(stats.presupuesto2027)}
+          label="Presupuesto 2027"
+          sub={`OPEX planeado en ${stats.lineas} líneas operativas`}
         />
         <StatCard
-          value={`${stats.cumplimiento}%`}
-          label="Efectividad"
-          sub="Porcentaje de cumplimiento de actividades cerradas"
+          value={fmtPct(stats.crecimiento)}
+          label="Variación vs 2026"
+          sub={`Frente a la línea base 2026 (${fmtB(TOTAL_2026)})`}
         />
         <StatCard
-          value={stats.totalPresupuesto}
-          label="Presupuesto 2026"
-          sub={`Gestión ambiental - ${stats.totalZonas} estaciones en ${PRESUPUESTO_ZONAS.length} zonas`}
+          value={`${stats.estaciones}`}
+          label="Cobertura"
+          sub={`Estaciones y lugares con actividad en ${stats.zonas} zonas`}
         />
       </div>
 

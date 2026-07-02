@@ -476,14 +476,14 @@ const useStyles = makeStyles({
 interface NavItemDef { id: SeccionApp; label: string; icon: React.ReactNode; badge?: string; }
 
 const NAV_ITEMS: NavItemDef[] = [
-  { id: 'dashboard', label: 'Dashboard', icon: <GridRegular /> },
+  { id: 'dashboard', label: 'Inicio', icon: <GridRegular /> },
   { id: 'planeacion', label: 'Planeación', icon: <CalendarLtrRegular /> },
   { id: 'ejecucion', label: 'Ejecución', icon: <PlayCircleRegular /> },
   { id: 'reportes', label: 'Reportes', icon: <DataBarVerticalRegular /> },
 ];
 
 const BREADCRUMBS: Record<SeccionApp, string> = {
-  dashboard: 'Dashboard',
+  dashboard: 'Página de Inicio',
   planeacion: 'Planeación Ambiental',
   ejecucion: 'Seguimiento a Ejecución',
   reportes: 'Reportes e Indicadores',
