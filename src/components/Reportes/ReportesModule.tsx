@@ -203,6 +203,8 @@ export const ReportesModule: React.FC = () => {
   const [vista, setVista] = useState(0);
   const [dirAtras, setDirAtras] = useState(false);
   const irAVista = (v: number) => { setDirAtras(v < vista); setVista(v); };
+  // Filtro por línea operativa clicando las gráficas (segundo clic en la misma línea lo quita).
+  const toggleLinea = (l: string) => setFiltroLinea(prev => (prev === l ? 'Todas' : l));
   const [filtroTipo, setFiltroTipo] = useState('Todos'); // Todos | OPEX | CAPEX
 
   // Opciones de filtro (de todas las actividades 2027, sin filtrar).
@@ -290,13 +292,13 @@ export const ReportesModule: React.FC = () => {
   const Filtros = (
     <div className={styles.filterBar}>
       <FilterRegular style={{ color: tokens.colorNeutralForeground3 }} />
-      <div className={styles.filterItem}>
-        <span className={styles.filterLabel}>Línea operativa</span>
-        <Select size="small" value={filtroLinea} onChange={(_, d) => setFiltroLinea(d.value)} style={{ minWidth: 170 }}>
-          <option value="Todas">Todas las líneas</option>
-          {opciones.lineas.map(l => <option key={l} value={l}>{l}</option>)}
-        </Select>
-      </div>
+      {/* La línea operativa se filtra clicando las gráficas de líneas (vistas 1 y 2). */}
+      {filtroLinea !== 'Todas' && (
+        <span className={styles.pill} style={{ background: GREENLIGHT, color: VERDE, cursor: 'pointer' }}
+          title="Quitar filtro de línea" onClick={() => setFiltroLinea('Todas')}>
+          Línea: {filtroLinea} ✕
+        </span>
+      )}
       <div className={styles.filterItem}>
         <span className={styles.filterLabel}>Tipo de presupuesto</span>
         <Select size="small" value={filtroTipo} onChange={(_, d) => setFiltroTipo(d.value)} style={{ minWidth: 120 }}>
@@ -415,14 +417,15 @@ export const ReportesModule: React.FC = () => {
 
           <Card className={mergeClasses(styles.chartCard, styles.heroChartCard)} style={{ marginTop: 10 }}>
             <span className={styles.chartTitle} style={{ fontSize: 14 }}>Líneas operativas {filtroZona !== 'Todas' ? `— ${filtroZona}` : ''}</span>
-            <span className={styles.chartHint} style={{ marginBottom: 4 }}>Presupuesto 2027 por línea operativa.</span>
+            <span className={styles.chartHint} style={{ marginBottom: 4 }}>Presupuesto 2027 por línea operativa. Clic para filtrar.</span>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 4 }}>
               {R.lineasOrdenadas.map(f => {
                 const mayor = R.lineasOrdenadas[0]?.valor || 1;
                 const pctBar = (f.valor / mayor) * 100;
                 const pctTot = pareto.total ? (f.valor / pareto.total) * 100 : 0;
                 return (
-                  <div key={f.nombre}>
+                  <div key={f.nombre} onClick={() => toggleLinea(f.nombre)} title="Clic para filtrar por esta línea"
+                    style={{ cursor: 'pointer', borderRadius: 6, padding: '2px 4px', background: filtroLinea === f.nombre ? GREENLIGHT : 'transparent', transition: 'background 0.2s ease' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, marginBottom: 2 }}>
                       <span style={{ fontWeight: 600, color: '#323130', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 180 }}>{f.nombre}</span>
                       <span style={{ fontWeight: 700, color: '#003057' }}>{fmtB(f.valor)} <span style={{ color: tokens.colorNeutralForeground3, fontWeight: 500 }}>{pctTot.toFixed(0)}%</span></span>
@@ -462,18 +465,18 @@ export const ReportesModule: React.FC = () => {
         <div className={styles.heroContent}>
           <Card className={mergeClasses(styles.chartCard, styles.heroChartCard)}>
             <span className={styles.chartTitle} style={{ fontSize: 14 }}>Comparación por línea operativa</span>
-            <span className={styles.chartHint} style={{ marginBottom: 4 }}>2026 (base) vs 2027 y brecha (Δ), de mayor a menor 2027.</span>
+            <span className={styles.chartHint} style={{ marginBottom: 4 }}>2026 (base) vs 2027 y brecha (Δ), de mayor a menor 2027. Clic en una barra para filtrar.</span>
             <ResponsiveContainer width="100%" height={290}>
               <BarChart data={[...compLinea].sort((a, b) => b.y2027 - a.y2027).map(c => ({ nombre: c.nombre, '2026': c.y2026, '2027': c.y2027, 'Brecha': c.delta }))}
                 layout="vertical" margin={{ left: 4, right: 14 }} barGap={1}>
-                <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+                <CartesianGrid stroke="#dbe2ea" horizontal={true} vertical={true} />
                 <XAxis type="number" tickFormatter={fmtAxis} tick={{ fontSize: 10 }} />
                 <YAxis type="category" dataKey="nombre" width={118} tick={{ fontSize: 9.5 }} interval={0} />
                 <RTooltip content={<TT />} />
                 <ReferenceLine x={0} stroke="#999" />
-                <Bar dataKey="2026" fill="#9db8d6" radius={[0, 3, 3, 0]} barSize={7} />
-                <Bar dataKey="2027" fill={AZUL} radius={[0, 3, 3, 0]} barSize={7} />
-                <Bar dataKey="Brecha" fill={NARANJA} radius={[0, 3, 3, 0]} barSize={7} />
+                <Bar dataKey="2026" fill="#9db8d6" radius={[0, 3, 3, 0]} barSize={7} style={{ cursor: 'pointer' }} onClick={(d: any) => { const n = d?.nombre ?? d?.payload?.nombre; if (n) toggleLinea(n); }} />
+                <Bar dataKey="2027" fill={AZUL} radius={[0, 3, 3, 0]} barSize={7} style={{ cursor: 'pointer' }} onClick={(d: any) => { const n = d?.nombre ?? d?.payload?.nombre; if (n) toggleLinea(n); }} />
+                <Bar dataKey="Brecha" fill={NARANJA} radius={[0, 3, 3, 0]} barSize={7} style={{ cursor: 'pointer' }} onClick={(d: any) => { const n = d?.nombre ?? d?.payload?.nombre; if (n) toggleLinea(n); }} />
               </BarChart>
             </ResponsiveContainer>
           </Card>
@@ -483,7 +486,7 @@ export const ReportesModule: React.FC = () => {
             <span className={styles.chartHint} style={{ marginBottom: 4 }}>Programar desembolsos y aprobaciones por picos (línea = promedio).</span>
             <ResponsiveContainer width="100%" height={190}>
               <BarChart data={caja.filas} margin={{ top: 14, left: 4, right: 10 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                <CartesianGrid stroke="#dbe2ea" horizontal={true} vertical={false} />
                 <XAxis dataKey="mes" tick={{ fontSize: 10 }} />
                 <YAxis tickFormatter={fmtAxis} tick={{ fontSize: 11 }} width={68} />
                 <RTooltip content={<TT />} />
