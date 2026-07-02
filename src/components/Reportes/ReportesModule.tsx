@@ -3,7 +3,11 @@ import {
   makeStyles, mergeClasses, shorthands, tokens,
   Title2, Title3, Body1, Caption1, Card, Button, Spinner, Select,
 } from '@fluentui/react-components';
-import { ArrowTrendingLinesRegular, DataBarVerticalRegular, FilterRegular, ChevronLeftRegular, ChevronRightRegular } from '@fluentui/react-icons';
+import {
+  ArrowTrendingLinesRegular, DataBarVerticalRegular, FilterRegular, ChevronLeftRegular, ChevronRightRegular,
+  PeopleTeamRegular, WarningRegular, TargetRegular, BeakerRegular, BuildingBankRegular,
+  QuestionCircleRegular, ShieldCheckmarkRegular, LeafTwoRegular, PersonBoardRegular,
+} from '@fluentui/react-icons';
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RTooltip,
   Cell, ReferenceLine, ComposedChart, Line, LabelList,
@@ -174,6 +178,16 @@ const UMBRAL_ALTO = 20, UMBRAL_MEDIO = 5;
 const riesgoProveedor = (pct: number) => pct > UMBRAL_ALTO
   ? { nivel: 'ALTO', color: '#d64545' }
   : pct > UMBRAL_MEDIO ? { nivel: 'MEDIO', color: '#e8a412' } : { nivel: 'BAJO', color: '#48946e' };
+// Icono SVG según el nombre del proveedor (data real de opex_data_raw).
+const iconoProveedor = (nombre: string) => {
+  const s = nombre.toLowerCase();
+  if (s.includes('chem') || s.includes('lab')) return <BeakerRegular />;
+  if (s.includes('autoridad')) return <BuildingBankRegular />;
+  if (s.includes('definir') || s.includes('confirmar')) return <QuestionCircleRegular />;
+  if (s.includes('applus')) return <ShieldCheckmarkRegular />;
+  if (s.includes('sostenib') || s.includes('ambient')) return <LeafTwoRegular />;
+  return <PersonBoardRegular />;
+};
 // Etiqueta sobre la barra en una sola línea (el LabelList por defecto envuelve
 // el texto al ancho de la barra y se corta contra el borde superior).
 const BarLabel = ({ x, y, width, value }: any) => (
@@ -454,10 +468,10 @@ export const ReportesModule: React.FC = () => {
       {/* B. Comparación 2026 vs 2027 (vista 1): mismo mapa + 2 gráficas */}
       {vista === 1 && (
       <div className={styles.heroOverlay}>
-        {/* Mapa de fondo, idéntico al del hero */}
+        {/* Mapa de fondo, idéntico al del hero (etiquetas con variación vs 2026) */}
         <div className={styles.heroMapBg}>
           <div className={styles.heroMapInner}>
-            <ColombiaMapa presupuestoPorZona={R.mapaPorZona} crecimientoPorZona={R.crecimientoPorZona} deltaPorZona={R.deltaPorZona} zonaSel={filtroZona} onSelectZona={setFiltroZona} />
+            <ColombiaMapa presupuestoPorZona={R.mapaPorZona} crecimientoPorZona={R.crecimientoPorZona} deltaPorZona={R.deltaPorZona} mostrarVariacion zonaSel={filtroZona} onSelectZona={setFiltroZona} />
           </div>
         </div>
 
@@ -556,6 +570,18 @@ export const ReportesModule: React.FC = () => {
 
       {/* D. Dependencia de proveedores (vista 3) */}
       {vista === 3 && (() => {
+        // Data real: proveedores agregados desde opex_data_raw de las actividades planeadas.
+        if (proveedores.length === 0) {
+          return (
+            <Card className={styles.chartCard} style={{ alignItems: 'center', padding: '48px 24px', gap: 8 }}>
+              <PeopleTeamRegular fontSize={36} color={tokens.colorNeutralForeground3} />
+              <Title3 style={{ color: '#003057' }}>Sin información de proveedores</Title3>
+              <Caption1 style={{ color: tokens.colorNeutralForeground3, textAlign: 'center', maxWidth: 460 }}>
+                Las actividades del ámbito seleccionado no tienen proveedor registrado en su planeación OPEX.
+              </Caption1>
+            </Card>
+          );
+        }
         const nAlto = proveedores.filter(p => p.pct > UMBRAL_ALTO).length;
         const indice = nAlto >= 2 ? { nivel: 'ALTO', color: ROJO } : nAlto === 1 ? { nivel: 'MEDIO', color: '#e8a412' } : { nivel: 'BAJO', color: VERDE };
         const topN = Math.min(2, proveedores.length);
@@ -572,11 +598,13 @@ export const ReportesModule: React.FC = () => {
         {/* KPIs de concentración */}
         <div className={styles.grid3}>
           <div style={{ background: AZUL_OSCURO, color: '#fff', borderRadius: 14, padding: '16px 18px', textAlign: 'center' }}>
+            <PeopleTeamRegular fontSize={30} style={{ marginBottom: 4 }} />
             <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 0.5 }}>LOS {topN} PRINCIPALES PROVEEDORES CONCENTRAN EL</div>
             <div style={{ fontSize: 38, fontWeight: 800, lineHeight: 1.1 }}>{topPct.toFixed(0)}%</div>
             <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 0.5 }}>DEL PRESUPUESTO TOTAL</div>
           </div>
           <div style={{ background: 'rgba(255,255,255,0.75)', borderRadius: 14, padding: '16px 18px', textAlign: 'center', border: '1px solid rgba(0,0,0,0.05)' }}>
+            <WarningRegular fontSize={30} color={indice.color} style={{ marginBottom: 4 }} />
             <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 0.5, color: '#003057' }}>ÍNDICE DE CONCENTRACIÓN</div>
             <div style={{ fontSize: 34, fontWeight: 800, color: indice.color, lineHeight: 1.2 }}>{indice.nivel}</div>
             <Caption1 style={{ color: tokens.colorNeutralForeground3 }}>
@@ -584,6 +612,7 @@ export const ReportesModule: React.FC = () => {
             </Caption1>
           </div>
           <div style={{ background: 'rgba(255,255,255,0.75)', borderRadius: 14, padding: '16px 18px', textAlign: 'center', border: '1px solid rgba(0,0,0,0.05)' }}>
+            <TargetRegular fontSize={30} color={VERDE} style={{ marginBottom: 4 }} />
             <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 0.5, color: '#003057' }}>UMBRALES DE RIESGO</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 8, fontSize: 12, textAlign: 'left' }}>
               <span><span style={{ color: '#d64545', fontWeight: 700 }}>● ALTO</span> — más del {UMBRAL_ALTO}%</span>
@@ -604,8 +633,13 @@ export const ReportesModule: React.FC = () => {
             {proveedores.map(p => {
               const r = riesgoProveedor(p.pct);
               return (
-                <div key={p.nombre} style={{ display: 'grid', gridTemplateColumns: '150px 1fr 80px', gap: 12, alignItems: 'center' }}>
-                  <span style={{ fontSize: 12, fontWeight: 600, color: '#323130', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={p.nombre}>{p.nombre}</span>
+                <div key={p.nombre} style={{ display: 'grid', gridTemplateColumns: '180px 1fr 80px', gap: 12, alignItems: 'center' }}>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+                    <span style={{ flexShrink: 0, width: 26, height: 26, borderRadius: '50%', background: 'rgba(38,75,150,0.1)', color: AZUL, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 14 }}>
+                      {iconoProveedor(p.nombre)}
+                    </span>
+                    <span style={{ fontSize: 12, fontWeight: 600, color: '#323130', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={p.nombre}>{p.nombre}</span>
+                  </span>
                   <div style={{ position: 'relative', height: 18 }}>
                     <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.05)', borderRadius: 4 }} />
                     <div style={{ position: 'absolute', top: 0, bottom: 0, left: 0, width: `${(p.pct / escala) * 100}%`, background: AZUL, borderRadius: 4, transition: 'width 0.6s cubic-bezier(0.16,1,0.3,1)' }} />

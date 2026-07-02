@@ -35,11 +35,13 @@ interface Props {
   crecimientoPorZona?: Record<string, number | null>;
   /** Variación en dinero vs 2026 (2027 − 2026), respetando los filtros aplicados. */
   deltaPorZona?: Record<string, number>;
+  /** true = etiquetas con variación vs 2026 (vista comparación); false = proporción del presupuesto en gris (vista principal). */
+  mostrarVariacion?: boolean;
   zonaSel: string;
   onSelectZona: (zona: string) => void;
 }
 
-export const ColombiaMapa: React.FC<Props> = ({ presupuestoPorZona, crecimientoPorZona, deltaPorZona, zonaSel, onSelectZona }) => {
+export const ColombiaMapa: React.FC<Props> = ({ presupuestoPorZona, crecimientoPorZona, deltaPorZona, mostrarVariacion = false, zonaSel, onSelectZona }) => {
   const styles = useStyles();
   const [hover, setHover] = useState<string>('');
   const zonas = Object.keys(ZONA_CIUDAD);
@@ -127,7 +129,7 @@ export const ColombiaMapa: React.FC<Props> = ({ presupuestoPorZona, crecimientoP
               stroke="rgba(0,0,0,0.07)" filter="drop-shadow(0 4px 10px rgba(0,0,0,0.08))" />
             <text x={c.bx + 12} y={c.by + 17} fontSize={11} fontWeight={700} fill={VERDE} letterSpacing="0.5">{c.z.toUpperCase()}</text>
             <text x={c.bx + 12} y={c.by + 42} fontSize={15} fontWeight={800} fill="#112240">{fmtB(c.v)}</text>
-            {(() => {
+            {mostrarVariacion ? (() => {
               const crec = crecimientoPorZona?.[c.z];
               const delta = deltaPorZona?.[c.z];
               if (delta == null) return null;
@@ -138,7 +140,9 @@ export const ColombiaMapa: React.FC<Props> = ({ presupuestoPorZona, crecimientoP
                   <text x={c.bx + CW - 12} y={c.by + 48} fontSize={10} fontWeight={700} fill={color} textAnchor="end">{fmtB(delta)}</text>
                 </>
               );
-            })()}
+            })() : (
+              <text x={c.bx + CW - 12} y={c.by + 42} fontSize={11} fontWeight={700} fill="#64748b" textAnchor="end">{((c.v / c.total) * 100).toFixed(0)}%</text>
+            )}
           </g>
         ))}
 
@@ -156,8 +160,16 @@ export const ColombiaMapa: React.FC<Props> = ({ presupuestoPorZona, crecimientoP
               <circle cx={bx + 13} cy={by + 15} r={3} fill={VERDE} />
               <text x={bx + 22} y={by + 18} fontSize={10} fontWeight={700} fill="#112240" letterSpacing="0.5">{etiquetaZona.toUpperCase()}</text>
               <text x={bx + 12} y={by + 42} fontSize={17} fontWeight={800} fill="#112240">{fmtB(presupuestoPorZona[etiquetaZona] ?? 0)}</text>
-              {crec != null && <text x={bx + w - 12} y={by + 34} fontSize={11} fontWeight={700} fill={color} textAnchor="end">{fmtPct(crec)}</text>}
-              {delta != null && <text x={bx + w - 12} y={by + 48} fontSize={10} fontWeight={700} fill={color} textAnchor="end">{fmtB(delta)}</text>}
+              {mostrarVariacion ? (
+                <>
+                  {crec != null && <text x={bx + w - 12} y={by + 34} fontSize={11} fontWeight={700} fill={color} textAnchor="end">{fmtPct(crec)}</text>}
+                  {delta != null && <text x={bx + w - 12} y={by + 48} fontSize={10} fontWeight={700} fill={color} textAnchor="end">{fmtB(delta)}</text>}
+                </>
+              ) : (
+                <text x={bx + w - 12} y={by + 42} fontSize={11} fontWeight={700} fill="#64748b" textAnchor="end">
+                  {(((presupuestoPorZona[etiquetaZona] ?? 0) / (zonas.reduce((s, z) => s + (presupuestoPorZona[z] ?? 0), 0) || 1)) * 100).toFixed(0)}%
+                </text>
+              )}
             </g>
           );
         })()}
