@@ -8,6 +8,7 @@ import {
   ArrowRight24Regular,
 } from '@fluentui/react-icons';
 import { useActividades } from '../../hooks/useActividades';
+import { useAuth } from '../../auth/AuthContext';
 import { CENIT_COLORS } from '../../theme/cenitTheme';
 import { StatCard } from '../common/StatCard';
 import { FeatureCard } from '../common/FeatureCard';
@@ -169,6 +170,8 @@ interface DashboardProps {
 export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
   const styles = useStyles();
   const { actividades } = useActividades();
+  const { currentUser, isAdmin } = useAuth();
+  const esVisor = !!currentUser?.visor && !isAdmin;
 
   // KPIs con datos reales de la planeación 2027 (misma fuente que Reportes).
   const stats = useMemo(() => {
@@ -210,9 +213,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
             className={styles.heroButton}
             icon={<ArrowRight24Regular />}
             iconPosition="after"
-            onClick={() => onNavigate('planeacion')}
+            onClick={() => onNavigate(esVisor ? 'reportes' : 'planeacion')}
           >
-            Ir a Planeación
+            {esVisor ? 'Ir a Reportes' : 'Ir a Planeación'}
           </Button>
         </div>
       </div>
@@ -241,26 +244,30 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
         />
       </div>
 
-      {/* Modules Grid */}
+      {/* Modules Grid (según el rol del usuario) */}
       <div className={styles.modulesSection}>
         <Title1 className={styles.sectionTitle}>Nuestros Módulos</Title1>
         <div className={styles.modulesGrid}>
-          <FeatureCard
-            title="Planeación Ambiental"
-            description="Gestiona y programa las actividades de mantenimiento y control ambiental."
-            actionLabel="Ver Planeación"
-            imageUrl="https://images.unsplash.com/photo-1542601906990-b4d3fb778b09?q=80&w=2626&auto=format&fit=crop"
-            gradient="linear-gradient(135deg, #16a34a 0%, #059669 100%)"
-            onClick={() => onNavigate('planeacion')}
-          />
-          <FeatureCard
-            title="Ejecución y Seguimiento"
-            description="Monitoreo en tiempo real del avance en campo y cumplimiento de metas."
-            actionLabel="Ver Ejecución"
-            imageUrl="https://sinnaps.com/wp-content/uploads/2017/09/dc1pt-pxsaqkcn_.jpg-large.jpg"
-            gradient="linear-gradient(135deg, #0056D2 0%, #0033A0 100%)"
-            onClick={() => onNavigate('ejecucion')}
-          />
+          {!esVisor && (
+            <FeatureCard
+              title="Planeación Ambiental"
+              description="Gestiona y programa las actividades de mantenimiento y control ambiental."
+              actionLabel="Ver Planeación"
+              imageUrl="https://images.unsplash.com/photo-1542601906990-b4d3fb778b09?q=80&w=2626&auto=format&fit=crop"
+              gradient="linear-gradient(135deg, #16a34a 0%, #059669 100%)"
+              onClick={() => onNavigate('planeacion')}
+            />
+          )}
+          {isAdmin && (
+            <FeatureCard
+              title="Ejecución y Seguimiento"
+              description="Monitoreo en tiempo real del avance en campo y cumplimiento de metas."
+              actionLabel="Ver Ejecución"
+              imageUrl="https://sinnaps.com/wp-content/uploads/2017/09/dc1pt-pxsaqkcn_.jpg-large.jpg"
+              gradient="linear-gradient(135deg, #0056D2 0%, #0033A0 100%)"
+              onClick={() => onNavigate('ejecucion')}
+            />
+          )}
           <FeatureCard
             title="Reportes e Indicadores"
             description="Análisis detallado de KPIs, cumplimiento normativo y estadísticas."
@@ -269,6 +276,16 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
             gradient="linear-gradient(135deg, #002266 0%, #172554 100%)"
             onClick={() => onNavigate('reportes')}
           />
+          {isAdmin && (
+            <FeatureCard
+              title="Administración"
+              description="Congela la matriz financiera y gestiona usuarios, roles y permisos por zona."
+              actionLabel="Ver Administración"
+              imageUrl="https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?q=80&w=2670&auto=format&fit=crop"
+              gradient="linear-gradient(135deg, #5b3fd6 0%, #3b2a8f 100%)"
+              onClick={() => onNavigate('administracion')}
+            />
+          )}
         </div>
       </div>
 
