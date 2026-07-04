@@ -294,12 +294,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return ambitoMatches(currentUser.revisor, linea, zona);
   }, [currentUser]);
 
-  const canViewActividad = useCallback((_actividad: ActividadAmbiental) => {
-    // Lectura global: cualquier usuario autorizado ve todas las actividades
-    // (los Reportes son completos, no recortados por zona). La edición sigue
-    // controlada por canEditActividad / canPlan / canReview y el congelamiento.
-    return !!currentUser;
-  }, [currentUser]);
+  const canViewActividad = useCallback((actividad: ActividadAmbiental) => {
+    // Ámbito de Planeación: cada planeador ve solo sus líneas/zonas.
+    // (Reportes usa la lista global sin este filtro: análisis completo.)
+    if (!currentUser) return false;
+    if (currentUser.admin || currentUser.visor) return true;
+    return canPlan(actividad.lineaOperativa, actividad.zona) || canReview(actividad.lineaOperativa, actividad.zona);
+  }, [canPlan, canReview, currentUser]);
 
   const canEditActividad = useCallback((actividad: ActividadAmbiental) => {
     if (!currentUser) return false;

@@ -222,7 +222,8 @@ const TT = ({ active, payload, label }: any) => {
 
 export const ReportesModule: React.FC = () => {
   const styles = useStyles();
-  const { actividades, cargando, errorCarga } = useActividades();
+  // Reportes analiza la lista GLOBAL (todas las zonas), sin el filtro de ámbito de Planeación.
+  const { actividadesGlobal: actividades, cargando, errorCarga } = useActividades();
 
   const [filtroLinea, setFiltroLinea] = useState('Todas');
   const [filtroZona, setFiltroZona] = useState('Todas');

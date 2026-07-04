@@ -19,6 +19,8 @@ const ActividadesService = SERVICES[DATA_SOURCE as keyof typeof SERVICES] ?? Moc
 
 export interface UseActividadesReturn {
   actividades: ActividadAmbiental[];
+  /** Lista completa sin filtro de ámbito (para Reportes: análisis global). */
+  actividadesGlobal: ActividadAmbiental[];
   cargando: boolean;
   errorCarga: string | null;
   guardando: boolean;
@@ -110,5 +112,10 @@ export function useActividades(): UseActividadesReturn {
     [actividades, canViewActividad],
   );
 
-  return { actividades: actividadesVisibles, cargando, errorCarga, guardando, recargar, crear, actualizar, eliminar };
+  return {
+    actividades: actividadesVisibles,
+    /** Lista completa sin filtro de ámbito (para Reportes: análisis global). */
+    actividadesGlobal: actividades,
+    cargando, errorCarga, guardando, recargar, crear, actualizar, eliminar,
+  };
 }
