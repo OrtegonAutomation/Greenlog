@@ -846,7 +846,7 @@ export const AppShell: React.FC<AppShellProps> = ({ onBack }) => {
                   {currentUser?.nombre ?? 'Usuario'}
                 </span>
                 <span style={{ fontSize: '10px', color: tokens.colorNeutralForeground3 }}>
-                  {isAdmin ? 'Admin' : currentUser?.zonaBase ?? 'Ambiental'}
+                  {isAdmin ? 'Admin' : currentUser?.visor ? 'Revisor' : currentUser?.zonaBase ?? 'Ambiental'}
                 </span>
               </div>
               <Button appearance="subtle" size="small" onClick={logout}>
