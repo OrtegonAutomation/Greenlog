@@ -1,7 +1,11 @@
 // ============================================================
 // AdminModule — Administración (solo administradores):
 //  1. Congelar / descongelar la matriz financiera (presupuesto).
-//  2. Gestión de usuarios: listar, crear y activar/desactivar.
+//  2. Gestión de usuarios con 3 roles:
+//     - Admin: control total.
+//     - Planeador: planea las líneas de gestión ambiental en su
+//       zona (la zona se puede cambiar desde aquí).
+//     - Revisor: solo consulta el módulo de Reportes.
 //
 // Los usuarios creados aquí quedan en greenlog_usuarios (allowlist
 // de la BD). Su cuenta se activa en el primer ingreso: escriben su
@@ -11,8 +15,8 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   makeStyles, shorthands, tokens,
-  Title2, Title3, Body1, Caption1, Card, Button, Switch, Input, Checkbox,
-  MessageBar, MessageBarBody, MessageBarTitle, Spinner, Badge,
+  Title2, Title3, Body1, Caption1, Card, Button, Switch, Input, Select,
+  Radio, RadioGroup, MessageBar, MessageBarBody, MessageBarTitle, Spinner, Badge,
 } from '@fluentui/react-components';
 import {
   LockClosedRegular, LockOpenRegular, PersonAddRegular, PeopleTeamRegular,
@@ -20,7 +24,13 @@ import {
 import { getSupabaseClient, isSupabaseEnabled } from '../../services/supabaseClient';
 import { ConfigService, usePresupuestoCongelado } from '../../services/ConfigService';
 import { MSG_MATRIZ_ENVIADA } from '../../config/presupuesto';
+import { LINEAS_GESTION_AMBIENTAL } from '../../data/equipoAmbiental';
 import { MEDIA } from '../../hooks/useResponsive';
+
+// Zonas operativas asignables a un planeador (como las usan las actividades).
+const ZONAS_PLANEACION = ['Occidente', 'Centro', 'CLC', 'Oriente', 'Llanos', 'Norte', 'Coveñas'];
+
+type RolNuevo = 'admin' | 'planeador' | 'revisor';
 
 const useStyles = makeStyles({
   root: { display: 'flex', flexDirection: 'column', ...shorthands.gap('20px') },
@@ -61,6 +71,8 @@ export const AdminModule: React.FC = () => {
   const { congelado, cargando: cargandoConfig, setCongelado } = usePresupuestoCongelado();
 
   const [usuarios, setUsuarios] = useState<UsuarioRow[]>([]);
+  // Zonas de planeación por usuario (derivadas de greenlog_usuario_ambitos).
+  const [zonasPorUsuario, setZonasPorUsuario] = useState<Record<string, string[]>>({});
   const [cargandoUsuarios, setCargandoUsuarios] = useState(true);
   const [guardando, setGuardando] = useState(false);
   const [mensaje, setMensaje] = useState<{ ok: boolean; texto: string } | null>(null);
@@ -68,18 +80,23 @@ export const AdminModule: React.FC = () => {
   // Form nuevo usuario
   const [nuevoNombre, setNuevoNombre] = useState('');
   const [nuevoEmail, setNuevoEmail] = useState('');
-  const [nuevoAlcance, setNuevoAlcance] = useState('Consulta Reportes');
-  const [nuevoVisor, setNuevoVisor] = useState(true);
-  const [nuevoAdmin, setNuevoAdmin] = useState(false);
+  const [nuevoRol, setNuevoRol] = useState<RolNuevo>('revisor');
+  const [nuevaZona, setNuevaZona] = useState(ZONAS_PLANEACION[0]);
 
   const cargarUsuarios = useCallback(async () => {
     if (!supabaseOk) { setCargandoUsuarios(false); return; }
     setCargandoUsuarios(true);
-    const { data, error } = await getSupabaseClient()
-      .from('greenlog_usuarios')
-      .select('id, email, nombre, alcance, admin, visor, activo')
-      .order('nombre');
-    if (!error && data) setUsuarios(data as UsuarioRow[]);
+    const supabase = getSupabaseClient();
+    const [{ data: users }, { data: ambitos }] = await Promise.all([
+      supabase.from('greenlog_usuarios').select('id, email, nombre, alcance, admin, visor, activo').order('nombre'),
+      supabase.from('greenlog_usuario_ambitos').select('usuario_id, tipo, zona').eq('tipo', 'planeador'),
+    ]);
+    if (users) setUsuarios(users as UsuarioRow[]);
+    const porUsuario: Record<string, Set<string>> = {};
+    for (const a of (ambitos ?? []) as { usuario_id: string; zona: string }[]) {
+      (porUsuario[a.usuario_id] ??= new Set()).add(a.zona);
+    }
+    setZonasPorUsuario(Object.fromEntries(Object.entries(porUsuario).map(([k, v]) => [k, [...v].sort()])));
     setCargandoUsuarios(false);
   }, [supabaseOk]);
 
@@ -99,6 +116,22 @@ export const AdminModule: React.FC = () => {
     }
   }, [setCongelado]);
 
+  /** Reemplaza los ámbitos de planeador de un usuario por las líneas de gestión en la zona dada. */
+  const asignarZonaPlaneador = useCallback(async (usuarioId: string, zona: string) => {
+    const supabase = getSupabaseClient();
+    const { error: delError } = await supabase
+      .from('greenlog_usuario_ambitos')
+      .delete()
+      .eq('usuario_id', usuarioId)
+      .eq('tipo', 'planeador');
+    if (delError) throw new Error(delError.message);
+    const filas = LINEAS_GESTION_AMBIENTAL.map(linea => ({
+      usuario_id: usuarioId, tipo: 'planeador', linea_operativa: linea, zona, global: false,
+    }));
+    const { error: insError } = await supabase.from('greenlog_usuario_ambitos').insert(filas);
+    if (insError) throw new Error(insError.message);
+  }, []);
+
   const crearUsuario = useCallback(async () => {
     const email = nuevoEmail.trim().toLowerCase();
     if (!nuevoNombre.trim() || !email.includes('@')) {
@@ -108,15 +141,23 @@ export const AdminModule: React.FC = () => {
     setGuardando(true);
     setMensaje(null);
     try {
-      const { error } = await getSupabaseClient().from('greenlog_usuarios').insert({
-        email, nombre: nuevoNombre.trim(), alcance: nuevoAlcance.trim(),
-        base_trabajo: 'Bogota', zona_base: 'Transversal',
-        admin: nuevoAdmin, visor: nuevoVisor, activo: true,
-      });
+      const supabase = getSupabaseClient();
+      const alcance = nuevoRol === 'admin' ? 'Administrador'
+        : nuevoRol === 'planeador' ? `Planeador ${nuevaZona}`
+          : 'Revisor — Consulta Reportes';
+      const { data: creado, error } = await supabase.from('greenlog_usuarios').insert({
+        email, nombre: nuevoNombre.trim(), alcance,
+        base_trabajo: 'Bogota',
+        zona_base: nuevoRol === 'planeador' ? nuevaZona : 'Transversal',
+        admin: nuevoRol === 'admin', visor: nuevoRol === 'revisor', activo: true,
+      }).select('id').single();
       if (error) throw new Error(error.message);
+      if (nuevoRol === 'planeador' && creado?.id) {
+        await asignarZonaPlaneador(creado.id, nuevaZona);
+      }
       setMensaje({
         ok: true,
-        texto: `Usuario ${email} creado. Entrégale una contraseña temporal: al ingresar por primera vez con su correo y esa contraseña, la cuenta se activa automáticamente.`,
+        texto: `Usuario ${email} creado como ${alcance}. Entrégale una contraseña temporal: al ingresar por primera vez con su correo y esa contraseña, la cuenta se activa automáticamente.`,
       });
       setNuevoNombre(''); setNuevoEmail('');
       await cargarUsuarios();
@@ -125,7 +166,23 @@ export const AdminModule: React.FC = () => {
     } finally {
       setGuardando(false);
     }
-  }, [nuevoNombre, nuevoEmail, nuevoAlcance, nuevoAdmin, nuevoVisor, cargarUsuarios]);
+  }, [nuevoNombre, nuevoEmail, nuevoRol, nuevaZona, asignarZonaPlaneador, cargarUsuarios]);
+
+  const cambiarZona = useCallback(async (u: UsuarioRow, zona: string) => {
+    setGuardando(true);
+    setMensaje(null);
+    try {
+      await asignarZonaPlaneador(u.id, zona);
+      await getSupabaseClient().from('greenlog_usuarios')
+        .update({ zona_base: zona, alcance: `Planeador ${zona}` }).eq('id', u.id);
+      setMensaje({ ok: true, texto: `${u.nombre} ahora planea en la zona ${zona}.` });
+      await cargarUsuarios();
+    } catch (e: any) {
+      setMensaje({ ok: false, texto: `No se pudo cambiar la zona: ${e.message}` });
+    } finally {
+      setGuardando(false);
+    }
+  }, [asignarZonaPlaneador, cargarUsuarios]);
 
   const toggleActivo = useCallback(async (u: UsuarioRow) => {
     setGuardando(true);
@@ -143,10 +200,17 @@ export const AdminModule: React.FC = () => {
     }
   }, [cargarUsuarios]);
 
+  const rolDe = useCallback((u: UsuarioRow): { label: string; esPlaneador: boolean } => {
+    if (u.admin) return { label: 'Admin', esPlaneador: false };
+    if (u.visor) return { label: 'Revisor', esPlaneador: false };
+    return { label: 'Planeador', esPlaneador: true };
+  }, []);
+
   const resumen = useMemo(() => ({
     total: usuarios.length,
     admins: usuarios.filter(u => u.admin).length,
-    visores: usuarios.filter(u => u.visor && !u.admin).length,
+    revisores: usuarios.filter(u => u.visor && !u.admin).length,
+    planeadores: usuarios.filter(u => !u.admin && !u.visor).length,
   }), [usuarios]);
 
   return (
@@ -200,18 +264,28 @@ export const AdminModule: React.FC = () => {
         <div className={styles.formGrid}>
           <Input placeholder="Nombre completo" value={nuevoNombre} onChange={(_, d) => setNuevoNombre(d.value)} />
           <Input placeholder="correo@cenit-transporte.com" type="email" value={nuevoEmail} onChange={(_, d) => setNuevoEmail(d.value)} />
-          <Input placeholder="Alcance (ej. Consulta Reportes)" value={nuevoAlcance} onChange={(_, d) => setNuevoAlcance(d.value)} />
         </div>
-        <div style={{ display: 'flex', gap: 18, flexWrap: 'wrap', alignItems: 'center' }}>
-          <Checkbox checked={nuevoVisor} onChange={(_, d) => setNuevoVisor(!!d.checked)} label="Visor (solo consulta de Reportes)" />
-          <Checkbox checked={nuevoAdmin} onChange={(_, d) => setNuevoAdmin(!!d.checked)} label="Administrador" />
+        <RadioGroup layout="horizontal" value={nuevoRol} onChange={(_, d) => setNuevoRol(d.value as RolNuevo)}>
+          <Radio value="revisor" label="Revisor — solo consulta Reportes" />
+          <Radio value="planeador" label="Planeador — planea en su zona" />
+          <Radio value="admin" label="Administrador" />
+        </RadioGroup>
+        <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', alignItems: 'center' }}>
+          {nuevoRol === 'planeador' && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <Caption1 style={{ fontWeight: 600 }}>Zona:</Caption1>
+              <Select value={nuevaZona} onChange={(_, d) => setNuevaZona(d.value)}>
+                {ZONAS_PLANEACION.map(z => <option key={z} value={z}>{z}</option>)}
+              </Select>
+            </div>
+          )}
           <Button appearance="primary" icon={<PersonAddRegular />} disabled={guardando || !supabaseOk} onClick={crearUsuario}>
             Crear usuario
           </Button>
         </div>
         <Caption1 style={{ color: tokens.colorNeutralForeground3 }}>
+          El planeador recibe las líneas de gestión ambiental (Monitoreos, ICAs, Pagos, Estudios, Compensaciones, Residuos, Servicios E, Hojas de Ruta) en la zona elegida.
           Tras crearlo, comunícale una contraseña temporal: en su primer ingreso el sistema crea la cuenta con esa contraseña.
-          Para permisos de planeación por zona/línea, solicita el ajuste de ámbitos en la base de datos.
         </Caption1>
       </Card>
 
@@ -219,7 +293,7 @@ export const AdminModule: React.FC = () => {
       <Card className={styles.card}>
         <Title3 style={{ color: '#003057' }}>
           <PeopleTeamRegular style={{ marginRight: 8 }} />
-          Usuarios ({resumen.total} · {resumen.admins} admins · {resumen.visores} visores)
+          Usuarios ({resumen.total} · {resumen.admins} admins · {resumen.planeadores} planeadores · {resumen.revisores} revisores)
         </Title3>
         {cargandoUsuarios ? <Spinner label="Cargando usuarios…" /> : (
           <div style={{ overflowX: 'auto' }}>
@@ -228,33 +302,49 @@ export const AdminModule: React.FC = () => {
                 <tr>
                   <th className={styles.th}>Nombre</th>
                   <th className={styles.th}>Correo</th>
-                  <th className={styles.th}>Alcance</th>
                   <th className={styles.th}>Rol</th>
+                  <th className={styles.th}>Zona de planeación</th>
                   <th className={styles.th}>Estado</th>
                   <th className={styles.th}></th>
                 </tr>
               </thead>
               <tbody>
-                {usuarios.map(u => (
-                  <tr key={u.id}>
-                    <td className={styles.td} style={{ fontWeight: 600 }}>{u.nombre}</td>
-                    <td className={styles.td}>{u.email}</td>
-                    <td className={styles.td}>{u.alcance}</td>
-                    <td className={styles.td}>
-                      {u.admin ? <Badge color="brand">Admin</Badge>
-                        : u.visor ? <Badge color="informative">Visor</Badge>
-                          : <Badge color="subtle">Equipo</Badge>}
-                    </td>
-                    <td className={styles.td}>
-                      <Badge appearance="tint" color={u.activo ? 'success' : 'danger'}>{u.activo ? 'Activo' : 'Inactivo'}</Badge>
-                    </td>
-                    <td className={styles.td}>
-                      <Button size="small" appearance="subtle" disabled={guardando} onClick={() => toggleActivo(u)}>
-                        {u.activo ? 'Desactivar' : 'Activar'}
-                      </Button>
-                    </td>
-                  </tr>
-                ))}
+                {usuarios.map(u => {
+                  const rol = rolDe(u);
+                  const zonas = zonasPorUsuario[u.id] ?? [];
+                  return (
+                    <tr key={u.id}>
+                      <td className={styles.td} style={{ fontWeight: 600 }}>{u.nombre}</td>
+                      <td className={styles.td}>{u.email}</td>
+                      <td className={styles.td}>
+                        <Badge color={rol.label === 'Admin' ? 'brand' : rol.label === 'Revisor' ? 'informative' : 'success'}>{rol.label}</Badge>
+                      </td>
+                      <td className={styles.td}>
+                        {rol.esPlaneador ? (
+                          zonas.length > 1 || zonas.includes('*') ? (
+                            <Caption1>{zonas.join(', ')}</Caption1>
+                          ) : (
+                            <Select size="small" value={zonas[0] ?? ''} disabled={guardando}
+                              onChange={(_, d) => d.value && cambiarZona(u, d.value)}>
+                              {!zonas[0] && <option value="">— asignar —</option>}
+                              {ZONAS_PLANEACION.map(z => <option key={z} value={z}>{z}</option>)}
+                            </Select>
+                          )
+                        ) : (
+                          <Caption1 style={{ color: tokens.colorNeutralForeground3 }}>—</Caption1>
+                        )}
+                      </td>
+                      <td className={styles.td}>
+                        <Badge appearance="tint" color={u.activo ? 'success' : 'danger'}>{u.activo ? 'Activo' : 'Inactivo'}</Badge>
+                      </td>
+                      <td className={styles.td}>
+                        <Button size="small" appearance="subtle" disabled={guardando} onClick={() => toggleActivo(u)}>
+                          {u.activo ? 'Desactivar' : 'Activar'}
+                        </Button>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

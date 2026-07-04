@@ -74,18 +74,31 @@ const AuthContext = createContext<AuthContextValue>({
  */
 const fetchUsuarioBD = async (email: string): Promise<EquipoAmbientalUser | null> => {
   try {
-    const { data, error } = await getSupabaseClient()
-      .rpc('greenlog_allowlist_profile', { p_email: email });
+    const supabase = getSupabaseClient();
+    const { data, error } = await supabase.rpc('greenlog_allowlist_profile', { p_email: email });
     if (error || !data || data.length === 0) return null;
     const row = data[0] as { nombre: string; alcance: string; zona_base: string; admin: boolean; visor: boolean };
+
+    // Ámbitos (solo disponible con sesión; sin sesión quedan vacíos y se
+    // recargan tras el login por onAuthStateChange).
+    const planeador: EquipoAmbientalUser['planeador'] = [];
+    const revisor: EquipoAmbientalUser['revisor'] = [];
+    try {
+      const { data: ambitos } = await supabase.rpc('greenlog_allowlist_ambitos', { p_email: email });
+      for (const a of (ambitos ?? []) as { tipo: string; linea_operativa: string; zona: string; global: boolean }[]) {
+        const destino = a.tipo === 'planeador' ? planeador : revisor;
+        destino.push({ lineas: [a.linea_operativa as never], zonas: [a.zona], global: a.global });
+      }
+    } catch { /* sin sesión aún */ }
+
     return {
       nombre: row.nombre || email,
       email,
       alcance: row.alcance || (row.visor ? 'Consulta Reportes' : ''),
       baseTrabajo: '',
       zonaBase: row.zona_base || 'Transversal',
-      planeador: [],
-      revisor: [],
+      planeador,
+      revisor,
       admin: row.admin,
       visor: row.visor,
     };
