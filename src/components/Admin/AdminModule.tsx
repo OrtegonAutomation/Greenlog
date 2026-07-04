@@ -17,14 +17,15 @@ import {
   makeStyles, shorthands, tokens,
   Title2, Title3, Body1, Caption1, Card, Button, Switch, Input, Select,
   Radio, RadioGroup, MessageBar, MessageBarBody, MessageBarTitle, Spinner, Badge,
+  Dialog, DialogSurface, DialogBody, DialogTitle, DialogContent, DialogActions, Checkbox,
 } from '@fluentui/react-components';
 import {
-  LockClosedRegular, LockOpenRegular, PersonAddRegular, PeopleTeamRegular,
+  LockClosedRegular, LockOpenRegular, PersonAddRegular, PeopleTeamRegular, GridRegular,
 } from '@fluentui/react-icons';
 import { getSupabaseClient, isSupabaseEnabled } from '../../services/supabaseClient';
 import { ConfigService, usePresupuestoCongelado } from '../../services/ConfigService';
 import { MSG_MATRIZ_ENVIADA } from '../../config/presupuesto';
-import { LINEAS_GESTION_AMBIENTAL } from '../../data/equipoAmbiental';
+import { LINEAS_GESTION_AMBIENTAL, TODAS_LINEAS_AMBIENTALES } from '../../data/equipoAmbiental';
 import { MEDIA } from '../../hooks/useResponsive';
 
 // Zonas operativas asignables a un planeador (como las usan las actividades).
@@ -184,6 +185,78 @@ export const AdminModule: React.FC = () => {
     }
   }, [asignarZonaPlaneador, cargarUsuarios]);
 
+  // ── Editor de permisos línea × zona por usuario ──
+  const [permisosUsuario, setPermisosUsuario] = useState<UsuarioRow | null>(null);
+  const [matriz, setMatriz] = useState<Set<string>>(new Set());
+  const [cargandoMatriz, setCargandoMatriz] = useState(false);
+  const clave = (linea: string, zona: string) => `${linea}|${zona}`;
+
+  const abrirPermisos = useCallback(async (u: UsuarioRow) => {
+    setPermisosUsuario(u);
+    setCargandoMatriz(true);
+    const { data } = await getSupabaseClient()
+      .from('greenlog_usuario_ambitos')
+      .select('linea_operativa, zona')
+      .eq('usuario_id', u.id)
+      .eq('tipo', 'planeador');
+    const set = new Set<string>();
+    for (const a of (data ?? []) as { linea_operativa: string; zona: string }[]) {
+      set.add(clave(a.linea_operativa, a.zona));
+    }
+    setMatriz(set);
+    setCargandoMatriz(false);
+  }, []);
+
+  const toggleCelda = useCallback((linea: string, zona: string) => {
+    setMatriz(prev => {
+      const next = new Set(prev);
+      const k = clave(linea, zona);
+      if (next.has(k)) next.delete(k); else next.add(k);
+      return next;
+    });
+  }, []);
+
+  const toggleZonaCompleta = useCallback((zona: string) => {
+    setMatriz(prev => {
+      const next = new Set(prev);
+      const todasMarcadas = TODAS_LINEAS_AMBIENTALES.every(l => next.has(clave(l, zona)));
+      for (const l of TODAS_LINEAS_AMBIENTALES) {
+        if (todasMarcadas) next.delete(clave(l, zona)); else next.add(clave(l, zona));
+      }
+      return next;
+    });
+  }, []);
+
+  const guardarPermisos = useCallback(async () => {
+    if (!permisosUsuario) return;
+    setGuardando(true);
+    setMensaje(null);
+    try {
+      const supabase = getSupabaseClient();
+      const { error: delError } = await supabase
+        .from('greenlog_usuario_ambitos')
+        .delete()
+        .eq('usuario_id', permisosUsuario.id)
+        .eq('tipo', 'planeador');
+      if (delError) throw new Error(delError.message);
+      const filas = [...matriz].map(k => {
+        const [linea, zona] = k.split('|');
+        return { usuario_id: permisosUsuario.id, tipo: 'planeador', linea_operativa: linea, zona, global: false };
+      });
+      if (filas.length > 0) {
+        const { error: insError } = await supabase.from('greenlog_usuario_ambitos').insert(filas);
+        if (insError) throw new Error(insError.message);
+      }
+      setMensaje({ ok: true, texto: `Permisos de ${permisosUsuario.nombre} actualizados (${filas.length} combinaciones línea × zona).` });
+      setPermisosUsuario(null);
+      await cargarUsuarios();
+    } catch (e: any) {
+      setMensaje({ ok: false, texto: `No se pudieron guardar los permisos: ${e.message}` });
+    } finally {
+      setGuardando(false);
+    }
+  }, [permisosUsuario, matriz, cargarUsuarios]);
+
   const toggleActivo = useCallback(async (u: UsuarioRow) => {
     setGuardando(true);
     try {
@@ -338,9 +411,16 @@ export const AdminModule: React.FC = () => {
                         <Badge appearance="tint" color={u.activo ? 'success' : 'danger'}>{u.activo ? 'Activo' : 'Inactivo'}</Badge>
                       </td>
                       <td className={styles.td}>
-                        <Button size="small" appearance="subtle" disabled={guardando} onClick={() => toggleActivo(u)}>
-                          {u.activo ? 'Desactivar' : 'Activar'}
-                        </Button>
+                        <div style={{ display: 'flex', gap: 4 }}>
+                          {!u.admin && !u.visor && (
+                            <Button size="small" appearance="subtle" icon={<GridRegular />} disabled={guardando} onClick={() => abrirPermisos(u)}>
+                              Permisos
+                            </Button>
+                          )}
+                          <Button size="small" appearance="subtle" disabled={guardando} onClick={() => toggleActivo(u)}>
+                            {u.activo ? 'Desactivar' : 'Activar'}
+                          </Button>
+                        </div>
                       </td>
                     </tr>
                   );
@@ -350,6 +430,61 @@ export const AdminModule: React.FC = () => {
           </div>
         )}
       </Card>
+
+      {/* Editor de permisos línea operativa × zona */}
+      <Dialog open={!!permisosUsuario} onOpenChange={(_, d) => { if (!d.open) setPermisosUsuario(null); }}>
+        <DialogSurface style={{ maxWidth: 940 }}>
+          <DialogBody>
+            <DialogTitle>Permisos de {permisosUsuario?.nombre}</DialogTitle>
+            <DialogContent>
+              <Caption1 style={{ color: tokens.colorNeutralForeground3, display: 'block', marginBottom: 10 }}>
+                Marca qué líneas operativas puede ver y planear este usuario en cada zona.
+                El encabezado de cada zona marca/desmarca la columna completa.
+              </Caption1>
+              {cargandoMatriz ? <Spinner label="Cargando permisos…" /> : (
+                <div style={{ overflowX: 'auto', maxHeight: 480, overflowY: 'auto' }}>
+                  <table className={styles.tabla}>
+                    <thead>
+                      <tr>
+                        <th className={styles.th} style={{ position: 'sticky', top: 0, background: '#fff' }}>Línea operativa</th>
+                        {ZONAS_PLANEACION.map(z => (
+                          <th key={z} className={styles.th}
+                            style={{ textAlign: 'center', cursor: 'pointer', position: 'sticky', top: 0, background: '#fff' }}
+                            title={`Marcar/desmarcar toda la zona ${z}`}
+                            onClick={() => toggleZonaCompleta(z)}>
+                            {z}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {TODAS_LINEAS_AMBIENTALES.map(linea => (
+                        <tr key={linea}>
+                          <td className={styles.td} style={{ fontWeight: 600, whiteSpace: 'nowrap' }}>{linea}</td>
+                          {ZONAS_PLANEACION.map(z => (
+                            <td key={z} className={styles.td} style={{ textAlign: 'center' }}>
+                              <Checkbox
+                                checked={matriz.has(`${linea}|${z}`)}
+                                onChange={() => toggleCelda(linea, z)}
+                              />
+                            </td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </DialogContent>
+            <DialogActions>
+              <Button appearance="secondary" onClick={() => setPermisosUsuario(null)}>Cancelar</Button>
+              <Button appearance="primary" disabled={guardando || cargandoMatriz} onClick={guardarPermisos}>
+                Guardar permisos
+              </Button>
+            </DialogActions>
+          </DialogBody>
+        </DialogSurface>
+      </Dialog>
     </div>
   );
 };
