@@ -68,6 +68,32 @@ const AuthContext = createContext<AuthContextValue>({
   getPlaneacionZonas: () => [],
 });
 
+/**
+ * Allowlist en BD: usuarios creados desde el módulo de Administración
+ * (p. ej. visores de Reportes) que no están en la lista embebida del front.
+ */
+const fetchUsuarioBD = async (email: string): Promise<EquipoAmbientalUser | null> => {
+  try {
+    const { data, error } = await getSupabaseClient()
+      .rpc('greenlog_allowlist_profile', { p_email: email });
+    if (error || !data || data.length === 0) return null;
+    const row = data[0] as { nombre: string; alcance: string; zona_base: string; admin: boolean; visor: boolean };
+    return {
+      nombre: row.nombre || email,
+      email,
+      alcance: row.alcance || (row.visor ? 'Consulta Reportes' : ''),
+      baseTrabajo: '',
+      zonaBase: row.zona_base || 'Transversal',
+      planeador: [],
+      revisor: [],
+      admin: row.admin,
+      visor: row.visor,
+    };
+  } catch {
+    return null;
+  }
+};
+
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const supabaseEnabled = isSupabaseEnabled();
   const [currentUser, setCurrentUser] = useState<EquipoAmbientalUser | null>(() => supabaseEnabled ? null : getInitialUser());
@@ -77,7 +103,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const setUserFromEmail = useCallback(async (email?: string | null) => {
     const normalized = normalizeEmail(email ?? '');
-    const user = normalized ? findEquipoAmbientalUser(normalized) : null;
+    let user = normalized ? findEquipoAmbientalUser(normalized) : null;
+    if (!user && normalized && supabaseEnabled) {
+      user = await fetchUsuarioBD(normalized);
+    }
     setCurrentUser(user);
 
     if (user) {
@@ -136,7 +165,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const login = useCallback(async (email: string, password: string): Promise<LoginResult> => {
     const normalized = normalizeEmail(email);
     const normalizedPassword = password.trim();
-    const user = findEquipoAmbientalUser(normalized);
+    let user = findEquipoAmbientalUser(normalized);
+    if (!user && supabaseEnabled) {
+      user = await fetchUsuarioBD(normalized);
+    }
     if (!user) {
       return {
         ok: false,

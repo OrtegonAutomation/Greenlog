@@ -7,6 +7,7 @@ export const SECTION_ROUTES: Record<SeccionApp, string> = {
   planeacion: '/planeacion',
   ejecucion: '/ejecucion',
   reportes: '/reportes',
+  administracion: '/administracion',
 };
 
 const ROUTE_SECTIONS = Object.entries(SECTION_ROUTES).reduce<Record<string, SeccionApp>>((acc, [section, route]) => {

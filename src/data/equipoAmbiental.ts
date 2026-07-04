@@ -17,6 +17,8 @@ export interface EquipoAmbientalUser {
   planeador: AmbitoAmbiental[];
   revisor: AmbitoAmbiental[];
   admin?: boolean;
+  /** Solo consulta de Reportes (sin planeación ni edición). */
+  visor?: boolean;
 }
 
 export const LINEAS_GESTION_AMBIENTAL: LineaOperativa[] = [

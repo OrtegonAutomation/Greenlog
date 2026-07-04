@@ -22,12 +22,14 @@ import {
   CheckmarkCircleRegular,
   DismissCircleRegular,
   ClipboardTaskRegular,
+  ShieldPersonRegular,
 } from '@fluentui/react-icons';
 import { SeccionApp } from '../../types';
 import { Dashboard } from '../Dashboard/Dashboard';
 import { PlaneacionModule } from '../Planeacion/PlaneacionModule';
 import { EjecucionModule } from '../Ejecucion/EjecucionModule';
 import { ReportesModule } from '../Reportes/ReportesModule';
+import { AdminModule } from '../Admin/AdminModule';
 import { CENIT_COLORS } from '../../theme/cenitTheme';
 import { startTour, maybeAutoStartTour } from '../Tour/TourGuide';
 import GreenLogBlanco from '../../assets/GreenLog Blanco.png';
@@ -480,6 +482,7 @@ const NAV_ITEMS: NavItemDef[] = [
   { id: 'planeacion', label: 'Planeación', icon: <CalendarLtrRegular /> },
   { id: 'ejecucion', label: 'Ejecución', icon: <PlayCircleRegular /> },
   { id: 'reportes', label: 'Reportes', icon: <DataBarVerticalRegular /> },
+  { id: 'administracion', label: 'Administración', icon: <ShieldPersonRegular /> },
 ];
 
 const BREADCRUMBS: Record<SeccionApp, string> = {
@@ -487,6 +490,7 @@ const BREADCRUMBS: Record<SeccionApp, string> = {
   planeacion: 'Planeación Ambiental',
   ejecucion: 'Seguimiento a Ejecución',
   reportes: 'Reportes e Indicadores',
+  administracion: 'Administración',
 };
 
 // ── Campana de notificaciones ─────────────────────────────────
@@ -607,6 +611,14 @@ export const AppShell: React.FC<AppShellProps> = ({ onBack }) => {
   const onEnter = () => { if (timer.current) clearTimeout(timer.current); setCollapsed(false); };
   const onLeave = () => { timer.current = setTimeout(() => setCollapsed(true), COLLAPSE_DELAY); };
 
+  // Visor puro: solo consulta Inicio y Reportes.
+  const esVisor = !!currentUser?.visor && !isAdmin;
+  const navItems = NAV_ITEMS.filter(item => {
+    if (item.id === 'ejecucion' || item.id === 'administracion') return isAdmin;
+    if (item.id === 'planeacion') return !esVisor;
+    return true;
+  });
+
   const navigateSection = useCallback((next: SeccionApp, replace = false) => {
     setSeccion(next);
     if (typeof window === 'undefined') return;
@@ -632,6 +644,15 @@ export const AppShell: React.FC<AppShellProps> = ({ onBack }) => {
     return () => window.removeEventListener('popstate', onPopState);
   }, [navigateSection]);
 
+  // Guard de rutas por rol: Ejecución y Administración solo admin; Planeación no para visores.
+  useEffect(() => {
+    if ((seccion === 'ejecucion' || seccion === 'administracion') && !isAdmin) {
+      navigateSection('dashboard', true);
+    } else if (seccion === 'planeacion' && esVisor) {
+      navigateSection('reportes', true);
+    }
+  }, [seccion, isAdmin, esVisor, navigateSection]);
+
   // Deep-link desde correos (?actividad=<id>): ir a Planeación y abrir el detalle.
   useEffect(() => {
     const actividadId = getActividadParam();
@@ -645,8 +666,9 @@ export const AppShell: React.FC<AppShellProps> = ({ onBack }) => {
     switch (seccion) {
       case 'dashboard': return <Dashboard onNavigate={navigateSection} />;
       case 'planeacion': return <PlaneacionModule />;
-      case 'ejecucion': return <EjecucionModule />;
+      case 'ejecucion': return isAdmin ? <EjecucionModule /> : <Dashboard onNavigate={navigateSection} />;
       case 'reportes': return <ReportesModule />;
+      case 'administracion': return isAdmin ? <AdminModule /> : <Dashboard onNavigate={navigateSection} />;
       default: return (
         <div className={styles.comingSoon}>
           <div className={styles.comingSoonCard}>
@@ -739,7 +761,7 @@ export const AppShell: React.FC<AppShellProps> = ({ onBack }) => {
 
         {/* Navigation */}
         <nav className={styles.nav}>
-          {NAV_ITEMS.map((item) => {
+          {navItems.map((item) => {
             const active = seccion === item.id;
             return (
               <div

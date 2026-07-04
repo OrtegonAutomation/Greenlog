@@ -8,7 +8,7 @@
 export type EstadoActividad   = 'Planeada' | 'En Ejecución' | 'Cerrada' | 'Pendiente Aprobación';
 export type Prioridad         = 'Alta' | 'Media' | 'Baja';
 export type EstadoAprobacion  = 'Pendiente' | 'Aprobado' | 'Rechazado';
-export type SeccionApp        = 'dashboard' | 'planeacion' | 'ejecucion' | 'reportes';
+export type SeccionApp        = 'dashboard' | 'planeacion' | 'ejecucion' | 'reportes' | 'administracion';
 export type ServicioApp       = 'none' | 'planeacion_ambiental' | 'provisiones';
 
 export type TipoLugar         = 'Estación' | 'Línea' | 'Zona' | 'Transversal';

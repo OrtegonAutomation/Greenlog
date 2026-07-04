@@ -11,6 +11,7 @@ import {
   DataBarVerticalRegular, DataBarVerticalFilled,
 } from '@fluentui/react-icons';
 import { SeccionApp } from '../../types';
+import { useAuth } from '../../auth/AuthContext';
 import { CENIT_COLORS } from '../../theme/cenitTheme';
 
 const useStyles = makeStyles({
@@ -70,9 +71,16 @@ export const BottomTabBar: React.FC<{
   onNavigate: (s: SeccionApp) => void;
 }> = ({ seccion, onNavigate }) => {
   const styles = useStyles();
+  const { currentUser, isAdmin } = useAuth();
+  const esVisor = !!currentUser?.visor && !isAdmin;
+  const tabs = TABS.filter(t => {
+    if (t.id === 'ejecucion') return isAdmin;
+    if (t.id === 'planeacion') return !esVisor;
+    return true;
+  });
   return (
     <nav className={styles.bar} aria-label="Navegación principal">
-      {TABS.map(tab => {
+      {tabs.map(tab => {
         const active = seccion === tab.id;
         return (
           <div

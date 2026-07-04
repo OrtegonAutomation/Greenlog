@@ -31,7 +31,8 @@ import { TarifasParametrosService } from '../../services/TarifasParametrosServic
 import { SupabaseService } from '../../services/SupabaseService';
 import { invalidateMonitoreosCache } from '../../services/MonitoreosMatrizService';
 import { isSupabaseEnabled } from '../../services/supabaseClient';
-import { MATRIZ_FINANCIERA_ENVIADA, MSG_MATRIZ_ENVIADA } from '../../config/presupuesto';
+import { MSG_MATRIZ_ENVIADA } from '../../config/presupuesto';
+import { usePresupuestoCongelado } from '../../services/ConfigService';
 
 const useStyles = makeStyles({
   root: {
@@ -347,9 +348,11 @@ export const PlaneacionModule: React.FC = () => {
   const { actividades, cargando, errorCarga, guardando, recargar, crear, actualizar, eliminar } = useActividades();
   const { currentUser, isAdmin, canPlan, canReview, canEditActividad, canViewActividad } = useAuth();
   const { actividadIdParaAbrir, limpiarAbrirActividad } = useNotificaciones();
-  // Congelamiento del presupuesto: la matriz financiera ya fue enviada.
-  // El equipo no puede crear/editar/eliminar; el admin conserva acceso de emergencia.
-  const edicionBloqueada = MATRIZ_FINANCIERA_ENVIADA && !isAdmin;
+  // Congelamiento del presupuesto (flag en greenlog_config, controlado desde
+  // Administración). El equipo no puede crear/editar/eliminar; el admin
+  // conserva acceso de emergencia.
+  const { congelado: presupuestoCongelado } = usePresupuestoCongelado();
+  const edicionBloqueada = presupuestoCongelado && !isAdmin;
   const canPlanAny = canPlan() && !edicionBloqueada;
   const actividadesVisibles = useMemo(
     () => actividades.filter(a => canViewActividad(a)),
@@ -909,7 +912,7 @@ export const PlaneacionModule: React.FC = () => {
       <Divider />
 
       {/* Aviso de presupuesto congelado (matriz financiera enviada) */}
-      {MATRIZ_FINANCIERA_ENVIADA && (
+      {presupuestoCongelado && (
         <MessageBar intent="warning">
           <MessageBarBody>
             <MessageBarTitle>📌 Matriz financiera enviada</MessageBarTitle>
