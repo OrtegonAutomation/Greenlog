@@ -31,6 +31,7 @@ import { TarifasParametrosService } from '../../services/TarifasParametrosServic
 import { SupabaseService } from '../../services/SupabaseService';
 import { invalidateMonitoreosCache } from '../../services/MonitoreosMatrizService';
 import { isSupabaseEnabled } from '../../services/supabaseClient';
+import { MATRIZ_FINANCIERA_ENVIADA, MSG_MATRIZ_ENVIADA } from '../../config/presupuesto';
 
 const useStyles = makeStyles({
   root: {
@@ -346,7 +347,10 @@ export const PlaneacionModule: React.FC = () => {
   const { actividades, cargando, errorCarga, guardando, recargar, crear, actualizar, eliminar } = useActividades();
   const { currentUser, isAdmin, canPlan, canReview, canEditActividad, canViewActividad } = useAuth();
   const { actividadIdParaAbrir, limpiarAbrirActividad } = useNotificaciones();
-  const canPlanAny = canPlan();
+  // Congelamiento del presupuesto: la matriz financiera ya fue enviada.
+  // El equipo no puede crear/editar/eliminar; el admin conserva acceso de emergencia.
+  const edicionBloqueada = MATRIZ_FINANCIERA_ENVIADA && !isAdmin;
+  const canPlanAny = canPlan() && !edicionBloqueada;
   const actividadesVisibles = useMemo(
     () => actividades.filter(a => canViewActividad(a)),
     [actividades, canViewActividad],
@@ -442,6 +446,10 @@ export const PlaneacionModule: React.FC = () => {
   const handleGuardar = useCallback(async (payload: NuevaActividadPayload) => {
     setErrorGuardar(null);
     setNotificationWarning(null);
+    if (edicionBloqueada) {
+      setErrorGuardar(MSG_MATRIZ_ENVIADA);
+      return;
+    }
     if (actividadEditar && !canEditActividad(actividadEditar)) {
       setErrorGuardar('No tienes permisos para editar esta actividad.');
       return;
@@ -636,6 +644,10 @@ export const PlaneacionModule: React.FC = () => {
   const handleWizardComplete = useCallback(async (result: PlaneacionWizardResult) => {
     setWizardAbierto(false);
     setNotificationWarning(null);
+    if (edicionBloqueada) {
+      setErrorGuardar(MSG_MATRIZ_ENVIADA);
+      return;
+    }
     if (actividadEditar && !canEditActividad(actividadEditar)) {
       setErrorGuardar('No tienes permisos para editar esta actividad.');
       return;
@@ -896,6 +908,17 @@ export const PlaneacionModule: React.FC = () => {
 
       <Divider />
 
+      {/* Aviso de presupuesto congelado (matriz financiera enviada) */}
+      {MATRIZ_FINANCIERA_ENVIADA && (
+        <MessageBar intent="warning">
+          <MessageBarBody>
+            <MessageBarTitle>📌 Matriz financiera enviada</MessageBarTitle>
+            {MSG_MATRIZ_ENVIADA}
+            {isAdmin ? ' Como administrador conservas acceso de emergencia para ajustes puntuales.' : ' Si necesitas un ajuste, contacta al administrador.'}
+          </MessageBarBody>
+        </MessageBar>
+      )}
+
       {/* Notificaciones */}
       {toastOk && (
         <MessageBar intent="success">
@@ -963,12 +986,12 @@ export const PlaneacionModule: React.FC = () => {
         onClose={handleDetailClose}
         onEdit={handleDetailEdit}
         onDelete={currentUser ? handleDetailDelete : undefined}
-        canEdit={!!detalleItem && canEditActividad(detalleItem)}
-        canDelete={!!currentUser && !!detalleItem && canViewActividad(detalleItem)}
-        canReview={!!detalleItem && detalleItem.estadoAprobacion === 'Pendiente' && canReview(detalleItem.lineaOperativa, detalleItem.zona)}
+        canEdit={!edicionBloqueada && !!detalleItem && canEditActividad(detalleItem)}
+        canDelete={!edicionBloqueada && !!currentUser && !!detalleItem && canViewActividad(detalleItem)}
+        canReview={!edicionBloqueada && !!detalleItem && detalleItem.estadoAprobacion === 'Pendiente' && canReview(detalleItem.lineaOperativa, detalleItem.zona)}
         onApprove={(actividad) => handleReview(actividad, 'Aprobado')}
         onReject={(actividad) => handleReview(actividad, 'Rechazado')}
-        canResendReviewRequest={!!detalleItem && detalleItem.estadoAprobacion === 'Pendiente' && canEditActividad(detalleItem)}
+        canResendReviewRequest={!edicionBloqueada && !!detalleItem && detalleItem.estadoAprobacion === 'Pendiente' && canEditActividad(detalleItem)}
         onResendReviewRequest={handleResendReviewRequest}
       />
 
