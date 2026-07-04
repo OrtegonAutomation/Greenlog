@@ -640,7 +640,7 @@ export const AppShell: React.FC<AppShellProps> = ({ onBack }) => {
     };
 
     window.addEventListener('popstate', onPopState);
-    maybeAutoStartTour(navigateSection, isAdmin);
+    maybeAutoStartTour(navigateSection, isAdmin, esVisor);
     return () => window.removeEventListener('popstate', onPopState);
   }, [navigateSection]);
 
@@ -825,7 +825,7 @@ export const AppShell: React.FC<AppShellProps> = ({ onBack }) => {
                 role="button"
                 tabIndex={0}
                 aria-label="Iniciar Tour"
-                onClick={() => startTour(navigateSection, isAdmin)}
+                onClick={() => startTour(navigateSection, isAdmin, esVisor)}
                 style={{ backgroundColor: seccion === 'dashboard' ? 'rgba(255,255,255,0.5)' : undefined }}
               >
                 <QuestionCircleRegular />

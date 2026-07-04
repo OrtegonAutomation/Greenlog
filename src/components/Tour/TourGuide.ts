@@ -74,8 +74,114 @@ const injectTourStyles = () => {
 const chipInteraccion = (texto: string) =>
   `<p style="margin:10px 0 0 0;display:inline-flex;align-items:center;gap:6px;background:#ebf6f0;color:#48946e;font-weight:700;font-size:12px;padding:4px 10px;border-radius:999px">👆 ${texto}</p>`;
 
-export const startTour = (setSeccion: (s: SeccionApp) => void, isAdmin = false) => {
+export const startTour = (setSeccion: (s: SeccionApp) => void, isAdmin = false, esVisor = false) => {
   injectTourStyles();
+
+  // Tour corto para revisores (solo consulta de Reportes).
+  const pasosVisor: DriveStep[] = [
+    {
+      popover: {
+        title: '👋 Bienvenido a GreenLog',
+        description: `<p style="margin:0 0 8px 0">Tu perfil es de <b>Revisor</b>: puedes consultar el <b>tablero de Reportes</b> con toda la información presupuestal ambiental de CENIT.</p>
+          <p style="margin:0;color:#003057;font-weight:600">Te muestro cómo sacarle provecho en 1 minuto.</p>`,
+      },
+    },
+    {
+      element: '#dashboard-kpis',
+      popover: {
+        title: '📌 Indicadores en vivo',
+        description: 'El Inicio resume la planeación: actividades 2027, presupuesto en vivo, variación vs 2026 y cobertura de estaciones.',
+        side: 'top',
+      },
+      onHighlightStarted: () => { setSeccion('dashboard'); },
+    },
+    {
+      element: '#nav-reportes',
+      popover: {
+        title: '📈 Reportes',
+        description: 'Tu módulo principal: comparación 2026 vs 2027, análisis por zona y dependencia de proveedores.',
+        side: 'right',
+      },
+      onHighlightStarted: async () => {
+        setSeccion('reportes');
+        await waitForSelector('#reportes-nav');
+        irAVistaReportes(0);
+      },
+    },
+    {
+      element: '#reportes-nav',
+      popover: {
+        title: '🧭 Navegación por vistas',
+        description: `<p style="margin:0">El reporte se recorre como una presentación con las <b>flechas</b> o los <b>puntos</b>.</p>${chipInteraccion('El tour las irá cambiando por ti')}`,
+        side: 'bottom',
+      },
+    },
+    {
+      element: '#reportes-mapa',
+      popover: {
+        title: '🗺️ Explora por zona',
+        description: '<p style="margin:0">El mapa muestra el presupuesto por zona. <b>Haz clic en un departamento</b> para filtrar todo el reporte; clic de nuevo para quitarlo.</p>',
+        side: 'left',
+      },
+      onHighlightStarted: async () => { irAVistaReportes(0); await wait(450); },
+    },
+    {
+      element: '#reportes-vista-comparacion',
+      popover: {
+        title: '⚖️ Comparación 2026 vs 2027',
+        description: 'Presupuesto por línea operativa con la brecha en naranja y la mensualización de la caja.',
+        side: 'left',
+      },
+      onHighlightStarted: async () => {
+        irAVistaReportes(1);
+        await waitForSelector('#reportes-vista-comparacion');
+        await wait(450);
+      },
+    },
+    {
+      element: '#reportes-vista-zona',
+      popover: {
+        title: '🔥 Análisis por zona',
+        description: 'Barras del planeado por zona y mapa de calor Zona × Línea (verde = menor gasto, rojo = mayor).',
+        side: 'top',
+      },
+      onHighlightStarted: async () => {
+        irAVistaReportes(2);
+        await waitForSelector('#reportes-vista-zona');
+        await wait(450);
+      },
+    },
+    {
+      element: '#reportes-vista-proveedores',
+      popover: {
+        title: '🤝 Dependencia de proveedores',
+        description: 'Participación del gasto por proveedor con el umbral del 20% y su nivel de riesgo.',
+        side: 'top',
+      },
+      onHighlightStarted: async () => {
+        irAVistaReportes(3);
+        await waitForSelector('#reportes-vista-proveedores');
+        await wait(450);
+      },
+    },
+    {
+      element: '#reportes-descargar',
+      popover: {
+        title: '⬇️ Descargar reporte',
+        description: 'Exporta todo el análisis a un Excel de 8 hojas listo para comité.',
+        side: 'bottom',
+      },
+      onHighlightStarted: async () => { irAVistaReportes(0); await wait(300); },
+    },
+    {
+      element: '#tour-trigger',
+      popover: {
+        title: '❓ ¿Necesitas repasar?',
+        description: 'Puedes repetir este tour cuando quieras desde aquí. ¡Listo para explorar!',
+        side: 'left',
+      },
+    },
+  ];
 
   const pasos: DriveStep[] = [
     // ───────────────────────── BIENVENIDA ─────────────────────────
@@ -318,7 +424,7 @@ export const startTour = (setSeccion: (s: SeccionApp) => void, isAdmin = false) 
     nextBtnText: 'Siguiente →',
     prevBtnText: '← Anterior',
     progressText: 'Paso {{current}} de {{total}}',
-    steps: pasos,
+    steps: esVisor ? pasosVisor : pasos,
     onDestroyed: () => {
       try { localStorage.setItem(TOUR_KEY, '1'); } catch { /* ignore */ }
     },
@@ -332,7 +438,7 @@ export const startTour = (setSeccion: (s: SeccionApp) => void, isAdmin = false) 
  * que un usuario visita la página. Si ya lo completó (o lo cerró), no lo vuelve
  * a abrir hasta que cambies el `TOUR_KEY` a una nueva versión.
  */
-export const maybeAutoStartTour = (setSeccion: (s: SeccionApp) => void, isAdmin = false) => {
+export const maybeAutoStartTour = (setSeccion: (s: SeccionApp) => void, isAdmin = false, esVisor = false) => {
   try {
     if (localStorage.getItem(TOUR_KEY) === '1') return;
   } catch { /* localStorage puede fallar en modos privados */ }
@@ -340,7 +446,7 @@ export const maybeAutoStartTour = (setSeccion: (s: SeccionApp) => void, isAdmin 
   // Esperar a que el shell esté montado antes de empezar
   setTimeout(() => {
     if (document.querySelector('#sidebar-logo')) {
-      startTour(setSeccion, isAdmin);
+      startTour(setSeccion, isAdmin, esVisor);
     }
   }, 600);
 };
