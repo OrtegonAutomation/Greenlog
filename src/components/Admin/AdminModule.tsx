@@ -31,7 +31,7 @@ import { LINEAS_GESTION_AMBIENTAL, TODAS_LINEAS_AMBIENTALES } from '../../data/e
 import { MEDIA } from '../../hooks/useResponsive';
 
 // Zonas operativas asignables a un planeador (como las usan las actividades).
-const ZONAS_PLANEACION = ['Occidente', 'Centro', 'CLC', 'Oriente', 'Llanos', 'Norte', 'Coveñas'];
+const ZONAS_PLANEACION = ['Occidente', 'Centro', 'CLC', 'Oriente', 'Llanos', 'Norte', 'Coveñas', 'Transversal'];
 
 type RolNuevo = 'admin' | 'planeador' | 'revisor';
 
