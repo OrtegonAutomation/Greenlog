@@ -44,7 +44,7 @@ const iconoLinea = (linea: string): React.ReactNode => {
 };
 
 // Paleta alineada al diseño AIDesigner.
-const AZUL = '#264b96', NARANJA = '#c05a1e', VERDE = '#48946e', ROJO = '#d64545', MORADO = '#5b3fd6';
+const AZUL = '#264b96', NARANJA = '#FD7B7B', VERDE = '#48946e', ROJO = '#d64545', MORADO = '#5b3fd6';
 const AZUL_OSCURO = '#112240', GREENLIGHT = '#ebf6f0';
 
 const useStyles = makeStyles({
