@@ -256,6 +256,8 @@ export const ReportesModule: React.FC = () => {
   const irAVista = (v: number) => { setDirAtras(v < vista); setVista(v); };
   // Filtro por línea operativa clicando las gráficas (segundo clic en la misma línea lo quita).
   const toggleLinea = (l: string) => setFiltroLinea(prev => (prev === l ? 'Todas' : l));
+  // Filtro por zona clicando la gráfica de zonas (segundo clic la quita).
+  const toggleZona = (z: string) => setFiltroZona(prev => (prev === z ? 'Todas' : z));
 
   // Permite que el tour guiado cambie de vista (evento global).
   React.useEffect(() => {
@@ -592,15 +594,19 @@ export const ReportesModule: React.FC = () => {
         {/* Planeado por zona (barras horizontales, mayor a menor) */}
         <Card className={styles.chartCard}>
           <span className={styles.chartTitle}>Planeado por zona</span>
-          <span className={styles.chartHint}>Presupuesto 2027 por zona, de mayor a menor.</span>
+          <span className={styles.chartHint}>Presupuesto 2027 por zona, de mayor a menor. Clic en una barra para filtrar.</span>
           <ResponsiveContainer width="100%" height={340}>
             <BarChart data={Object.entries(R.mapaPorZona).sort((a, b) => b[1] - a[1]).map(([nombre, valor]) => ({ nombre, valor }))}
-              layout="vertical" margin={{ left: 4, right: 54 }}>
+              layout="vertical" margin={{ left: 4, right: 54 }} style={{ cursor: 'pointer' }}
+              onClick={(st: any) => { const z = st?.activeLabel; if (z) toggleZona(String(z)); }}>
               <CartesianGrid strokeDasharray="3 3" horizontal={false} />
               <XAxis type="number" tickFormatter={fmtAxis} tick={{ fontSize: 10 }} />
               <YAxis type="category" dataKey="nombre" width={76} tick={{ fontSize: 11 }} interval={0} />
               <RTooltip content={<TT />} />
-              <Bar dataKey="valor" name="Planeado 2027" fill={AZUL} radius={[0, 4, 4, 0]}>
+              <Bar dataKey="valor" name="Planeado 2027" radius={[0, 4, 4, 0]}>
+                {Object.entries(R.mapaPorZona).sort((a, b) => b[1] - a[1]).map(([nombre]) => (
+                  <Cell key={nombre} fill={AZUL} opacity={filtroZona !== 'Todas' && filtroZona !== nombre ? 0.35 : 1} />
+                ))}
                 <LabelList dataKey="valor" position="right" formatter={(v: any) => fmtB(Number(v))} style={{ fontSize: 10, fontWeight: 700 }} />
               </Bar>
             </BarChart>
