@@ -134,9 +134,9 @@ export const ColombiaMapa: React.FC<Props> = ({ presupuestoPorZona, crecimientoP
           {callouts.map(c => {
             const maxV = Math.max(...callouts.map(x => x.v), 1);
             return (
-              <linearGradient key={c.z} id={`gl-calor-${c.z.replace(/[^a-zA-Z0-9]/g, '')}`} x1="0" y1="0" x2="1" y2="0">
-                <stop offset="0%" stopColor="#ffffff" />
-                <stop offset="100%" stopColor={tinteCalor(c.v / maxV)} />
+              <linearGradient key={c.z} id={`gl-calor-${c.z.replace(/[^a-zA-Z0-9]/g, '')}`} x1="0" y1="1" x2="0" y2="0">
+                <stop offset="0%" stopColor={tinteCalor(c.v / maxV)} />
+                <stop offset="100%" stopColor="#ffffff" />
               </linearGradient>
             );
           })}
