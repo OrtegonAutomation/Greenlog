@@ -21,7 +21,9 @@ import {
 } from '@fluentui/react-components';
 import {
   LockClosedRegular, LockOpenRegular, PersonAddRegular, PeopleTeamRegular, GridRegular,
+  CopyRegular, DeleteRegular, KeyRegular,
 } from '@fluentui/react-icons';
+import { useAuth } from '../../auth/AuthContext';
 import { getSupabaseClient, isSupabaseEnabled } from '../../services/supabaseClient';
 import { ConfigService, usePresupuestoCongelado } from '../../services/ConfigService';
 import { MSG_MATRIZ_ENVIADA } from '../../config/presupuesto';
@@ -32,6 +34,18 @@ import { MEDIA } from '../../hooks/useResponsive';
 const ZONAS_PLANEACION = ['Occidente', 'Centro', 'CLC', 'Oriente', 'Llanos', 'Norte', 'Coveñas'];
 
 type RolNuevo = 'admin' | 'planeador' | 'revisor';
+
+/** Contraseña temporal con el formato estándar (22 caracteres con # y !). */
+const generarContrasena = (): string => {
+  const abc = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  const rnd = new Uint32Array(20);
+  crypto.getRandomValues(rnd);
+  const chars = [...rnd].map(n => abc[n % abc.length]);
+  const pos = [4 + (rnd[0] % 10), 12 + (rnd[1] % 6)];
+  chars.splice(pos[0], 0, '#');
+  chars.splice(pos[1], 0, '!');
+  return chars.join('');
+};
 
 const useStyles = makeStyles({
   root: { display: 'flex', flexDirection: 'column', ...shorthands.gap('20px') },
@@ -71,7 +85,9 @@ export const AdminModule: React.FC = () => {
   const supabaseOk = isSupabaseEnabled();
   const { congelado, cargando: cargandoConfig, setCongelado } = usePresupuestoCongelado();
 
+  const { currentUser } = useAuth();
   const [usuarios, setUsuarios] = useState<UsuarioRow[]>([]);
+  const [credencial, setCredencial] = useState<{ email: string; pwd: string } | null>(null);
   // Zonas de planeación por usuario (derivadas de greenlog_usuario_ambitos).
   const [zonasPorUsuario, setZonasPorUsuario] = useState<Record<string, string[]>>({});
   const [cargandoUsuarios, setCargandoUsuarios] = useState(true);
@@ -156,10 +172,9 @@ export const AdminModule: React.FC = () => {
       if (nuevoRol === 'planeador' && creado?.id) {
         await asignarZonaPlaneador(creado.id, nuevaZona);
       }
-      setMensaje({
-        ok: true,
-        texto: `Usuario ${email} creado como ${alcance}. Entrégale una contraseña temporal: al ingresar por primera vez con su correo y esa contraseña, la cuenta se activa automáticamente.`,
-      });
+      const pwd = generarContrasena();
+      setCredencial({ email, pwd });
+      setMensaje({ ok: true, texto: `Usuario ${email} creado como ${alcance}.` });
       setNuevoNombre(''); setNuevoEmail('');
       await cargarUsuarios();
     } catch (e: any) {
@@ -257,6 +272,26 @@ export const AdminModule: React.FC = () => {
     }
   }, [permisosUsuario, matriz, cargarUsuarios]);
 
+  const eliminarUsuario = useCallback(async (u: UsuarioRow) => {
+    if (currentUser?.email && u.email.toLowerCase() === currentUser.email.toLowerCase()) {
+      setMensaje({ ok: false, texto: 'No puedes eliminar tu propia cuenta.' });
+      return;
+    }
+    if (!window.confirm(`¿Eliminar definitivamente a ${u.nombre} (${u.email})? Se borran también sus permisos. Esta acción no se puede deshacer.`)) return;
+    setGuardando(true);
+    setMensaje(null);
+    try {
+      const { error } = await getSupabaseClient().from('greenlog_usuarios').delete().eq('id', u.id);
+      if (error) throw new Error(error.message);
+      setMensaje({ ok: true, texto: `${u.nombre} fue eliminado (sus permisos se borraron en cascada).` });
+      await cargarUsuarios();
+    } catch (e: any) {
+      setMensaje({ ok: false, texto: `No se pudo eliminar: ${e.message}` });
+    } finally {
+      setGuardando(false);
+    }
+  }, [cargarUsuarios, currentUser]);
+
   const toggleActivo = useCallback(async (u: UsuarioRow) => {
     setGuardando(true);
     try {
@@ -302,6 +337,26 @@ export const AdminModule: React.FC = () => {
             {mensaje.texto}
           </MessageBarBody>
         </MessageBar>
+      )}
+
+      {/* Credenciales del usuario recién creado */}
+      {credencial && (
+        <Card className={styles.card} style={{ background: '#ebf6f0', border: '1px solid rgba(72,148,110,0.35)' }}>
+          <Title3 style={{ color: '#0f5132' }}><KeyRegular style={{ marginRight: 8 }} />Contraseña generada para {credencial.email}</Title3>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+            <code style={{ fontSize: 18, fontWeight: 700, background: '#fff', padding: '8px 14px', borderRadius: 8, border: '1px solid rgba(0,0,0,0.1)', letterSpacing: 0.5 }}>
+              {credencial.pwd}
+            </code>
+            <Button icon={<CopyRegular />} appearance="secondary"
+              onClick={() => { navigator.clipboard.writeText(`${credencial.email}	${credencial.pwd}`); setMensaje({ ok: true, texto: 'Credenciales copiadas al portapapeles.' }); }}>
+              Copiar
+            </Button>
+            <Button appearance="subtle" onClick={() => setCredencial(null)}>Cerrar</Button>
+          </div>
+          <Caption1 style={{ color: '#0f5132' }}>
+            Guárdala ahora: no se volverá a mostrar. Entrégasela al usuario por un canal seguro; en su <b>primer ingreso</b> con su correo y esta contraseña, la cuenta se activa automáticamente con ella.
+          </Caption1>
+        </Card>
       )}
 
       {/* 1. Matriz financiera */}
@@ -420,6 +475,9 @@ export const AdminModule: React.FC = () => {
                           <Button size="small" appearance="subtle" disabled={guardando} onClick={() => toggleActivo(u)}>
                             {u.activo ? 'Desactivar' : 'Activar'}
                           </Button>
+                          <Button size="small" appearance="subtle" icon={<DeleteRegular />} disabled={guardando}
+                            style={{ color: '#d64545' }} title="Eliminar usuario definitivamente"
+                            onClick={() => eliminarUsuario(u)} />
                         </div>
                       </td>
                     </tr>
