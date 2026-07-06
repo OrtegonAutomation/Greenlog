@@ -9,7 +9,7 @@ import { makeStyles, shorthands, tokens } from '@fluentui/react-components';
 import { DEPARTAMENTOS, ZONA_CIUDAD, MAPA_VIEWBOX } from '../../data/colombiaMapa';
 import { fmtB, fmtPct } from '../../utils/reportesAggregations';
 
-const VERDE = '#48946e', VERDE_SUAVE = '#bfe0cf', VERDE_HOVER = '#8fc7ab', GRIS = '#e7edf3';
+const VERDE = '#03bd87', VERDE_SUAVE = '#b3ecd9', VERDE_HOVER = '#5fd7ae', GRIS = '#e7edf3';
 
 // Tinte de calor sutil para el fondo de las etiquetas: más presupuesto → más
 // rojo, menos → más verde (misma escala del mapa de calor, mezclada con blanco).
@@ -19,7 +19,7 @@ const tinteCalor = (t: number): string => {
   const VERDE_C = [99, 190, 123], AMARILLO_C = [255, 235, 132], ROJO_C = [248, 105, 107];
   const c = k <= 0.5 ? lerp(VERDE_C, AMARILLO_C, k * 2) : lerp(AMARILLO_C, ROJO_C, (k - 0.5) * 2);
   // Mezcla con blanco (75% blanco) para que el tinte sea sutil.
-  const suave = c.map(x => Math.round(255 + (x - 255) * 0.25));
+  const suave = c.map(x => Math.round(255 + (x - 255) * 0.5));
   return `rgb(${suave[0]},${suave[1]},${suave[2]})`;
 };
 
@@ -135,8 +135,8 @@ export const ColombiaMapa: React.FC<Props> = ({ presupuestoPorZona, crecimientoP
             const maxV = Math.max(...callouts.map(x => x.v), 1);
             return (
               <linearGradient key={c.z} id={`gl-calor-${c.z.replace(/[^a-zA-Z0-9]/g, '')}`} x1="0" y1="1" x2="0" y2="0">
-                <stop offset="0%" stopColor={tinteCalor(c.v / maxV)} />
-                <stop offset="100%" stopColor="#ffffff" />
+                <stop offset="0%" stopColor={tinteCalor(c.v / maxV)} stopOpacity="1" />
+                <stop offset="100%" stopColor={tinteCalor(c.v / maxV)} stopOpacity="0" />
               </linearGradient>
             );
           })}
@@ -158,7 +158,7 @@ export const ColombiaMapa: React.FC<Props> = ({ presupuestoPorZona, crecimientoP
               <circle cx="5" cy="4.8" r="1.9" fill="#fff" />
             </g>
             <text x={c.bx + 27} y={c.by + 17} fontSize={11} fontWeight={700} fill={VERDE} letterSpacing="0.5">{c.z.toUpperCase()}</text>
-            <text x={c.bx + 12} y={c.by + 42} fontSize={15} fontWeight={800} fill="#112240">{fmtB(c.v)}</text>
+            <text x={c.bx + 12} y={c.by + 42} fontSize={15} fontWeight={800} fill="#0e283f">{fmtB(c.v)}</text>
             {mostrarVariacion ? (() => {
               const crec = crecimientoPorZona?.[c.z];
               const delta = deltaPorZona?.[c.z];
@@ -188,8 +188,8 @@ export const ColombiaMapa: React.FC<Props> = ({ presupuestoPorZona, crecimientoP
               <rect x={bx} y={by} width={w} height={h} rx={11} fill="#fff" stroke="rgba(0,0,0,0.06)"
                 filter="drop-shadow(0 10px 24px rgba(0,0,0,0.14))" />
               <circle cx={bx + 13} cy={by + 15} r={3} fill={VERDE} />
-              <text x={bx + 22} y={by + 18} fontSize={10} fontWeight={700} fill="#112240" letterSpacing="0.5">{etiquetaZona.toUpperCase()}</text>
-              <text x={bx + 12} y={by + 42} fontSize={17} fontWeight={800} fill="#112240">{fmtB(presupuestoPorZona[etiquetaZona] ?? 0)}</text>
+              <text x={bx + 22} y={by + 18} fontSize={10} fontWeight={700} fill="#0e283f" letterSpacing="0.5">{etiquetaZona.toUpperCase()}</text>
+              <text x={bx + 12} y={by + 42} fontSize={17} fontWeight={800} fill="#0e283f">{fmtB(presupuestoPorZona[etiquetaZona] ?? 0)}</text>
               {mostrarVariacion ? (
                 <>
                   {crec != null && <text x={bx + w - 12} y={by + 34} fontSize={11} fontWeight={700} fill={color} textAnchor="end">{fmtPct(crec)}</text>}

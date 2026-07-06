@@ -44,8 +44,8 @@ const iconoLinea = (linea: string): React.ReactNode => {
 };
 
 // Paleta alineada al diseño AIDesigner.
-const AZUL = '#264b96', NARANJA = '#c05a1e', VERDE = '#48946e', ROJO = '#d64545', MORADO = '#5b3fd6';
-const AZUL_OSCURO = '#112240', GREENLIGHT = '#ebf6f0';
+const AZUL = '#0270d2', NARANJA = '#f67400', VERDE = '#03bd87', ROJO = '#d64545', MORADO = '#7e30d1';
+const AZUL_OSCURO = '#0e283f', GREENLIGHT = '#e6f9f2';
 
 const useStyles = makeStyles({
   root: { display: 'flex', flexDirection: 'column', ...shorthands.gap(tokens.spacingVerticalL) },
@@ -103,20 +103,20 @@ const useStyles = makeStyles({
     border: '1px solid rgba(255,255,255,0.7)',
   },
   eyebrow: { fontSize: '11px', fontWeight: 700, letterSpacing: '1px', color: tokens.colorNeutralForeground3, textTransform: 'uppercase' },
-  heroTitle: { fontSize: '30px', fontWeight: 800, color: '#003057', lineHeight: 1.05, [MEDIA.mobile]: { fontSize: '22px' } },
+  heroTitle: { fontSize: '30px', fontWeight: 800, color: '#0e283f', lineHeight: 1.05, [MEDIA.mobile]: { fontSize: '22px' } },
   bigCard: {
     ...shorthands.padding('12px', '14px'), borderRadius: '14px', background: 'rgba(255,255,255,0.9)',
     border: '1px solid rgba(0,0,0,0.05)', boxShadow: '0 4px 18px rgba(0,0,0,0.04)',
     display: 'flex', flexDirection: 'column', ...shorthands.gap('3px'),
   },
-  bigValue: { fontSize: '27px', fontWeight: 800, color: '#003057', lineHeight: 1 },
+  bigValue: { fontSize: '27px', fontWeight: 800, color: '#0e283f', lineHeight: 1 },
   // Variante compacta de chartCard para las tarjetas del hero (panel izquierdo).
   heroChartCard: { ...shorthands.padding('14px'), rowGap: '2px' },
   pill: { display: 'inline-flex', alignItems: 'center', ...shorthands.gap('4px'), fontSize: '12px', fontWeight: 700, ...shorthands.padding('2px', '8px'), borderRadius: '999px', width: 'fit-content' },
   miniRow: { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', ...shorthands.gap('8px') },
   miniKpi: { ...shorthands.padding('10px', '10px'), borderRadius: '12px', background: 'rgba(255,255,255,0.7)', border: '1px solid rgba(0,0,0,0.04)', display: 'flex', flexDirection: 'column', ...shorthands.gap('2px') },
   miniLabel: { fontSize: '10px', fontWeight: 600, color: tokens.colorNeutralForeground3, textTransform: 'uppercase', letterSpacing: '0.2px' },
-  miniValue: { fontSize: '17px', fontWeight: 800, color: '#003057', lineHeight: 1.1 },
+  miniValue: { fontSize: '17px', fontWeight: 800, color: '#0e283f', lineHeight: 1.1 },
   mapPanel: {
     ...shorthands.padding('12px'), borderRadius: '18px', background: 'rgba(255,255,255,0.5)',
     border: '1px solid rgba(255,255,255,0.6)', display: 'flex', flexDirection: 'column', minHeight: '440px', justifyContent: 'center',
@@ -132,7 +132,7 @@ const useStyles = makeStyles({
   navRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', ...shorthands.gap('10px'), flexWrap: 'wrap' },
   // En móvil las flechas quedan solo con icono (se oculta el texto).
   navBtnText: { [MEDIA.mobile]: { display: 'none' } },
-  navTitulo: { marginLeft: '6px', color: '#003057', fontWeight: 600, [MEDIA.mobile]: { display: 'none' } },
+  navTitulo: { marginLeft: '6px', color: '#0e283f', fontWeight: 600, [MEDIA.mobile]: { display: 'none' } },
   // Grid de la vista "Análisis por zona": 30/60 en escritorio, apilado en móvil.
   zonaGrid: {
     display: 'grid', gridTemplateColumns: '3fr 6fr', ...shorthands.gap('16px'), alignItems: 'start',
@@ -177,9 +177,9 @@ const useStyles = makeStyles({
     border: '1px solid rgba(255,255,255,0.8)', borderRadius: '14px',
   },
   kpiLabel: { color: tokens.colorNeutralForeground3, fontSize: '12px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.3px' },
-  kpiValue: { fontSize: '30px', [MEDIA.mobile]: { fontSize: '24px' }, fontWeight: 800, color: '#003057', lineHeight: 1 },
+  kpiValue: { fontSize: '30px', [MEDIA.mobile]: { fontSize: '24px' }, fontWeight: 800, color: '#0e283f', lineHeight: 1 },
   kpiSub: { color: tokens.colorNeutralForeground3, fontSize: '11px' },
-  sectionTitle: { color: '#003057', fontWeight: 700, marginTop: '8px' },
+  sectionTitle: { color: '#0e283f', fontWeight: 700, marginTop: '8px' },
   grid2: {
     display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(380px, 1fr))', ...shorthands.gap('16px'),
     [MEDIA.mobile]: { gridTemplateColumns: '1fr' },
@@ -189,10 +189,10 @@ const useStyles = makeStyles({
     borderRadius: '18px', border: 'none', boxShadow: 'none',
     display: 'flex', flexDirection: 'column', ...shorthands.gap('4px'),
   },
-  chartTitle: { color: '#003057', fontWeight: 700, fontSize: '15px' },
+  chartTitle: { color: '#0e283f', fontWeight: 700, fontSize: '15px' },
   chartHint: { color: tokens.colorNeutralForeground3, fontSize: '11px', marginBottom: '8px' },
   table: { width: '100%', borderCollapse: 'collapse', fontSize: '12.5px' },
-  th: { textAlign: 'left', padding: '8px 10px', color: '#003057', fontWeight: 700, borderBottom: '1px solid rgba(0,0,0,0.08)', background: 'rgba(248,250,252,0.7)' },
+  th: { textAlign: 'left', padding: '8px 10px', color: '#0e283f', fontWeight: 700, borderBottom: '1px solid rgba(0,0,0,0.08)', background: 'rgba(248,250,252,0.7)' },
   td: { padding: '8px 10px', borderBottom: '1px solid rgba(0,0,0,0.04)' },
 });
 
@@ -228,7 +228,7 @@ const iconoProveedor = (nombre: string) => {
 // el texto al ancho de la barra y se corta contra el borde superior).
 const BarLabel = ({ x, y, width, value }: any) => (
   <text x={Number(x) + Number(width) / 2} y={Number(y) - 6} textAnchor="middle"
-    fontSize={10} fontWeight={800} fill="#003057">{fmtB(Number(value))}</text>
+    fontSize={10} fontWeight={800} fill="#0e283f">{fmtB(Number(value))}</text>
 );
 const TT = ({ active, payload, label }: any) => {
   if (!active || !payload?.length) return null;
@@ -335,7 +335,7 @@ export const ReportesModule: React.FC = () => {
   const Header = (
     <div className={styles.header}>
       <div className={styles.headerLeft}>
-        <Title2 style={{ color: '#003057', fontWeight: 700 }}>Reportes — Análisis financiero OPEX</Title2>
+        <Title2 style={{ color: '#0e283f', fontWeight: 700 }}>Reportes — Análisis financiero OPEX</Title2>
         <Body1 style={{ color: tokens.colorNeutralForeground2 }}>
           Comparación presupuestal 2026 vs 2027, concentración, caja, riesgo contractual y proveedores.
         </Body1>
@@ -401,7 +401,7 @@ export const ReportesModule: React.FC = () => {
         {Filtros}
         <Card className={styles.chartCard} style={{ alignItems: 'center', padding: '64px 24px', gap: 8 }}>
           <DataBarVerticalRegular fontSize={40} color={tokens.colorNeutralForeground3} />
-          <Title3 style={{ color: '#003057' }}>Sin datos para el análisis</Title3>
+          <Title3 style={{ color: '#0e283f' }}>Sin datos para el análisis</Title3>
           <Caption1 style={{ color: tokens.colorNeutralForeground3, textAlign: 'center', maxWidth: 460 }}>
             {errorCarga
               ? errorCarga
@@ -472,7 +472,7 @@ export const ReportesModule: React.FC = () => {
                 <YAxis tickFormatter={(v: number) => `$${(v / 1e9).toFixed(0)}`} tick={{ fontSize: 10 }} width={34} />
                 <RTooltip content={<TT />} />
                 <Bar dataKey="valor" radius={[6, 6, 0, 0]} barSize={48}>
-                  <Cell fill="#9db8d6" /><Cell fill={AZUL} />
+                  <Cell fill="#8fc3f5" /><Cell fill={AZUL} />
                   <LabelList dataKey="valor" content={<BarLabel />} />
                 </Bar>
               </BarChart>
@@ -496,7 +496,7 @@ export const ReportesModule: React.FC = () => {
                         <span style={{ flexShrink: 0, display: 'inline-flex', color: AZUL, fontSize: 13 }}>{iconoLinea(f.nombre)}</span>
                         <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{f.nombre}</span>
                       </span>
-                      <span style={{ fontWeight: 700, color: '#003057' }}>{fmtB(f.valor)} <span style={{ color: tokens.colorNeutralForeground3, fontWeight: 500 }}>{pctTot.toFixed(0)}%</span></span>
+                      <span style={{ fontWeight: 700, color: '#0e283f' }}>{fmtB(f.valor)} <span style={{ color: tokens.colorNeutralForeground3, fontWeight: 500 }}>{pctTot.toFixed(0)}%</span></span>
                     </div>
                     <div style={{ height: 6, background: 'rgba(0,0,0,0.05)', borderRadius: 5 }}>
                       <div style={{ width: `${pctBar}%`, height: '100%', background: AZUL, borderRadius: 5, transition: 'width 0.6s cubic-bezier(0.16,1,0.3,1)' }} />
@@ -558,7 +558,7 @@ export const ReportesModule: React.FC = () => {
                 <YAxis type="category" dataKey="nombre" width={118} tick={{ fontSize: 9.5 }} interval={0} />
                 <RTooltip content={<TT />} />
                 <ReferenceLine x={0} stroke="#999" />
-                <Bar dataKey="2026" fill="#9db8d6" radius={[0, 3, 3, 0]} barSize={7} style={{ cursor: 'pointer' }} onClick={(d: any) => { const n = d?.nombre ?? d?.payload?.nombre; if (n) toggleLinea(n); }} />
+                <Bar dataKey="2026" fill="#8fc3f5" radius={[0, 3, 3, 0]} barSize={7} style={{ cursor: 'pointer' }} onClick={(d: any) => { const n = d?.nombre ?? d?.payload?.nombre; if (n) toggleLinea(n); }} />
                 <Bar dataKey="2027" fill={AZUL} radius={[0, 3, 3, 0]} barSize={7} style={{ cursor: 'pointer' }} onClick={(d: any) => { const n = d?.nombre ?? d?.payload?.nombre; if (n) toggleLinea(n); }} />
                 <Bar dataKey="Variación" fill={NARANJA} radius={[0, 3, 3, 0]} barSize={7} style={{ cursor: 'pointer' }} onClick={(d: any) => { const n = d?.nombre ?? d?.payload?.nombre; if (n) toggleLinea(n); }} />
               </BarChart>
@@ -650,7 +650,7 @@ export const ReportesModule: React.FC = () => {
           return (
             <Card className={styles.chartCard} style={{ alignItems: 'center', padding: '48px 24px', gap: 8 }}>
               <PeopleTeamRegular fontSize={36} color={tokens.colorNeutralForeground3} />
-              <Title3 style={{ color: '#003057' }}>Sin información de proveedores</Title3>
+              <Title3 style={{ color: '#0e283f' }}>Sin información de proveedores</Title3>
               <Caption1 style={{ color: tokens.colorNeutralForeground3, textAlign: 'center', maxWidth: 460 }}>
                 Las actividades del ámbito seleccionado no tienen proveedor registrado en su planeación OPEX.
               </Caption1>
@@ -680,7 +680,7 @@ export const ReportesModule: React.FC = () => {
           </div>
           <div style={{ background: 'rgba(255,255,255,0.75)', borderRadius: 14, padding: '16px 18px', textAlign: 'center', border: '1px solid rgba(0,0,0,0.05)' }}>
             <WarningRegular fontSize={30} color={indice.color} style={{ marginBottom: 4 }} />
-            <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 0.5, color: '#003057' }}>ÍNDICE DE CONCENTRACIÓN</div>
+            <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 0.5, color: '#0e283f' }}>ÍNDICE DE CONCENTRACIÓN</div>
             <div style={{ fontSize: 34, fontWeight: 800, color: indice.color, lineHeight: 1.2 }}>{indice.nivel}</div>
             <Caption1 style={{ color: tokens.colorNeutralForeground3 }}>
               {nAlto >= 2 ? `${nAlto} proveedores superan` : nAlto === 1 ? '1 proveedor supera' : 'Ningún proveedor supera'} el umbral recomendado ({UMBRAL_ALTO}%)
@@ -688,7 +688,7 @@ export const ReportesModule: React.FC = () => {
           </div>
           <div style={{ background: 'rgba(255,255,255,0.75)', borderRadius: 14, padding: '16px 18px', textAlign: 'center', border: '1px solid rgba(0,0,0,0.05)' }}>
             <TargetRegular fontSize={30} color={VERDE} style={{ marginBottom: 4 }} />
-            <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 0.5, color: '#003057' }}>UMBRALES DE RIESGO</div>
+            <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 0.5, color: '#0e283f' }}>UMBRALES DE RIESGO</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 8, fontSize: 12, textAlign: 'left' }}>
               <span><span style={{ color: '#d64545', fontWeight: 700 }}>● ALTO</span> — más del {UMBRAL_ALTO}%</span>
               <span><span style={{ color: '#e8a412', fontWeight: 700 }}>● MEDIO</span> — {UMBRAL_MEDIO}.1% a {UMBRAL_ALTO}%</span>
@@ -702,7 +702,7 @@ export const ReportesModule: React.FC = () => {
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', flexWrap: 'wrap' }}>
             <span className={styles.chartTitle}>Participación del gasto por proveedor</span>
             <span style={{ fontSize: 11, fontWeight: 700, color: ROJO }}>UMBRAL RECOMENDADO {UMBRAL_ALTO}%</span>
-            <span style={{ fontSize: 11, fontWeight: 700, color: '#003057' }}>NIVEL DE RIESGO</span>
+            <span style={{ fontSize: 11, fontWeight: 700, color: '#0e283f' }}>NIVEL DE RIESGO</span>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 10 }}>
             {proveedores.map(p => {
@@ -718,7 +718,7 @@ export const ReportesModule: React.FC = () => {
                   <div style={{ position: 'relative', height: 18 }}>
                     <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.05)', borderRadius: 4 }} />
                     <div style={{ position: 'absolute', top: 0, bottom: 0, left: 0, width: `${(p.pct / escala) * 100}%`, background: AZUL, borderRadius: 4, transition: 'width 0.6s cubic-bezier(0.16,1,0.3,1)' }} />
-                    <span style={{ position: 'absolute', left: `calc(${(p.pct / escala) * 100}% + 6px)`, top: 1, fontSize: 12, fontWeight: 700, color: '#003057' }}>{p.pct.toFixed(0)}%</span>
+                    <span style={{ position: 'absolute', left: `calc(${(p.pct / escala) * 100}% + 6px)`, top: 1, fontSize: 12, fontWeight: 700, color: '#0e283f' }}>{p.pct.toFixed(0)}%</span>
                     {/* Línea del umbral */}
                     <div style={{ position: 'absolute', top: -3, bottom: -3, left: `${(UMBRAL_ALTO / escala) * 100}%`, borderLeft: `2px dashed ${ROJO}` }} />
                   </div>
