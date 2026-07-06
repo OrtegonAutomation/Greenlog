@@ -152,7 +152,11 @@ export const ColombiaMapa: React.FC<Props> = ({ presupuestoPorZona, crecimientoP
             <circle cx={c.cx} cy={c.cy} r={3} fill={VERDE} />
             <rect x={c.bx} y={c.by} width={CW} height={CH} rx={10} fill={`url(#gl-calor-${c.z.replace(/[^a-zA-Z0-9]/g, '')})`}
               stroke="rgba(0,0,0,0.07)" filter="drop-shadow(0 4px 10px rgba(0,0,0,0.08))" />
-            <text x={c.bx + 12} y={c.by + 18} fontSize={11}>📍</text>
+            {/* Pin de ubicación (SVG) */}
+            <g transform={`translate(${c.bx + 11}, ${c.by + 8}) scale(0.95)`}>
+              <path d="M5 0C2.24 0 0 2.24 0 5c0 3.5 5 8.5 5 8.5S10 8.5 10 5c0-2.76-2.24-5-5-5Z" fill={VERDE} />
+              <circle cx="5" cy="4.8" r="1.9" fill="#fff" />
+            </g>
             <text x={c.bx + 27} y={c.by + 17} fontSize={11} fontWeight={700} fill={VERDE} letterSpacing="0.5">{c.z.toUpperCase()}</text>
             <text x={c.bx + 12} y={c.by + 42} fontSize={15} fontWeight={800} fill="#112240">{fmtB(c.v)}</text>
             {mostrarVariacion ? (() => {
