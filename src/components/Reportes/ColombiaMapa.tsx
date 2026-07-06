@@ -11,6 +11,18 @@ import { fmtB, fmtPct } from '../../utils/reportesAggregations';
 
 const VERDE = '#48946e', VERDE_SUAVE = '#bfe0cf', VERDE_HOVER = '#8fc7ab', GRIS = '#e7edf3';
 
+// Tinte de calor sutil para el fondo de las etiquetas: más presupuesto → más
+// rojo, menos → más verde (misma escala del mapa de calor, mezclada con blanco).
+const tinteCalor = (t: number): string => {
+  const k = Math.pow(Math.min(Math.max(t, 0), 1), 0.6);
+  const lerp = (a: number[], b: number[], f: number) => a.map((x, i) => x + (b[i] - x) * f);
+  const VERDE_C = [99, 190, 123], AMARILLO_C = [255, 235, 132], ROJO_C = [248, 105, 107];
+  const c = k <= 0.5 ? lerp(VERDE_C, AMARILLO_C, k * 2) : lerp(AMARILLO_C, ROJO_C, (k - 0.5) * 2);
+  // Mezcla con blanco (75% blanco) para que el tinte sea sutil.
+  const suave = c.map(x => Math.round(255 + (x - 255) * 0.25));
+  return `rgb(${suave[0]},${suave[1]},${suave[2]})`;
+};
+
 const useStyles = makeStyles({
   wrap: { position: 'relative', width: '100%' },
   svg: { width: '100%', height: 'auto', display: 'block', overflow: 'visible' },
@@ -117,6 +129,19 @@ export const ColombiaMapa: React.FC<Props> = ({ presupuestoPorZona, crecimientoP
             </g>
           );
         })}
+        {/* Degradados de calor para el fondo de los callouts */}
+        <defs>
+          {callouts.map(c => {
+            const maxV = Math.max(...callouts.map(x => x.v), 1);
+            return (
+              <linearGradient key={c.z} id={`gl-calor-${c.z.replace(/[^a-zA-Z0-9]/g, '')}`} x1="0" y1="0" x2="1" y2="0">
+                <stop offset="0%" stopColor="#ffffff" />
+                <stop offset="100%" stopColor={tinteCalor(c.v / maxV)} />
+              </linearGradient>
+            );
+          })}
+        </defs>
+
         {/* Callouts de todas las zonas (vista por defecto, sin selección ni hover) */}
         {zonaSel === 'Todas' && !hover && callouts.map(c => (
           <g key={c.z} style={{ pointerEvents: 'none' }}>
@@ -125,7 +150,7 @@ export const ColombiaMapa: React.FC<Props> = ({ presupuestoPorZona, crecimientoP
               y1={c.by + CH < c.cy ? c.by + CH : c.by + CH / 2}
               x2={c.cx} y2={c.cy} stroke="#9fb3c8" strokeWidth={1.3} />
             <circle cx={c.cx} cy={c.cy} r={3} fill={VERDE} />
-            <rect x={c.bx} y={c.by} width={CW} height={CH} rx={10} fill="rgba(255,255,255,0.95)"
+            <rect x={c.bx} y={c.by} width={CW} height={CH} rx={10} fill={`url(#gl-calor-${c.z.replace(/[^a-zA-Z0-9]/g, '')})`}
               stroke="rgba(0,0,0,0.07)" filter="drop-shadow(0 4px 10px rgba(0,0,0,0.08))" />
             <text x={c.bx + 12} y={c.by + 17} fontSize={11} fontWeight={700} fill={VERDE} letterSpacing="0.5">{c.z.toUpperCase()}</text>
             <text x={c.bx + 12} y={c.by + 42} fontSize={15} fontWeight={800} fill="#112240">{fmtB(c.v)}</text>
