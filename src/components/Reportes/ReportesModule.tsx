@@ -469,37 +469,60 @@ export const ReportesModule: React.FC = () => {
 
         {/* Contenido flotante (izquierda): fila presupuesto + evolución, y líneas debajo */}
         <div className={styles.heroContent}>
+          {/* Dos recuadros: presupuesto 2027 (azul oscuro) y equivalencia (teal) */}
           <div className={styles.heroTopRow}>
-          <div className={styles.bigCard}>
-            <span className={styles.kpiLabel}>Presupuesto 2027</span>
-            <div className={styles.bigValue}>{fmtB(resumen.total2027)} <span style={{ fontSize: 13, color: tokens.colorNeutralForeground3 }}>COP</span></div>
-            <span className={styles.pill} style={{ background: GREENLIGHT, color: VERDE }}>
-              {(resumen.crecimiento ?? 0) >= 0 ? '↑' : '↓'} {fmtPct(resumen.crecimiento)} vs 2026
-            </span>
-            <div style={{ display: 'flex', gap: 24, marginTop: 8 }}>
-              <div><div className={styles.miniLabel}>Presupuesto 2026</div><div style={{ fontWeight: 800, color: AZUL_OSCURO }}>{fmtB(resumen.total2026)}</div></div>
-              <div><div className={styles.miniLabel}>Desviación en $</div><div style={{ fontWeight: 800, color: VERDE }}>{fmtB(resumen.delta)}</div></div>
+            <div style={{ background: AZUL_OSCURO, borderRadius: 14, padding: '16px 18px', color: '#fff', display: 'flex', alignItems: 'center', gap: 14, boxShadow: '0 6px 20px rgba(17,34,64,0.25)' }}>
+              <div style={{ flexShrink: 0, width: 46, height: 46, borderRadius: '50%', border: '3px solid #0fd5e7', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, fontWeight: 800 }}>$</div>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 0.6, opacity: 0.85 }}>PRESUPUESTO 2027</div>
+                <div style={{ fontSize: 26, fontWeight: 800, lineHeight: 1.15, whiteSpace: 'nowrap' }}>{fmtB(resumen.total2027)} <span style={{ fontSize: 13, opacity: 0.7 }}>COP</span></div>
+                <div style={{ fontSize: 13, marginTop: 2 }}>
+                  <span style={{ opacity: 0.8 }}>vs. 2026 </span>
+                  <span style={{ color: '#4ade80', fontWeight: 800 }}>{(resumen.crecimiento ?? 0) >= 0 ? '↑' : '↓'} {fmtPct(resumen.crecimiento)}</span>
+                </div>
+              </div>
+            </div>
+            <div style={{ background: '#0f7a80', borderRadius: 14, padding: '16px 18px', color: '#fff', boxShadow: '0 6px 20px rgba(9,114,119,0.25)' }}>
+              <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
+                <div>
+                  <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 0.6, opacity: 0.9 }}>EQUIVALE A</div>
+                  <div style={{ fontSize: 26, fontWeight: 800, lineHeight: 1.15 }}>{fmtB(resumen.delta)}</div>
+                </div>
+                <MoneyRegular fontSize={26} style={{ opacity: 0.85, flexShrink: 0 }} />
+              </div>
+              <div style={{ fontSize: 11.5, marginTop: 4, opacity: 0.9 }}>
+                2027 ({fmtB(resumen.total2027)}) frente a la base 2026 ({fmtB(resumen.total2026)})
+              </div>
             </div>
           </div>
 
-          {/* Evolución 2026 vs 2027, al lado derecho de la tarjeta de presupuesto */}
-          <Card className={mergeClasses(styles.chartCard, styles.heroChartCard)}>
+          {/* Evolución 2026 vs 2027 con badge de crecimiento al lado */}
+          <Card className={mergeClasses(styles.chartCard, styles.heroChartCard)} style={{ marginTop: 10 }}>
             <span className={styles.chartTitle} style={{ fontSize: 14 }}>Evolución presupuesto {filtroZona !== 'Todas' ? `— ${filtroZona}` : ''}</span>
             <span className={styles.chartHint} style={{ marginBottom: 4 }}>Base 2026 vs 2027 (miles de millones COP).</span>
-            <ResponsiveContainer width="100%" height={150}>
-              <BarChart data={[{ nombre: '2026', valor: resumen.total2026 }, { nombre: '2027', valor: resumen.total2027 }]} margin={{ top: 18, left: 0, right: 10 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                <XAxis dataKey="nombre" tick={{ fontSize: 11, fontWeight: 700 }} />
-                <YAxis tickFormatter={(v: number) => `$${(v / 1e9).toFixed(0)}`} tick={{ fontSize: 10 }} width={34} />
-                <RTooltip content={<TT />} />
-                <Bar dataKey="valor" radius={[6, 6, 0, 0]} barSize={48}>
-                  <Cell fill="#9db8d6" /><Cell fill={AZUL} />
-                  <LabelList dataKey="valor" content={<BarLabel />} />
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <ResponsiveContainer width="100%" height={150}>
+                  <BarChart data={[{ nombre: '2026', valor: resumen.total2026 }, { nombre: '2027', valor: resumen.total2027 }]} margin={{ top: 18, left: 0, right: 10 }}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                    <XAxis dataKey="nombre" tick={{ fontSize: 11, fontWeight: 700 }} />
+                    <YAxis tickFormatter={(v: number) => `$${(v / 1e9).toFixed(0)}`} tick={{ fontSize: 10 }} width={34} />
+                    <RTooltip content={<TT />} />
+                    <Bar dataKey="valor" radius={[6, 6, 0, 0]} barSize={48}>
+                      <Cell fill="#9db8d6" /><Cell fill={AZUL} />
+                      <LabelList dataKey="valor" content={<BarLabel />} />
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+              <div style={{ flexShrink: 0, width: 108, textAlign: 'center', background: GREENLIGHT, borderRadius: 12, padding: '10px 8px' }}>
+                <div style={{ fontSize: 17, fontWeight: 800, color: (resumen.crecimiento ?? 0) >= 0 ? VERDE : ROJO }}>
+                  {(resumen.crecimiento ?? 0) >= 0 ? '↑' : '↓'} {fmtPct(resumen.crecimiento)}
+                </div>
+                <div style={{ fontSize: 10.5, color: '#0f5132', marginTop: 2, lineHeight: 1.25 }}>Crecimiento frente a 2026</div>
+              </div>
+            </div>
           </Card>
-          </div>
 
           <Card className={mergeClasses(styles.chartCard, styles.heroChartCard)} style={{ marginTop: 10 }}>
             <span className={styles.chartTitle} style={{ fontSize: 14 }}>Líneas operativas {filtroZona !== 'Todas' ? `— ${filtroZona}` : ''}</span>
