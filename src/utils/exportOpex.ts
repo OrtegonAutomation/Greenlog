@@ -19,14 +19,22 @@ export const exportOpexToExcel = (actividades: ActividadAmbiental[]) => {
   const excelData = opexActivities.map(item => {
     const opx = parseOpex(item.opexDataRaw);
     
-    // Helper function to extract properties by month
+    // Helper function to extract properties by month.
+    // Nota: la cantidad casi nunca viene a nivel de mes (mes.cantidad); vive en el
+    // desglose por ítem (mes.preciosIndividuales[].cantidad). Se suma de ahí como
+    // respaldo para que ninguna línea operativa quede sin cantidades en la matriz.
     const getMonthData = (mesNombre: string) => {
       const match = opx.meses?.find((m: any) => m.mes.toLowerCase() === mesNombre.toLowerCase());
-      return {
-        precio: match ? (match.precio || 0) : 0,
-        cantidad: match ? (match.cantidad || 0) : 0,
-        total: match ? (match.total || 0) : 0
-      };
+      if (!match) return { precio: 0, cantidad: 0, total: 0 };
+
+      const total = match.total || 0;
+      const items: any[] = Array.isArray(match.preciosIndividuales) ? match.preciosIndividuales : [];
+      const cantidadItems = items.reduce((s, p) => s + (Number(p?.cantidad) || 0), 0);
+      const cantidad = match.cantidad || cantidadItems || 0;
+      // Precio unitario: el del mes si existe; si no, el efectivo (total / cantidad).
+      const precio = match.precio || (cantidad > 0 ? total / cantidad : 0);
+
+      return { precio, cantidad, total };
     };
 
     const ene = getMonthData("Enero");
