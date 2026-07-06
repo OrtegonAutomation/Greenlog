@@ -180,9 +180,12 @@ const useStyles = makeStyles({
 const fmtAxis = (v: number) => `$${(v / 1e9).toFixed(1)} MM`;
 // Escala de 3 colores para el mapa de calor (verde → amarillo → rojo, estilo Excel).
 const colorCalor = (t: number): string => {
-  const lerp = (a: number[], b: number[], k: number) => a.map((x, i) => Math.round(x + (b[i] - x) * k));
+  // Escala con raíz (t^0.45): abre el rango para que los valores medios caigan
+  // en amarillo/naranja y no quede casi todo verde con un solo rojo.
+  const k = Math.pow(Math.min(Math.max(t, 0), 1), 0.45);
+  const lerp = (a: number[], b: number[], f: number) => a.map((x, i) => Math.round(x + (b[i] - x) * f));
   const VERDE_C = [99, 190, 123], AMARILLO_C = [255, 235, 132], ROJO_C = [248, 105, 107];
-  const c = t <= 0.5 ? lerp(VERDE_C, AMARILLO_C, t * 2) : lerp(AMARILLO_C, ROJO_C, (t - 0.5) * 2);
+  const c = k <= 0.5 ? lerp(VERDE_C, AMARILLO_C, k * 2) : lerp(AMARILLO_C, ROJO_C, (k - 0.5) * 2);
   return `rgb(${c[0]},${c[1]},${c[2]})`;
 };
 // Vistas del reporte (navegación por flechas).
@@ -506,11 +509,26 @@ export const ReportesModule: React.FC = () => {
 
         {/* Gráficas de comparación a la izquierda */}
         <div className={styles.heroContent}>
+          {/* Variación total del ámbito: % y a cuánto refiere en dinero */}
+          <div className={styles.bigCard} style={{ marginBottom: 10, flexDirection: 'row', alignItems: 'center', gap: 18, flexWrap: 'wrap' }}>
+            <div>
+              <div className={styles.miniLabel}>Variación total vs 2026</div>
+              <div style={{ fontSize: 26, fontWeight: 800, color: (resumen.crecimiento ?? 0) >= 0 ? VERDE : ROJO }}>{fmtPct(resumen.crecimiento)}</div>
+            </div>
+            <div>
+              <div className={styles.miniLabel}>Equivale a</div>
+              <div style={{ fontSize: 26, fontWeight: 800, color: AZUL_OSCURO }}>{fmtB(resumen.delta)}</div>
+            </div>
+            <Caption1 style={{ color: tokens.colorNeutralForeground3, maxWidth: 200 }}>
+              2027 ({fmtB(resumen.total2027)}) frente a la base 2026 ({fmtB(resumen.total2026)}).
+            </Caption1>
+          </div>
+
           <Card className={mergeClasses(styles.chartCard, styles.heroChartCard)}>
             <span className={styles.chartTitle} style={{ fontSize: 14 }}>Comparación por línea operativa</span>
-            <span className={styles.chartHint} style={{ marginBottom: 4 }}>2026 (base) vs 2027 y brecha (Δ), de mayor a menor 2027. Clic en una barra para filtrar.</span>
+            <span className={styles.chartHint} style={{ marginBottom: 4 }}>2026 (base) vs 2027 y variación (Δ), de mayor a menor 2027. Clic en una barra para filtrar.</span>
             <ResponsiveContainer width="100%" height={290}>
-              <BarChart data={[...compLinea].sort((a, b) => b.y2027 - a.y2027).map(c => ({ nombre: c.nombre, '2026': c.y2026, '2027': c.y2027, 'Brecha': c.delta }))}
+              <BarChart data={[...compLinea].sort((a, b) => b.y2027 - a.y2027).map(c => ({ nombre: c.nombre, '2026': c.y2026, '2027': c.y2027, 'Variación': c.delta }))}
                 layout="vertical" margin={{ left: 4, right: 14 }} barGap={1} style={{ cursor: 'pointer' }}
                 onClick={(st: any) => { const n = st?.activeLabel; if (n) toggleLinea(String(n)); }}>
                 <CartesianGrid stroke="#dbe2ea" horizontal={true} vertical={true} />
@@ -520,7 +538,7 @@ export const ReportesModule: React.FC = () => {
                 <ReferenceLine x={0} stroke="#999" />
                 <Bar dataKey="2026" fill="#9db8d6" radius={[0, 3, 3, 0]} barSize={7} style={{ cursor: 'pointer' }} onClick={(d: any) => { const n = d?.nombre ?? d?.payload?.nombre; if (n) toggleLinea(n); }} />
                 <Bar dataKey="2027" fill={AZUL} radius={[0, 3, 3, 0]} barSize={7} style={{ cursor: 'pointer' }} onClick={(d: any) => { const n = d?.nombre ?? d?.payload?.nombre; if (n) toggleLinea(n); }} />
-                <Bar dataKey="Brecha" fill={NARANJA} radius={[0, 3, 3, 0]} barSize={7} style={{ cursor: 'pointer' }} onClick={(d: any) => { const n = d?.nombre ?? d?.payload?.nombre; if (n) toggleLinea(n); }} />
+                <Bar dataKey="Variación" fill={NARANJA} radius={[0, 3, 3, 0]} barSize={7} style={{ cursor: 'pointer' }} onClick={(d: any) => { const n = d?.nombre ?? d?.payload?.nombre; if (n) toggleLinea(n); }} />
               </BarChart>
             </ResponsiveContainer>
           </Card>
@@ -570,11 +588,16 @@ export const ReportesModule: React.FC = () => {
       {/* Mapa de calor por zona */}
       <Card className={styles.chartCard}>
         <span className={styles.chartTitle}>Mapa de calor por zona</span>
-        <span className={styles.chartHint}>Dónde poner controles de gasto y dueños de presupuesto. Valores en miles de millones (MM).</span>
+        <span className={styles.chartHint}>Dónde poner controles de gasto y dueños de presupuesto. Valores en miles de millones (MM). Clic en una línea para filtrar la vista.</span>
         <div style={{ overflowX: 'auto' }}>
           <table className={styles.table} style={{ minWidth: 560, tableLayout: 'fixed' }}>
             <thead>
-              <tr><th className={styles.th}>Zona</th>{heat.lineas.map(l => <th key={l} className={styles.th} style={{ textAlign: 'center', overflow: 'hidden', textOverflow: 'ellipsis' }}>{l}</th>)}</tr>
+              <tr><th className={styles.th}>Zona</th>{heat.lineas.map(l => (
+                <th key={l} className={styles.th}
+                  style={{ textAlign: 'center', overflow: 'hidden', textOverflow: 'ellipsis', cursor: 'pointer', background: filtroLinea === l ? GREENLIGHT : undefined }}
+                  title="Clic para filtrar las gráficas de esta vista por esta línea"
+                  onClick={() => toggleLinea(l)}>{l}</th>
+              ))}</tr>
             </thead>
             <tbody>
               {heat.zonas.map(z => (

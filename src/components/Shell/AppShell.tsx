@@ -611,11 +611,13 @@ export const AppShell: React.FC<AppShellProps> = ({ onBack }) => {
   const onEnter = () => { if (timer.current) clearTimeout(timer.current); setCollapsed(false); };
   const onLeave = () => { timer.current = setTimeout(() => setCollapsed(true), COLLAPSE_DELAY); };
 
-  // Visor puro: solo consulta Inicio y Reportes.
+  // Visor puro: solo consulta Inicio y Reportes (salvo que tenga acceso de
+  // solo-visualización a Planeación).
   const esVisor = !!currentUser?.visor && !isAdmin;
+  const puedeVerPlaneacion = !esVisor || !!currentUser?.verPlaneacion;
   const navItems = NAV_ITEMS.filter(item => {
     if (item.id === 'ejecucion' || item.id === 'administracion') return isAdmin;
-    if (item.id === 'planeacion') return !esVisor;
+    if (item.id === 'planeacion') return puedeVerPlaneacion;
     return true;
   });
 
@@ -648,10 +650,10 @@ export const AppShell: React.FC<AppShellProps> = ({ onBack }) => {
   useEffect(() => {
     if ((seccion === 'ejecucion' || seccion === 'administracion') && !isAdmin) {
       navigateSection('dashboard', true);
-    } else if (seccion === 'planeacion' && esVisor) {
+    } else if (seccion === 'planeacion' && !puedeVerPlaneacion) {
       navigateSection('reportes', true);
     }
-  }, [seccion, isAdmin, esVisor, navigateSection]);
+  }, [seccion, isAdmin, esVisor, puedeVerPlaneacion, navigateSection]);
 
   // Deep-link desde correos (?actividad=<id>): ir a Planeación y abrir el detalle.
   useEffect(() => {

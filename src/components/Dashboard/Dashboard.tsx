@@ -248,7 +248,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
       <div className={styles.modulesSection}>
         <Title1 className={styles.sectionTitle}>Nuestros Módulos</Title1>
         <div className={styles.modulesGrid}>
-          {!esVisor && (
+          {(!esVisor || currentUser?.verPlaneacion) && (
             <FeatureCard
               title="Planeación Ambiental"
               description="Gestiona y programa las actividades de mantenimiento y control ambiental."

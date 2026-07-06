@@ -75,7 +75,7 @@ export const BottomTabBar: React.FC<{
   const esVisor = !!currentUser?.visor && !isAdmin;
   const tabs = TABS.filter(t => {
     if (t.id === 'ejecucion') return isAdmin;
-    if (t.id === 'planeacion') return !esVisor;
+    if (t.id === 'planeacion') return !esVisor || !!currentUser?.verPlaneacion;
     return true;
   });
   return (

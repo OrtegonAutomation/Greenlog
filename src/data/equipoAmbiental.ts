@@ -19,6 +19,8 @@ export interface EquipoAmbientalUser {
   admin?: boolean;
   /** Solo consulta de Reportes (sin planeación ni edición). */
   visor?: boolean;
+  /** Visor con acceso de solo-visualización al módulo de Planeación. */
+  verPlaneacion?: boolean;
 }
 
 export const LINEAS_GESTION_AMBIENTAL: LineaOperativa[] = [

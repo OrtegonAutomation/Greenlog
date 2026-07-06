@@ -77,7 +77,7 @@ const fetchUsuarioBD = async (email: string): Promise<EquipoAmbientalUser | null
     const supabase = getSupabaseClient();
     const { data, error } = await supabase.rpc('greenlog_allowlist_profile', { p_email: email });
     if (error || !data || data.length === 0) return null;
-    const row = data[0] as { nombre: string; alcance: string; zona_base: string; admin: boolean; visor: boolean };
+    const row = data[0] as { nombre: string; alcance: string; zona_base: string; admin: boolean; visor: boolean; ver_planeacion?: boolean };
 
     // Ámbitos (solo disponible con sesión; sin sesión quedan vacíos y se
     // recargan tras el login por onAuthStateChange).
@@ -101,6 +101,7 @@ const fetchUsuarioBD = async (email: string): Promise<EquipoAmbientalUser | null
       revisor,
       admin: row.admin,
       visor: row.visor,
+      verPlaneacion: !!row.ver_planeacion,
     };
   } catch {
     return null;
