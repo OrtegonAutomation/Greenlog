@@ -230,6 +230,25 @@ const BarLabel = ({ x, y, width, value }: any) => (
   <text x={Number(x) + Number(width) / 2} y={Number(y) - 6} textAnchor="middle"
     fontSize={10} fontWeight={800} fill="#003057">{fmtB(Number(value))}</text>
 );
+// Tooltip de la comparación por línea: series + % de variación vs 2026.
+const TTComparacion = ({ active, payload, label }: any) => {
+  if (!active || !payload?.length) return null;
+  const g = (k: string) => Number(payload.find((p: any) => p.dataKey === k)?.value ?? 0);
+  const y2026 = g('2026'), y2027 = g('2027');
+  const pct = y2026 > 0 ? (y2027 - y2026) / y2026 : null;
+  return (
+    <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 8, padding: '8px 10px', fontSize: 12, boxShadow: '0 4px 16px rgba(0,0,0,0.1)' }}>
+      <div style={{ fontWeight: 700, marginBottom: 4 }}>{label}</div>
+      {payload.map((p: any, i: number) => (
+        <div key={i} style={{ color: p.color }}>{p.name}: {fmtB(p.value)}</div>
+      ))}
+      <div style={{ marginTop: 4, fontWeight: 700, color: (pct ?? 0) >= 0 ? '#48946e' : '#d64545' }}>
+        Variación %: {fmtPct(pct)}
+      </div>
+    </div>
+  );
+};
+
 const TT = ({ active, payload, label }: any) => {
   if (!active || !payload?.length) return null;
   return (
@@ -558,7 +577,7 @@ export const ReportesModule: React.FC = () => {
                 <CartesianGrid stroke="#dbe2ea" horizontal={true} vertical={true} />
                 <XAxis type="number" tickFormatter={fmtAxis} tick={{ fontSize: 10 }} />
                 <YAxis type="category" dataKey="nombre" width={118} tick={{ fontSize: 9.5 }} interval={0} />
-                <RTooltip content={<TT />} />
+                <RTooltip content={<TTComparacion />} />
                 <ReferenceLine x={0} stroke="#999" />
                 <Bar dataKey="2026" fill="#9db8d6" radius={[0, 3, 3, 0]} barSize={7} style={{ cursor: 'pointer' }} onClick={(d: any) => { const n = d?.nombre ?? d?.payload?.nombre; if (n) toggleLinea(n); }} />
                 <Bar dataKey="2027" fill={AZUL} radius={[0, 3, 3, 0]} barSize={7} style={{ cursor: 'pointer' }} onClick={(d: any) => { const n = d?.nombre ?? d?.payload?.nombre; if (n) toggleLinea(n); }} />
