@@ -9,7 +9,7 @@ import { makeStyles, shorthands, tokens } from '@fluentui/react-components';
 import { DEPARTAMENTOS, ZONA_CIUDAD, MAPA_VIEWBOX } from '../../data/colombiaMapa';
 import { fmtB, fmtPct } from '../../utils/reportesAggregations';
 
-const VERDE = '#03bd87', VERDE_SUAVE = '#b3ecd9', VERDE_HOVER = '#5fd7ae', GRIS = '#e7edf3';
+const VERDE = '#48946e', VERDE_SUAVE = '#bfe0cf', VERDE_HOVER = '#8fc7ab', GRIS = '#e7edf3';
 
 // Tinte de calor sutil para el fondo de las etiquetas: más presupuesto → más
 // rojo, menos → más verde (misma escala del mapa de calor, mezclada con blanco).
@@ -158,7 +158,7 @@ export const ColombiaMapa: React.FC<Props> = ({ presupuestoPorZona, crecimientoP
               <circle cx="5" cy="4.8" r="1.9" fill="#fff" />
             </g>
             <text x={c.bx + 27} y={c.by + 17} fontSize={11} fontWeight={700} fill={VERDE} letterSpacing="0.5">{c.z.toUpperCase()}</text>
-            <text x={c.bx + 12} y={c.by + 42} fontSize={15} fontWeight={800} fill="#0e283f">{fmtB(c.v)}</text>
+            <text x={c.bx + 12} y={c.by + 42} fontSize={15} fontWeight={800} fill="#112240">{fmtB(c.v)}</text>
             {mostrarVariacion ? (() => {
               const crec = crecimientoPorZona?.[c.z];
               const delta = deltaPorZona?.[c.z];
@@ -188,8 +188,8 @@ export const ColombiaMapa: React.FC<Props> = ({ presupuestoPorZona, crecimientoP
               <rect x={bx} y={by} width={w} height={h} rx={11} fill="#fff" stroke="rgba(0,0,0,0.06)"
                 filter="drop-shadow(0 10px 24px rgba(0,0,0,0.14))" />
               <circle cx={bx + 13} cy={by + 15} r={3} fill={VERDE} />
-              <text x={bx + 22} y={by + 18} fontSize={10} fontWeight={700} fill="#0e283f" letterSpacing="0.5">{etiquetaZona.toUpperCase()}</text>
-              <text x={bx + 12} y={by + 42} fontSize={17} fontWeight={800} fill="#0e283f">{fmtB(presupuestoPorZona[etiquetaZona] ?? 0)}</text>
+              <text x={bx + 22} y={by + 18} fontSize={10} fontWeight={700} fill="#112240" letterSpacing="0.5">{etiquetaZona.toUpperCase()}</text>
+              <text x={bx + 12} y={by + 42} fontSize={17} fontWeight={800} fill="#112240">{fmtB(presupuestoPorZona[etiquetaZona] ?? 0)}</text>
               {mostrarVariacion ? (
                 <>
                   {crec != null && <text x={bx + w - 12} y={by + 34} fontSize={11} fontWeight={700} fill={color} textAnchor="end">{fmtPct(crec)}</text>}
