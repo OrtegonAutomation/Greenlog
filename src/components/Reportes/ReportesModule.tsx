@@ -23,6 +23,11 @@ import {
 } from '../../utils/reportesAggregations';
 import { exportReporteToExcel } from '../../utils/exportReporte';
 import { ColombiaMapa } from './ColombiaMapa';
+import { LINEAS_PLANEACION } from '../../types';
+
+// Icono (emoji) por línea operativa, del catálogo de planeación.
+const iconoLinea = (linea: string): string =>
+  LINEAS_PLANEACION.find(l => l.value === linea)?.icon ?? '📦';
 
 // Paleta alineada al diseño AIDesigner.
 const AZUL = '#264b96', NARANJA = '#c05a1e', VERDE = '#48946e', ROJO = '#d64545', MORADO = '#5b3fd6';
@@ -473,7 +478,7 @@ export const ReportesModule: React.FC = () => {
                   <div key={f.nombre} onClick={() => toggleLinea(f.nombre)} title="Clic para filtrar por esta línea"
                     style={{ cursor: 'pointer', borderRadius: 6, padding: '2px 4px', background: filtroLinea === f.nombre ? GREENLIGHT : 'transparent', transition: 'background 0.2s ease' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, marginBottom: 2 }}>
-                      <span style={{ fontWeight: 600, color: '#323130', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 180 }}>{f.nombre}</span>
+                      <span style={{ fontWeight: 600, color: '#323130', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 190 }}>{iconoLinea(f.nombre)} {f.nombre}</span>
                       <span style={{ fontWeight: 700, color: '#003057' }}>{fmtB(f.valor)} <span style={{ color: tokens.colorNeutralForeground3, fontWeight: 500 }}>{pctTot.toFixed(0)}%</span></span>
                     </div>
                     <div style={{ height: 6, background: 'rgba(0,0,0,0.05)', borderRadius: 5 }}>

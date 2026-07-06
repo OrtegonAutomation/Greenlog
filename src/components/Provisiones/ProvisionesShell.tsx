@@ -37,7 +37,7 @@ const useStyles = makeStyles({
     display: 'flex',
     height: '100vh',
     overflow: 'hidden',
-    background: 'linear-gradient(135deg, #F0F6FF 0%, #F4FCE3 100%)',
+    background: 'linear-gradient(135deg, #F6F8FA 0%, #F2F4F6 100%)',
   },
 
   // ── Sidebar ──────────────────────────────────────────────────
