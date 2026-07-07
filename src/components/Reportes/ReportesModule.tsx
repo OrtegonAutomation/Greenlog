@@ -84,7 +84,7 @@ const useStyles = makeStyles({
   },
   // Fila superior: tarjeta de presupuesto a la izquierda y Evolución a la derecha.
   heroTopRow: {
-    display: 'grid', gridTemplateColumns: '1fr 1fr', ...shorthands.gap('12px'), alignItems: 'stretch',
+    display: 'grid', gridTemplateColumns: '0.8fr 1.2fr', ...shorthands.gap('12px'), alignItems: 'stretch',
     [MEDIA.mobile]: { gridTemplateColumns: '1fr' },
   },
   // Bloque de título flotante en la esquina superior derecha del mapa
@@ -501,8 +501,8 @@ export const ReportesModule: React.FC = () => {
           <Card className={mergeClasses(styles.chartCard, styles.heroChartCard)}>
             <span className={styles.chartTitle} style={{ fontSize: 14 }}>Evolución presupuesto {filtroZona !== 'Todas' ? `— ${filtroZona}` : ''}</span>
             <span className={styles.chartHint} style={{ marginBottom: 4 }}>Base 2026 vs 2027 (miles de millones COP).</span>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 108px', alignItems: 'center', gap: 10 }}>
+              <div style={{ minWidth: 0 }}>
                 <ResponsiveContainer width="100%" height={150}>
                   <BarChart data={[{ nombre: '2026', valor: resumen.total2026 }, { nombre: '2027', valor: resumen.total2027 }]} margin={{ top: 18, left: 0, right: 10 }}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} />
@@ -516,7 +516,7 @@ export const ReportesModule: React.FC = () => {
                   </BarChart>
                 </ResponsiveContainer>
               </div>
-              <div style={{ flexShrink: 0, width: 108, textAlign: 'center', background: GREENLIGHT, borderRadius: 12, padding: '10px 8px' }}>
+              <div style={{ textAlign: 'center', background: GREENLIGHT, borderRadius: 12, padding: '10px 8px' }}>
                 <div style={{ fontSize: 17, fontWeight: 800, color: (resumen.crecimiento ?? 0) >= 0 ? VERDE : ROJO }}>
                   {(resumen.crecimiento ?? 0) >= 0 ? '↑' : '↓'} {fmtPct(resumen.crecimiento)}
                 </div>
