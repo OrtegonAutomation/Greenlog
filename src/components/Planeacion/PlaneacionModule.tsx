@@ -478,7 +478,7 @@ export const PlaneacionModule: React.FC = () => {
     } catch (err) {
       setErrorGuardar(err instanceof Error ? err.message : 'Error inesperado al guardar.');
     }
-  }, [crear, actualizar, actividadEditar, canEditActividad, canPlan, sendRevisionRequested, withSolicitante]);
+  }, [crear, actualizar, actividadEditar, canEditActividad, canPlan, sendRevisionRequested, withSolicitante, edicionBloqueada]);
 
   const handleItemClick = useCallback((item: ActividadAmbiental) => {
     setDetalleItem(item);
@@ -790,7 +790,7 @@ export const PlaneacionModule: React.FC = () => {
     } catch (err) {
       setErrorGuardar(err instanceof Error ? err.message : 'Error al guardar la planeación.');
     }
-  }, [crear, actualizar, actividadEditar, canEditActividad, canPlan, currentUser, planeacionInitial, sendRevisionRequested, withSolicitante]);
+  }, [crear, actualizar, actividadEditar, canEditActividad, canPlan, currentUser, planeacionInitial, sendRevisionRequested, withSolicitante, edicionBloqueada]);
 
   return (
     <div className={styles.root}>
