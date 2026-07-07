@@ -40,6 +40,24 @@ export function useActividades(): UseActividadesReturn {
 
   const recargar = useCallback(() => setVersion((v) => v + 1), []);
 
+  // Revalidar al recuperar el foco de la pestaña: los cambios de otros
+  // usuarios (o de otra pestaña) se reflejan sin recargar la página.
+  useEffect(() => {
+    let ultimo = Date.now();
+    const onFocus = () => {
+      // Evitar ráfagas: refrescar como mucho cada 15 segundos.
+      if (Date.now() - ultimo < 15_000) return;
+      ultimo = Date.now();
+      setVersion((v) => v + 1);
+    };
+    window.addEventListener('focus', onFocus);
+    document.addEventListener('visibilitychange', onFocus);
+    return () => {
+      window.removeEventListener('focus', onFocus);
+      document.removeEventListener('visibilitychange', onFocus);
+    };
+  }, []);
+
   useEffect(() => {
     let cancelled = false;
     setCargando(true);
