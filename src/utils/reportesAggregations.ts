@@ -29,7 +29,7 @@ export const MESES_LABEL = [
   'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
   'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre',
 ];
-const MES_ABBR = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+export const MES_ABBR = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
 
 const parseOpex = (raw?: string): any => { try { return raw ? JSON.parse(raw) : {}; } catch { return {}; } };
 
@@ -121,6 +121,22 @@ export function cajaMensual(acts: ActividadAmbiental[]): { filas: MesRow[]; prom
   const promedio = suma / 12;
   let picoIdx = 0; tot.forEach((v, i) => { if (v > tot[picoIdx]) picoIdx = i; });
   return { filas, promedio, picoMes: MES_ABBR[picoIdx], picoValor: tot[picoIdx] };
+}
+
+/** Presupuesto 2027 por línea operativa de UN mes (índice 0-11). */
+export function porLineaDeMes(acts: ActividadAmbiental[], mesIdx: number): Record<string, number> {
+  const m: Record<string, number> = {};
+  for (const a of acts) {
+    const opx = parseOpex(a.opexDataRaw);
+    if (!Array.isArray(opx?.meses)) continue;
+    let total = 0;
+    opx.meses.forEach((mes: any, i: number) => {
+      const idx = MESES_LABEL.indexOf(mes.mes);
+      if ((idx >= 0 ? idx : i) === mesIdx) total += mes.total || 0;
+    });
+    if (total > 0) m[a.lineaOperativa || '—'] = (m[a.lineaOperativa || '—'] ?? 0) + total;
+  }
+  return m;
 }
 
 // ---- Dependencia de proveedores 2027 ----

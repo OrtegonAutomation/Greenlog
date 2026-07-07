@@ -21,7 +21,7 @@ import {
   actividadesAnio, resumenComparacion, comparacionPorZona, comparacionPorLinea,
   paretoLineas, concentracionTop, cajaMensual, dependenciaProveedores,
   exposicionPorLinea, heatmapZonaLinea, fmtB, fmtPct,
-  baseline2026Filtrada, mapPorZona, mapPorLinea, porZona2027, total2027,
+  baseline2026Filtrada, mapPorZona, mapPorLinea, porZona2027, total2027, porLineaDeMes, MES_ABBR,
 } from '../../utils/reportesAggregations';
 import { exportReporteToExcel } from '../../utils/exportReporte';
 import { ColombiaMapa } from './ColombiaMapa';
@@ -272,11 +272,21 @@ export const ReportesModule: React.FC = () => {
   // y dirección del último cambio para animar el slide.
   const [vista, setVista] = useState(0);
   const [dirAtras, setDirAtras] = useState(false);
-  const irAVista = (v: number) => { setDirAtras(v < vista); setVista(v); };
+  const irAVista = (v: number) => {
+    // Preservar la posición de scroll: el remount de la vista hacía saltar la página.
+    let sc: HTMLElement | null = document.getElementById('reportes-nav');
+    while (sc && sc.scrollHeight <= sc.clientHeight) sc = sc.parentElement;
+    const top = sc?.scrollTop ?? 0;
+    setDirAtras(v < vista); setVista(v);
+    requestAnimationFrame(() => { if (sc) sc.scrollTop = top; });
+  };
   // Filtro por línea operativa clicando las gráficas (segundo clic en la misma línea lo quita).
   const toggleLinea = (l: string) => setFiltroLinea(prev => (prev === l ? 'Todas' : l));
   // Filtro por zona clicando la gráfica de zonas (segundo clic la quita).
   const toggleZona = (z: string) => setFiltroZona(prev => (prev === z ? 'Todas' : z));
+  // Filtro por mes clicando la mensualización (segundo clic lo quita).
+  const [filtroMes, setFiltroMes] = useState('');
+  const toggleMes = (m: string) => setFiltroMes(prev => (prev === m ? '' : m));
 
   // Permite que el tour guiado cambie de vista (evento global).
   React.useEffect(() => {
@@ -379,6 +389,12 @@ export const ReportesModule: React.FC = () => {
         <span className={styles.pill} style={{ background: GREENLIGHT, color: VERDE, cursor: 'pointer' }}
           title="Quitar filtro de línea" onClick={() => setFiltroLinea('Todas')}>
           Línea: {filtroLinea} ✕
+        </span>
+      )}
+      {filtroMes && (
+        <span className={styles.pill} style={{ background: GREENLIGHT, color: VERDE, cursor: 'pointer' }}
+          title="Quitar filtro de mes" onClick={() => setFiltroMes('')}>
+          Mes: {filtroMes} ✕
         </span>
       )}
       <div className={styles.filterItem}>
@@ -557,10 +573,7 @@ export const ReportesModule: React.FC = () => {
         {/* Título flotante en la esquina superior derecha del mapa */}
         <div className={styles.heroCaption}>
           <span className={styles.eyebrow}>Presupuesto 2026 vs 2027</span>
-          <div className={styles.heroTitle} style={{ margin: '4px 0 6px' }}>Explora por zona</div>
-          <Caption1 style={{ color: tokens.colorNeutralForeground3, display: 'block' }}>
-            Selecciona una zona en el mapa para filtrar y analizar su presupuesto.
-          </Caption1>
+          <div className={styles.heroTitle} style={{ margin: '4px 0 0' }}>Resumen<br />General</div>
         </div>
       </div>
       )}
@@ -575,10 +588,16 @@ export const ReportesModule: React.FC = () => {
           </div>
         </div>
 
+        {/* Título flotante de la vista de comparación */}
+        <div className={styles.heroCaption}>
+          <span className={styles.eyebrow}>2026 vs 2027</span>
+          <div className={styles.heroTitle} style={{ margin: '4px 0 0' }}>Análisis</div>
+        </div>
+
         {/* Gráficas de comparación a la izquierda */}
         <div className={styles.heroContent}>
           {/* Variación total del ámbito: % y a cuánto refiere en dinero */}
-          <div className={styles.bigCard} style={{ marginBottom: 10, flexDirection: 'row', alignItems: 'center', gap: 18, flexWrap: 'wrap' }}>
+          <div className={styles.bigCard} style={{ marginBottom: 8, flexDirection: 'row', alignItems: 'center', gap: 16, flexWrap: 'wrap', padding: '10px 14px' }}>
             <div>
               <div className={styles.miniLabel}>Variación total vs 2026</div>
               <div style={{ fontSize: 26, fontWeight: 800, color: (resumen.crecimiento ?? 0) >= 0 ? VERDE : ROJO }}>{fmtPct(resumen.crecimiento)}</div>
@@ -593,36 +612,46 @@ export const ReportesModule: React.FC = () => {
           </div>
 
           <Card className={mergeClasses(styles.chartCard, styles.heroChartCard)}>
-            <span className={styles.chartTitle} style={{ fontSize: 14 }}>Comparación por línea operativa</span>
-            <span className={styles.chartHint} style={{ marginBottom: 4 }}>2026 (base) vs 2027 y variación (Δ), de mayor a menor 2027. Clic en una barra para filtrar.</span>
-            <ResponsiveContainer width="100%" height={290}>
-              <BarChart data={[...compLinea].sort((a, b) => b.y2027 - a.y2027).map(c => ({ nombre: c.nombre, '2026': c.y2026, '2027': c.y2027, 'Variación': c.delta }))}
+            <span className={styles.chartTitle} style={{ fontSize: 14 }}>Comparación por línea operativa {filtroMes ? `— ${filtroMes} 2027` : ''}</span>
+            <span className={styles.chartHint} style={{ marginBottom: 4 }}>{filtroMes ? `Presupuesto 2027 de ${filtroMes} por línea. Clic en una barra para filtrar.` : '2026 (base) vs 2027 y variación (Δ), de mayor a menor 2027. Clic en una barra para filtrar.'}</span>
+            <ResponsiveContainer width="100%" height={255}>
+              <BarChart data={filtroMes
+                  ? Object.entries(porLineaDeMes(R.acts, MES_ABBR.indexOf(filtroMes))).sort((a, b) => b[1] - a[1]).map(([nombre, v]) => ({ nombre, [`2027 ${filtroMes}`]: v }))
+                  : [...compLinea].sort((a, b) => b.y2027 - a.y2027).map(c => ({ nombre: c.nombre, '2026': c.y2026, '2027': c.y2027, 'Variación': c.delta }))}
                 layout="vertical" margin={{ left: 4, right: 14 }} barGap={1} style={{ cursor: 'pointer' }}
                 onClick={(st: any) => { const n = st?.activeLabel; if (n) toggleLinea(String(n)); }}>
                 <CartesianGrid stroke="#dbe2ea" horizontal={true} vertical={true} />
                 <XAxis type="number" tickFormatter={fmtAxis} tick={{ fontSize: 10 }} />
                 <YAxis type="category" dataKey="nombre" width={118} tick={{ fontSize: 9.5 }} interval={0} />
-                <RTooltip content={<TTComparacion />} />
+                <RTooltip content={filtroMes ? <TT /> : <TTComparacion />} />
                 <ReferenceLine x={0} stroke="#999" />
+                {filtroMes ? (
+                  <Bar dataKey={`2027 ${filtroMes}`} fill={AZUL} radius={[0, 3, 3, 0]} barSize={14} style={{ cursor: 'pointer' }} onClick={(d: any) => { const n = d?.nombre ?? d?.payload?.nombre; if (n) toggleLinea(n); }} />
+                ) : (<>
                 <Bar dataKey="2026" fill="#9db8d6" radius={[0, 3, 3, 0]} barSize={7} style={{ cursor: 'pointer' }} onClick={(d: any) => { const n = d?.nombre ?? d?.payload?.nombre; if (n) toggleLinea(n); }} />
                 <Bar dataKey="2027" fill={AZUL} radius={[0, 3, 3, 0]} barSize={7} style={{ cursor: 'pointer' }} onClick={(d: any) => { const n = d?.nombre ?? d?.payload?.nombre; if (n) toggleLinea(n); }} />
                 <Bar dataKey="Variación" fill={NARANJA} radius={[0, 3, 3, 0]} barSize={7} style={{ cursor: 'pointer' }} onClick={(d: any) => { const n = d?.nombre ?? d?.payload?.nombre; if (n) toggleLinea(n); }} />
+                </>)}
               </BarChart>
             </ResponsiveContainer>
           </Card>
 
           <Card className={mergeClasses(styles.chartCard, styles.heroChartCard)} style={{ marginTop: 10 }}>
-            <span className={styles.chartTitle} style={{ fontSize: 14 }}>Mensualización</span>
-            <span className={styles.chartHint} style={{ marginBottom: 4 }}>Programar desembolsos y aprobaciones por picos (línea = promedio).</span>
-            <ResponsiveContainer width="100%" height={190}>
-              <BarChart data={caja.filas} margin={{ top: 14, left: 4, right: 10 }}>
+            <span className={styles.chartTitle} style={{ fontSize: 14 }}>Mensualización {filtroMes ? `— ${filtroMes}` : ''}</span>
+            <span className={styles.chartHint} style={{ marginBottom: 4 }}>Programar desembolsos por picos (línea = promedio). Clic en un mes para filtrar.</span>
+            <ResponsiveContainer width="100%" height={170}>
+              <BarChart data={caja.filas} margin={{ top: 14, left: 4, right: 10 }} style={{ cursor: 'pointer' }}
+                onClick={(st: any) => { const m = st?.activeLabel; if (m) toggleMes(String(m)); }}>
                 <CartesianGrid stroke="#dbe2ea" horizontal={true} vertical={false} />
                 <XAxis dataKey="mes" tick={{ fontSize: 10 }} />
                 <YAxis tickFormatter={fmtAxis} tick={{ fontSize: 11 }} width={68} />
                 <RTooltip content={<TT />} />
                 <ReferenceLine y={caja.promedio} stroke="#111" strokeDasharray="4 4" />
                 <Bar dataKey="valor" name="Caja" radius={[3, 3, 0, 0]}>
-                  {caja.filas.map((f, i) => <Cell key={i} fill={f.valor > caja.promedio ? NARANJA : AZUL} />)}
+                  {caja.filas.map((f, i) => (
+                    <Cell key={i} fill={f.valor > caja.promedio ? NARANJA : AZUL}
+                      opacity={filtroMes && filtroMes !== f.mes ? 0.35 : 1} />
+                  ))}
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
