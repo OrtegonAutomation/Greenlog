@@ -469,35 +469,36 @@ export const ReportesModule: React.FC = () => {
 
         {/* Contenido flotante (izquierda): fila presupuesto + evolución, y líneas debajo */}
         <div className={styles.heroContent}>
-          {/* Dos recuadros: presupuesto 2027 (azul oscuro) y equivalencia (teal) */}
+          {/* Columna izquierda: 2 recuadros apilados; derecha: evolución (vista compacta) */}
           <div className={styles.heroTopRow}>
-            <div style={{ background: AZUL_OSCURO, borderRadius: 14, padding: '16px 18px', color: '#fff', display: 'flex', alignItems: 'center', gap: 14, boxShadow: '0 6px 20px rgba(17,34,64,0.25)' }}>
-              <div style={{ flexShrink: 0, width: 46, height: 46, borderRadius: '50%', border: '3px solid #0fd5e7', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, fontWeight: 800 }}>$</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <div style={{ background: AZUL_OSCURO, borderRadius: 14, padding: '12px 14px', color: '#fff', display: 'flex', alignItems: 'center', gap: 12, boxShadow: '0 6px 20px rgba(17,34,64,0.25)', flex: 1 }}>
+              <div style={{ flexShrink: 0, width: 38, height: 38, borderRadius: '50%', border: '3px solid #0fd5e7', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, fontWeight: 800 }}>$</div>
               <div style={{ minWidth: 0 }}>
                 <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 0.6, opacity: 0.85 }}>PRESUPUESTO 2027</div>
-                <div style={{ fontSize: 26, fontWeight: 800, lineHeight: 1.15, whiteSpace: 'nowrap' }}>{fmtB(resumen.total2027)} <span style={{ fontSize: 13, opacity: 0.7 }}>COP</span></div>
+                <div style={{ fontSize: 22, fontWeight: 800, lineHeight: 1.15, whiteSpace: 'nowrap' }}>{fmtB(resumen.total2027)} <span style={{ fontSize: 12, opacity: 0.7 }}>COP</span></div>
                 <div style={{ fontSize: 13, marginTop: 2 }}>
                   <span style={{ opacity: 0.8 }}>vs. 2026 </span>
                   <span style={{ color: '#4ade80', fontWeight: 800 }}>{(resumen.crecimiento ?? 0) >= 0 ? '↑' : '↓'} {fmtPct(resumen.crecimiento)}</span>
                 </div>
               </div>
             </div>
-            <div style={{ background: '#0f7a80', borderRadius: 14, padding: '16px 18px', color: '#fff', boxShadow: '0 6px 20px rgba(9,114,119,0.25)' }}>
+            <div style={{ background: '#0f7a80', borderRadius: 14, padding: '12px 14px', color: '#fff', boxShadow: '0 6px 20px rgba(9,114,119,0.25)', flex: 1 }}>
               <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
                 <div>
                   <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 0.6, opacity: 0.9 }}>EQUIVALE A</div>
-                  <div style={{ fontSize: 26, fontWeight: 800, lineHeight: 1.15 }}>{fmtB(resumen.delta)}</div>
+                  <div style={{ fontSize: 22, fontWeight: 800, lineHeight: 1.15 }}>{fmtB(resumen.delta)}</div>
                 </div>
-                <MoneyRegular fontSize={26} style={{ opacity: 0.85, flexShrink: 0 }} />
+                <MoneyRegular fontSize={24} style={{ opacity: 0.85, flexShrink: 0 }} />
               </div>
-              <div style={{ fontSize: 11.5, marginTop: 4, opacity: 0.9 }}>
+              <div style={{ fontSize: 11, marginTop: 3, opacity: 0.9 }}>
                 2027 ({fmtB(resumen.total2027)}) frente a la base 2026 ({fmtB(resumen.total2026)})
               </div>
             </div>
-          </div>
+            </div>
 
           {/* Evolución 2026 vs 2027 con badge de crecimiento al lado */}
-          <Card className={mergeClasses(styles.chartCard, styles.heroChartCard)} style={{ marginTop: 10 }}>
+          <Card className={mergeClasses(styles.chartCard, styles.heroChartCard)}>
             <span className={styles.chartTitle} style={{ fontSize: 14 }}>Evolución presupuesto {filtroZona !== 'Todas' ? `— ${filtroZona}` : ''}</span>
             <span className={styles.chartHint} style={{ marginBottom: 4 }}>Base 2026 vs 2027 (miles de millones COP).</span>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -523,6 +524,7 @@ export const ReportesModule: React.FC = () => {
               </div>
             </div>
           </Card>
+          </div>
 
           <Card className={mergeClasses(styles.chartCard, styles.heroChartCard)} style={{ marginTop: 10 }}>
             <span className={styles.chartTitle} style={{ fontSize: 14 }}>Líneas operativas {filtroZona !== 'Todas' ? `— ${filtroZona}` : ''}</span>
