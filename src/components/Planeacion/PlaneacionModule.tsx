@@ -85,6 +85,16 @@ const useStyles = makeStyles({
 
 const asArray = <T,>(value: unknown): T[] => Array.isArray(value) ? value as T[] : [];
 
+/** Mensaje legible de cualquier error (incluye PostgrestError, que no es instancia de Error). */
+const errorMessage = (err: unknown, fallback: string): string => {
+  const raw = (err as any)?.message ?? (err as any)?.error_description ?? '';
+  if (!raw) return fallback;
+  if (String(raw).includes('row-level security')) {
+    return 'El servidor rechazó la operación por permisos: verifica que tu usuario tenga la línea y zona asignadas, o que el presupuesto no esté congelado. (Detalle: ' + raw + ')';
+  }
+  return String(raw);
+};
+
 const asNumber = (value: unknown, fallback = 0) => {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : fallback;
@@ -476,7 +486,7 @@ export const PlaneacionModule: React.FC = () => {
       setActividadEditar(null);
       setToastOk(true);
     } catch (err) {
-      setErrorGuardar(err instanceof Error ? err.message : 'Error inesperado al guardar.');
+      setErrorGuardar(errorMessage(err, 'Error inesperado al guardar.'));
     }
   }, [crear, actualizar, actividadEditar, canEditActividad, canPlan, sendRevisionRequested, withSolicitante, edicionBloqueada]);
 
@@ -549,7 +559,7 @@ export const PlaneacionModule: React.FC = () => {
       setToastMsg('La actividad fue eliminada correctamente.');
       setToastOk(true);
     } catch (err) {
-      setErrorGuardar(err instanceof Error ? err.message : 'Error al eliminar.');
+      setErrorGuardar(errorMessage(err, 'Error al eliminar.'));
     }
   }, [actividadesVisibles, canViewActividad, currentUser, detalleItem, eliminar]);
 
@@ -570,7 +580,7 @@ export const PlaneacionModule: React.FC = () => {
       setToastOk(true);
       if (recargar) await recargar();
     } catch (err) {
-      setErrorGuardar(err instanceof Error ? err.message : 'Error al actualizar tarifas.');
+      setErrorGuardar(errorMessage(err, 'Error al actualizar tarifas.'));
     } finally {
       setTarifasCargando(false);
     }
@@ -595,7 +605,7 @@ export const PlaneacionModule: React.FC = () => {
       setToastOk(true);
       sendRevisionResolved(actualizada, estadoAprobacion);
     } catch (err) {
-      setErrorGuardar(err instanceof Error ? err.message : 'Error al actualizar la revisión.');
+      setErrorGuardar(errorMessage(err, 'Error al actualizar la revisión.'));
     }
   }, [actualizar, canReview, currentUser, sendRevisionResolved]);
 
@@ -788,7 +798,7 @@ export const PlaneacionModule: React.FC = () => {
       }
       setToastOk(true);
     } catch (err) {
-      setErrorGuardar(err instanceof Error ? err.message : 'Error al guardar la planeación.');
+      setErrorGuardar(errorMessage(err, 'Error al guardar la planeación.'));
     }
   }, [crear, actualizar, actividadEditar, canEditActividad, canPlan, currentUser, planeacionInitial, sendRevisionRequested, withSolicitante, edicionBloqueada]);
 
