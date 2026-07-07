@@ -43,7 +43,18 @@ export function usePresupuestoCongelado() {
     }
   }, []);
 
-  useEffect(() => { void refrescar(); }, [refrescar]);
+  useEffect(() => {
+    void refrescar();
+    // Revalidar cuando la pestaña recupera el foco: si un admin congela o
+    // descongela, las sesiones abiertas se enteran sin recargar.
+    const onFocus = () => { void refrescar(); };
+    window.addEventListener('focus', onFocus);
+    document.addEventListener('visibilitychange', onFocus);
+    return () => {
+      window.removeEventListener('focus', onFocus);
+      document.removeEventListener('visibilitychange', onFocus);
+    };
+  }, [refrescar]);
 
   return { congelado, cargando, refrescar, setCongelado };
 }
