@@ -1000,7 +1000,7 @@ export const PlaneacionModule: React.FC = () => {
         onEdit={handleDetailEdit}
         onDelete={currentUser ? handleDetailDelete : undefined}
         canEdit={!edicionBloqueada && !!detalleItem && canEditActividad(detalleItem)}
-        canDelete={!edicionBloqueada && !!currentUser && !!detalleItem && canViewActividad(detalleItem)}
+        canDelete={!edicionBloqueada && isAdmin && !!detalleItem}
         canReview={!edicionBloqueada && !!detalleItem && detalleItem.estadoAprobacion === 'Pendiente' && canReview(detalleItem.lineaOperativa, detalleItem.zona)}
         onApprove={(actividad) => handleReview(actividad, 'Aprobado')}
         onReject={(actividad) => handleReview(actividad, 'Rechazado')}
