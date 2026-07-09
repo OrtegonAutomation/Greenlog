@@ -572,8 +572,8 @@ export const ReportesModule: React.FC = () => {
 
         {/* Título flotante en la esquina superior derecha del mapa */}
         <div className={styles.heroCaption}>
+          <div className={styles.heroTitle} style={{ margin: '0 0 2px' }}>Resumen<br />General</div>
           <span className={styles.eyebrow}>Presupuesto 2026 vs 2027</span>
-          <div className={styles.heroTitle} style={{ margin: '4px 0 0' }}>Resumen<br />General</div>
         </div>
       </div>
       )}
@@ -590,8 +590,8 @@ export const ReportesModule: React.FC = () => {
 
         {/* Título flotante de la vista de comparación */}
         <div className={styles.heroCaption}>
-          <span className={styles.eyebrow}>2026 vs 2027</span>
-          <div className={styles.heroTitle} style={{ margin: '4px 0 0' }}>Análisis</div>
+          <div className={styles.heroTitle} style={{ margin: '0 0 2px' }}>Análisis</div>
+          <span className={styles.eyebrow}>Presupuesto 2026 vs 2027</span>
         </div>
 
         {/* Gráficas de comparación a la izquierda */}
