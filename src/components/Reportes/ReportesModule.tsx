@@ -198,6 +198,21 @@ const useStyles = makeStyles({
 
 const fmtAxis = (v: number) => `$${(v / 1e9).toFixed(1)} MM`;
 // Escala de 3 colores para el mapa de calor (verde → amarillo → rojo, estilo Excel).
+// Nombre corto de línea operativa para encabezados estrechos (heatmap).
+const lineaCorta = (l: string): string => ({
+  'Monitoreos': 'Monitoreos',
+  'Pagos': 'Pagos',
+  'Servicios E': 'Servicios E',
+  'ICAs': 'ICAs',
+  'Estudios Ambientales': 'Estudios Amb.',
+  'Hojas de Ruta Sostenibilidad Ambiental': 'Hojas de Ruta',
+  'Residuos peligrosos': 'Residuos pel.',
+  'Herramienta Digital': 'Herram. Digital',
+  'Compensaciones estaciones': 'Compensac.',
+  'Compensaciones provisiones': 'Compens. prov.',
+  'Compensaciones e Inv': 'Compens. Inv.',
+}[l] ?? l);
+
 const colorCalor = (t: number): string => {
   // Escala con raíz (t^0.45): abre el rango para que los valores medios caigan
   // en amarillo/naranja y no quede casi todo verde con un solo rojo.
@@ -597,16 +612,16 @@ export const ReportesModule: React.FC = () => {
         {/* Gráficas de comparación a la izquierda */}
         <div className={styles.heroContent}>
           {/* Variación total del ámbito: % y a cuánto refiere en dinero */}
-          <div className={styles.bigCard} style={{ marginBottom: 8, flexDirection: 'row', alignItems: 'center', gap: 16, flexWrap: 'wrap', padding: '10px 14px' }}>
+          <div className={styles.bigCard} style={{ marginBottom: 6, flexDirection: 'row', alignItems: 'center', gap: 14, flexWrap: 'wrap', padding: '8px 12px' }}>
             <div>
               <div className={styles.miniLabel}>Variación total vs 2026</div>
-              <div style={{ fontSize: 26, fontWeight: 800, color: (resumen.crecimiento ?? 0) >= 0 ? VERDE : ROJO }}>{fmtPct(resumen.crecimiento)}</div>
+              <div style={{ fontSize: 22, fontWeight: 800, color: (resumen.crecimiento ?? 0) >= 0 ? VERDE : ROJO }}>{fmtPct(resumen.crecimiento)}</div>
             </div>
             <div>
               <div className={styles.miniLabel}>Equivale a</div>
-              <div style={{ fontSize: 26, fontWeight: 800, color: AZUL_OSCURO }}>{fmtB(resumen.delta)}</div>
+              <div style={{ fontSize: 22, fontWeight: 800, color: AZUL_OSCURO }}>{fmtB(resumen.delta)}</div>
             </div>
-            <Caption1 style={{ color: tokens.colorNeutralForeground3, maxWidth: 200 }}>
+            <Caption1 style={{ color: tokens.colorNeutralForeground3, maxWidth: 190, fontSize: 11 }}>
               2027 ({fmtB(resumen.total2027)}) frente a la base 2026 ({fmtB(resumen.total2026)}).
             </Caption1>
           </div>
@@ -614,7 +629,7 @@ export const ReportesModule: React.FC = () => {
           <Card className={mergeClasses(styles.chartCard, styles.heroChartCard)}>
             <span className={styles.chartTitle} style={{ fontSize: 14 }}>Comparación por línea operativa {filtroMes ? `— ${filtroMes} 2027` : ''}</span>
             <span className={styles.chartHint} style={{ marginBottom: 4 }}>{filtroMes ? `Presupuesto 2027 de ${filtroMes} por línea. Clic en una barra para filtrar.` : '2026 (base) vs 2027 y variación (Δ), de mayor a menor 2027. Clic en una barra para filtrar.'}</span>
-            <ResponsiveContainer width="100%" height={255}>
+            <ResponsiveContainer width="100%" height={235}>
               <BarChart data={filtroMes
                   ? Object.entries(porLineaDeMes(R.acts, MES_ABBR.indexOf(filtroMes))).sort((a, b) => b[1] - a[1]).map(([nombre, v]) => ({ nombre, [`2027 ${filtroMes}`]: v }))
                   : [...compLinea].sort((a, b) => b.y2027 - a.y2027).map(c => ({ nombre: c.nombre, '2026': c.y2026, '2027': c.y2027, 'Variación': c.delta }))}
@@ -652,10 +667,10 @@ export const ReportesModule: React.FC = () => {
             )}
           </Card>
 
-          <Card className={mergeClasses(styles.chartCard, styles.heroChartCard)} style={{ marginTop: 10 }}>
+          <Card className={mergeClasses(styles.chartCard, styles.heroChartCard)} style={{ marginTop: 6 }}>
             <span className={styles.chartTitle} style={{ fontSize: 14 }}>Mensualización {filtroMes ? `— ${filtroMes}` : ''}</span>
             <span className={styles.chartHint} style={{ marginBottom: 4 }}>Programar desembolsos por picos (línea = promedio). Clic en un mes para filtrar.</span>
-            <ResponsiveContainer width="100%" height={170}>
+            <ResponsiveContainer width="100%" height={150}>
               <BarChart data={caja.filas} margin={{ top: 14, left: 4, right: 10 }} style={{ cursor: 'pointer' }}
                 onClick={(st: any) => { const m = st?.activeLabel; if (m) toggleMes(String(m)); }}>
                 <CartesianGrid stroke="#dbe2ea" horizontal={true} vertical={false} />
@@ -709,11 +724,11 @@ export const ReportesModule: React.FC = () => {
         <div style={{ overflowX: 'auto' }}>
           <table className={styles.table} style={{ minWidth: 560, tableLayout: 'fixed' }}>
             <thead>
-              <tr><th className={styles.th}>Zona</th>{heat.lineas.map(l => (
+              <tr><th className={styles.th} style={{ fontSize: 10 }}>Zona</th>{heat.lineas.map(l => (
                 <th key={l} className={styles.th}
-                  style={{ textAlign: 'center', overflow: 'hidden', textOverflow: 'ellipsis', cursor: 'pointer', background: filtroLinea === l ? GREENLIGHT : undefined }}
-                  title="Clic para filtrar las gráficas de esta vista por esta línea"
-                  onClick={() => toggleLinea(l)}>{l}</th>
+                  style={{ textAlign: 'center', fontSize: 9.5, lineHeight: 1.15, whiteSpace: 'normal', wordBreak: 'break-word', cursor: 'pointer', background: filtroLinea === l ? GREENLIGHT : undefined }}
+                  title={`${l} — clic para filtrar`}
+                  onClick={() => toggleLinea(l)}>{lineaCorta(l)}</th>
               ))}</tr>
             </thead>
             <tbody>
