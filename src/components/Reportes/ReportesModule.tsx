@@ -336,7 +336,7 @@ export const ReportesModule: React.FC = () => {
     const caja = cajaMensual(acts);
     const proveedores = dependenciaProveedores(acts);
     const exposicion = exposicionPorLinea(acts);
-    const heat = heatmapZonaLinea(acts);
+    const heat = heatmapZonaLinea(acts, 100); // todas las líneas operativas, no solo el top
     const conc = concentracionTop(acts, 3);
     // Todas las líneas operativas del ámbito, ordenadas de mayor a menor presupuesto.
     const lineasOrdenadas = pareto.filas;
@@ -628,12 +628,28 @@ export const ReportesModule: React.FC = () => {
                 {filtroMes ? (
                   <Bar dataKey={`2027 ${filtroMes}`} fill={AZUL} radius={[0, 3, 3, 0]} barSize={14} style={{ cursor: 'pointer' }} onClick={(d: any) => { const n = d?.nombre ?? d?.payload?.nombre; if (n) toggleLinea(n); }} />
                 ) : (<>
-                <Bar dataKey="2026" fill="#9db8d6" radius={[0, 3, 3, 0]} barSize={7} style={{ cursor: 'pointer' }} onClick={(d: any) => { const n = d?.nombre ?? d?.payload?.nombre; if (n) toggleLinea(n); }} />
-                <Bar dataKey="2027" fill={AZUL} radius={[0, 3, 3, 0]} barSize={7} style={{ cursor: 'pointer' }} onClick={(d: any) => { const n = d?.nombre ?? d?.payload?.nombre; if (n) toggleLinea(n); }} />
-                <Bar dataKey="Variación" fill={NARANJA} radius={[0, 3, 3, 0]} barSize={7} style={{ cursor: 'pointer' }} onClick={(d: any) => { const n = d?.nombre ?? d?.payload?.nombre; if (n) toggleLinea(n); }} />
+                {/* Barra 2026 con la variación apilada encima (2026 + Δ = 2027) */}
+                <Bar dataKey="2026" stackId="base" fill="#9db8d6" barSize={9} style={{ cursor: 'pointer' }} onClick={(d: any) => { const n = d?.nombre ?? d?.payload?.nombre; if (n) toggleLinea(n); }} />
+                <Bar dataKey="Variación" stackId="base" fill={NARANJA} radius={[0, 3, 3, 0]} barSize={9} style={{ cursor: 'pointer' }} onClick={(d: any) => { const n = d?.nombre ?? d?.payload?.nombre; if (n) toggleLinea(n); }} />
+                {/* Barra 2027 independiente al lado */}
+                <Bar dataKey="2027" fill={AZUL} radius={[0, 3, 3, 0]} barSize={9} style={{ cursor: 'pointer' }} onClick={(d: any) => { const n = d?.nombre ?? d?.payload?.nombre; if (n) toggleLinea(n); }} />
                 </>)}
               </BarChart>
             </ResponsiveContainer>
+            {/* Convenciones */}
+            {!filtroMes && (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px 16px', marginTop: 8, paddingLeft: 4 }}>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11, color: tokens.colorNeutralForeground2 }}>
+                  <span style={{ width: 11, height: 11, borderRadius: 2, background: '#9db8d6' }} /> Base 2026
+                </span>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11, color: tokens.colorNeutralForeground2 }}>
+                  <span style={{ width: 11, height: 11, borderRadius: 2, background: NARANJA }} /> Variación (Δ vs 2026)
+                </span>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11, color: tokens.colorNeutralForeground2 }}>
+                  <span style={{ width: 11, height: 11, borderRadius: 2, background: AZUL }} /> Total 2027
+                </span>
+              </div>
+            )}
           </Card>
 
           <Card className={mergeClasses(styles.chartCard, styles.heroChartCard)} style={{ marginTop: 10 }}>
