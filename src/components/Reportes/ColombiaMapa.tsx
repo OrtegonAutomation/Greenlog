@@ -60,23 +60,10 @@ export const ColombiaMapa: React.FC<Props> = ({ presupuestoPorZona, crecimientoP
   const toggle = (z: string) => onSelectZona(zonaSel === z ? 'Todas' : z);
   const activa = (z: string) => zonaSel === z || (zonaSel === 'Todas' && hover === z);
 
-  // Escala coroplética: verde graduado por presupuesto de la zona (más = más
-  // intenso). Se normaliza por RANGO (min→max) para maximizar la distinción
-  // entre zonas aunque sus valores estén relativamente cerca.
-  const valores = zonas.map(z => presupuestoPorZona[z] ?? 0);
-  const minPres = Math.min(...valores), maxPres = Math.max(...valores);
-  const rango = maxPres - minPres || 1;
-  const verdePorPresupuesto = (z: string) => {
-    const norm = ((presupuestoPorZona[z] ?? 0) - minPres) / rango; // 0 (menor) .. 1 (mayor)
-    const t = 0.12 + norm * 0.88; // deja un piso claro y usa casi todo el rango
-    const CLARO = [232, 247, 239], OSCURO = [22, 92, 58]; // #e8f7ef → #165c3a (más contraste)
-    const c = CLARO.map((a, i) => Math.round(a + (OSCURO[i] - a) * t));
-    return `rgb(${c[0]},${c[1]},${c[2]})`;
-  };
   const fillAncla = (z: string) => {
     if (activa(z)) return VERDE;
     if (hover === z) return VERDE_HOVER;
-    return verdePorPresupuesto(z);
+    return VERDE_SUAVE;
   };
   // Zona cuya etiqueta se muestra: la seleccionada, o la que tiene hover.
   const etiquetaZona = zonaSel !== 'Todas' ? zonaSel : hover;
