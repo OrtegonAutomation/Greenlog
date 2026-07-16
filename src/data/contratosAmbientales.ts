@@ -94,7 +94,7 @@ export const CONTRATOS_AMBIENTALES: ContratoAmbiental[] = [
   },
   {
     noContrato: '8000009578',
-    contratista: 'ATENCION EN SOSTENIBILIDAD INTEGRAL',
+    contratista: 'ASI - Atencion en Sostenibilidad Integral',
     administrador: 'Diana Leiva',
     supervisor: 'Edgar Andrés Yara',
     objeto: 'SERVICIOS DE ESTUDIOS AMBIENTALES ESPECIALIZADOS',
@@ -104,7 +104,7 @@ export const CONTRATOS_AMBIENTALES: ContratoAmbiental[] = [
   },
   {
     noContrato: '8000009782',
-    contratista: 'BUSSINESS AND QUALITY SERVICES SAS',
+    contratista: 'BQS - Business and Quality Services SAS',
     administrador: 'Diana Leiva',
     supervisor: 'Viviana Buitrago',
     objeto: 'Servicio para la ejecución del proyecto "Implementación de un esquema de pago por servicios ambientales (PSA) para la reactivación económica sostenible y ambiental (RESA) en el Consejo Comunitario Unión Río Caunapí municipio de Tumaco departamento de Nariño", en el marco del mecanismo de obras por impuestos.',
@@ -124,7 +124,7 @@ export const CONTRATOS_AMBIENTALES: ContratoAmbiental[] = [
   },
   {
     noContrato: '8000009383',
-    contratista: 'BUSSINESS AND QUALITY SERVICES SAS',
+    contratista: 'BQS - Business and Quality Services SAS',
     administrador: 'Diana Leiva',
     supervisor: 'Juan Helderth Cardenas',
     objeto: 'SERVICIOS AMBIENTALES PARA EL DESARROLLO DE ACTIVIDADES QUE DEN CUMPLIMIENTO A LAS OBLIGACIONES Y/O MEDIDAS COMPENSATORIAS Y/O INVERSIÓN AL 1% Y/O VOLUNTARIAS.',

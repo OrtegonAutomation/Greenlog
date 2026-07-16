@@ -242,14 +242,18 @@ export const exportOpexToExcel = (actividades: ActividadAmbiental[]) => {
       // Tarifa base (col M): precio unitario del primer mes con datos.
       const primerMesConDatos = mesesData.find(d => d.total > 0);
       const tarifaBase = primerMesConDatos ? primerMesConDatos.precio : 0;
+      // Sin contrato firmado ("Nuevo contrato"): el número va vacío, no 000.
+      const contratoFinal = /^nuevo contrato$/i.test(String(contratistaRow).trim()) ? '' : contratoRow;
       return [
-        contratoRow,                                              // A  Contrato
+        contratoFinal,                                            // A  Contrato
         contratistaRow,                                           // B  Contratista
         opx.necesidad || '',                                      // C  Necesidad
         opx.subnecesidad || '',                                   // D  Subnecesidad
         nombreItem,                                               // E  Item
         zonaPlantilla(opx.zona || item.zona || ''),               // F  Zona
-        item.estacion || opx.pk || '',                            // G  Estación / Línea
+        // Estación / Línea: estación o PK; para Compensaciones (sin estación)
+        // se usa el sector (p. ej. "Estación Mariquita") o el sistema.
+        item.estacion || opx.pk || opx.sector || opx.sistema || '', // G  Estación / Línea
         '',                                                       // H  Orden Interna
         '',                                                       // I  Cuenta Contable
         ipcActivo ? 'SI' : 'NO',                                  // J  Aplica Ajuste Tarifario
