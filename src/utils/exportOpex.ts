@@ -19,18 +19,56 @@ export const exportOpexToExcel = (actividades: ActividadAmbiental[]) => {
   const excelData = opexActivities.map(item => {
     const opx = parseOpex(item.opexDataRaw);
     
-    // Helper function to extract properties by month.
-    // Nota: la cantidad casi nunca viene a nivel de mes (mes.cantidad); vive en el
-    // desglose por ítem (mes.preciosIndividuales[].cantidad). Se suma de ahí como
-    // respaldo para que ninguna línea operativa quede sin cantidades en la matriz.
+    // Factores IVA (por ítem) e IPC (por mes) guardados en la planeación.
+    const ivaFactorFor = (p: any) => {
+      const aplicaIva = typeof p?.aplicaIva === 'boolean'
+        ? p.aplicaIva
+        : !((opx.ivaItemsExcluidos ?? []).includes(p?.key));
+      return (opx.ivaGlobalActivo && aplicaIva && (opx.ivaGlobalPorcentaje ?? 0) > 0)
+        ? 1 + (opx.ivaGlobalPorcentaje / 100)
+        : 1;
+    };
+    const ipcFactorFor = (mesIndex: number) =>
+      (opx.ipcGlobalActivo && (Array.isArray(opx.ipcMeses) ? opx.ipcMeses : []).includes(mesIndex) && (opx.ipcGlobalPorcentaje ?? 0) > 0)
+        ? 1 + (opx.ipcGlobalPorcentaje / 100)
+        : 1;
+
+    // Datos del mes reconstruidos desde el desglose por ítem (preciosIndividuales).
+    // El total del mes se recalcula como Σ precio×cantidad×frecuencia×IVA×IPC para
+    // que en la plantilla siempre cuadre Precio × Cantidad = Total, incluso si el
+    // total guardado quedó desactualizado tras editar cantidades. Los pagos
+    // diferidos (cantidad=0 con total) conservan su total guardado.
     const getMonthData = (mesNombre: string) => {
       const match = opx.meses?.find((m: any) => m.mes.toLowerCase() === mesNombre.toLowerCase());
       if (!match) return { precio: 0, cantidad: 0, total: 0 };
+      // Índice calendario del mes (0=Enero) para el factor IPC.
+      const mesIndex = MESES_LABEL.findIndex(m => m.toLowerCase() === mesNombre.toLowerCase());
 
-      const total = match.total || 0;
       const items: any[] = Array.isArray(match.preciosIndividuales) ? match.preciosIndividuales : [];
-      const cantidadItems = items.reduce((s, p) => s + (Number(p?.cantidad) || 0), 0);
-      let cantidad = match.cantidad || cantidadItems || 0;
+
+      let total = 0;
+      let cantidad = 0;
+
+      if (items.length > 0) {
+        const ipcFactor = ipcFactorFor(mesIndex);
+        for (const p of items) {
+          const cant = Number(p?.cantidad) || 0;
+          const frec = Number(p?.frecuencia) || 1;
+          const precioBase = Number(p?.precio) || 0;
+          const totalGuardado = Number(p?.total) || 0;
+          if (cant > 0 && precioBase > 0) {
+            total += precioBase * cant * frec * ivaFactorFor(p) * ipcFactor;
+          } else {
+            // Diferidos (cantidad 0) o ítems sin precio digitado: usar el total guardado.
+            total += totalGuardado;
+          }
+          cantidad += cant;
+        }
+      } else {
+        // Legacy sin desglose por ítem: usar los valores a nivel de mes.
+        total = match.total || 0;
+        cantidad = match.cantidad || 0;
+      }
 
       // Pagos diferidos: cantidad=0 pero hay total → cantidad=1 para que P×Q=Total.
       if (cantidad === 0 && total > 0) {
@@ -55,6 +93,9 @@ export const exportOpexToExcel = (actividades: ActividadAmbiental[]) => {
     const oct = getMonthData("Octubre");
     const nov = getMonthData("Noviembre");
     const dic = getMonthData("Diciembre");
+
+    const totalAnio1 = ene.total + feb.total + mar.total + abr.total + may.total + jun.total
+      + jul.total + ago.total + sep.total + oct.total + nov.total + dic.total;
 
     return {
       "Línea Operativa": item.lineaOperativa || "",
@@ -116,7 +157,7 @@ export const exportOpexToExcel = (actividades: ActividadAmbiental[]) => {
       "Total julio año 1": jul.total, "Total agosto año 1": ago.total, "Total septiembre año 1": sep.total,
       "Total octubre año 1": oct.total, "Total noviembre año 1": nov.total, "Total diciembre año 1": dic.total,
 
-      "Total año 1": item.presupuestoPlan || 0,
+      "Total año 1": totalAnio1 || item.presupuestoPlan || 0,
 
       "Total equivalente enero año 1 Ajustado2": 0, "Total equivalente febrero año 1 Ajustado3": 0,
       "Total equivalente marzo año 1 Ajustado4": 0, "Total equivalente abril año 1 Ajustado5": 0,
