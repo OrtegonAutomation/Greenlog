@@ -12,6 +12,10 @@ const parseOpex = (raw?: string) => {
 
 const FMT_CONTABLE = '_-* #,##0_-;\\-* #,##0_-;_-* "-"??_-;_-@_-';
 
+// Solo en la plantilla OPEX las zonas "Occidente Norte" / "Occidente Sur"
+// se reportan unificadas como "Occidente" (la app conserva la zona real).
+const zonaPlantilla = (zona: string) => /^Occidente\b/i.test(zona.trim()) ? 'Occidente' : zona;
+
 const BORDER_THIN_AUTO_TOP = {
   left: { style: 'thin', color: { auto: 1 } },
   right: { style: 'thin', color: { auto: 1 } },
@@ -244,7 +248,7 @@ export const exportOpexToExcel = (actividades: ActividadAmbiental[]) => {
         opx.necesidad || '',                                      // C  Necesidad
         opx.subnecesidad || '',                                   // D  Subnecesidad
         nombreItem,                                               // E  Item
-        opx.zona || item.zona || '',                              // F  Zona
+        zonaPlantilla(opx.zona || item.zona || ''),               // F  Zona
         item.estacion || opx.pk || '',                            // G  Estación / Línea
         '',                                                       // H  Orden Interna
         '',                                                       // I  Cuenta Contable
