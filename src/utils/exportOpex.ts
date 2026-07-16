@@ -30,9 +30,15 @@ export const exportOpexToExcel = (actividades: ActividadAmbiental[]) => {
       const total = match.total || 0;
       const items: any[] = Array.isArray(match.preciosIndividuales) ? match.preciosIndividuales : [];
       const cantidadItems = items.reduce((s, p) => s + (Number(p?.cantidad) || 0), 0);
-      const cantidad = match.cantidad || cantidadItems || 0;
-      // Precio unitario: el del mes si existe; si no, el efectivo (total / cantidad).
-      const precio = match.precio || (cantidad > 0 ? total / cantidad : 0);
+      let cantidad = match.cantidad || cantidadItems || 0;
+
+      // Pagos diferidos: cantidad=0 pero hay total → cantidad=1 para que P×Q=Total.
+      if (cantidad === 0 && total > 0) {
+        cantidad = 1;
+      }
+
+      // Precio unitario efectivo (incluye IVA, IPC y diferidos): total / cantidad.
+      const precio = cantidad > 0 ? total / cantidad : 0;
 
       return { precio, cantidad, total };
     };
@@ -222,6 +228,31 @@ export const exportDetalleInternoToExcel = (actividades: ActividadAmbiental[]) =
         const firstEntry = (firstMonth.preciosIndividuales as any[]).find((p: any) => p.key === itemKey);
         if (!firstEntry) continue;
 
+        let totalAnual = 0;
+        let cantidadAnual = 0;
+        const mesTotals: Record<string, number> = {};
+        for (const mes of opx.meses as any[]) {
+          const entry = (mes.preciosIndividuales as any[] | undefined)?.find((p: any) => p.key === itemKey);
+          const mesTotal = entry?.total ?? 0;
+          mesTotals[mes.mes] = mesTotal;
+          totalAnual += mesTotal;
+          cantidadAnual += Number(entry?.cantidad) || 0;
+        }
+
+        let precioEfectivo: number;
+        if (cantidadAnual > 0) {
+          precioEfectivo = totalAnual / cantidadAnual;
+        } else if (totalAnual > 0) {
+          precioEfectivo = totalAnual;
+        } else {
+          const basePrecio = firstEntry.precio ?? 0;
+          const aplicaIva = firstEntry.aplicaIva ?? !((opx.ivaItemsExcluidos ?? []).includes(itemKey));
+          const ivaFactor = (opx.ivaGlobalActivo && aplicaIva && (opx.ivaGlobalPorcentaje ?? 0) > 0)
+            ? (1 + (opx.ivaGlobalPorcentaje / 100))
+            : 1;
+          precioEfectivo = basePrecio * ivaFactor;
+        }
+
         const row: Record<string, any> = {
           "Zona": zona,
           "Línea Operativa": linea,
@@ -235,15 +266,11 @@ export const exportDetalleInternoToExcel = (actividades: ActividadAmbiental[]) =
           "Ítem / Parámetro": firstEntry.nombre,
           "Puntos": opx.paramTipoMuestra?.[itemKey] === 'compuesto' ? 0 : 1,
           "Compuestos": opx.paramTipoMuestra?.[itemKey] === 'compuesto' ? (opx.paramCantCompuestos?.[itemKey] || 1) : 0,
-          "Precio / Und": firstEntry.precio,
+          "Precio / Und": precioEfectivo,
         };
 
-        let totalAnual = 0;
-        for (const mes of opx.meses as any[]) {
-          const entry = (mes.preciosIndividuales as any[] | undefined)?.find((p: any) => p.key === itemKey);
-          const mesTotal = entry?.total ?? 0;
-          row[mes.mes] = mesTotal;
-          totalAnual += mesTotal;
+        for (const [mesNombre, mesTotal] of Object.entries(mesTotals)) {
+          row[mesNombre] = mesTotal;
         }
         // Fill any missing month columns with 0
         for (const m of MESES_LABEL) {
