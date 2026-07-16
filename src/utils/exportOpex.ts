@@ -6,6 +6,90 @@ const parseOpex = (raw?: string) => {
   try { return JSON.parse(raw); } catch { return null; }
 };
 
+// ── Estructura de la plantilla PXQ (Exceles de Referencia/PXQ (3) - copia.xlsx) ──
+// Réplica exacta de la hoja "PXQ ": columnas A–AY, encabezados en la fila 6,
+// caja IPC/TRM en M3:N4, notas en la fila 5 y estilos/formatos originales.
+
+const FMT_CONTABLE = '_-* #,##0_-;\\-* #,##0_-;_-* "-"??_-;_-@_-';
+
+const BORDER_THIN_AUTO_TOP = {
+  left: { style: 'thin', color: { auto: 1 } },
+  right: { style: 'thin', color: { auto: 1 } },
+  top: { style: 'thin', color: { auto: 1 } },
+};
+const BORDER_THIN_BLACK_TOP = {
+  left: { style: 'thin', color: { rgb: 'FF000000' } },
+  right: { style: 'thin', color: { rgb: 'FF000000' } },
+  top: { style: 'thin', color: { rgb: 'FF000000' } },
+};
+const BORDER_DATA = {
+  left: { style: 'thin', color: { rgb: 'AEAEAE' } },
+  right: { style: 'thin', color: { rgb: 'AEAEAE' } },
+  top: { style: 'thin', color: { rgb: 'AEAEAE' } },
+  bottom: { style: 'thin', color: { rgb: 'AEAEAE' } },
+};
+
+const FONT_HEADER_APTOS = { bold: true, sz: 11, color: { rgb: 'FFFFFF' }, name: 'Aptos Narrow' };
+const FONT_HEADER_ARIAL_BLANCA = { bold: true, sz: 10, color: { rgb: 'FFFFFF' }, name: 'Arial' };
+const FONT_HEADER_ARIAL_NEGRA = { bold: true, sz: 10, color: { rgb: '000000' }, name: 'Arial' };
+const FONT_DATA = { sz: 11, color: { rgb: '000000' }, name: 'Aptos Narrow' };
+
+const CENTER = { horizontal: 'center', vertical: 'center' } as const;
+const CENTER_WRAP = { horizontal: 'center', vertical: 'center', wrapText: true } as const;
+
+// Estilo de encabezado (fila 6) por columna, según el grupo de la plantilla.
+const headerStyleFor = (col: number) => {
+  if (col <= 4) // A–E: azul oscuro, sin borde
+    return { font: FONT_HEADER_APTOS, fill: { patternType: 'solid', fgColor: { rgb: '0E2841' } }, alignment: CENTER };
+  if (col === 5) // F: azul medio, borde negro
+    return { font: FONT_HEADER_APTOS, fill: { patternType: 'solid', fgColor: { rgb: '0B77A0' } }, border: BORDER_THIN_BLACK_TOP, alignment: CENTER };
+  if (col <= 12) // G–M: azul medio, borde negro, con ajuste de texto
+    return { font: FONT_HEADER_APTOS, fill: { patternType: 'solid', fgColor: { rgb: '0B77A0' } }, border: BORDER_THIN_BLACK_TOP, alignment: CENTER_WRAP };
+  if (col <= 24) // N–Y (precios): celeste
+    return { font: FONT_HEADER_ARIAL_BLANCA, fill: { patternType: 'solid', fgColor: { rgb: '46B1E1' } }, border: BORDER_THIN_AUTO_TOP, alignment: CENTER_WRAP };
+  if (col <= 36) // Z–AK (cantidades): celeste claro, letra negra
+    return { font: FONT_HEADER_ARIAL_NEGRA, fill: { patternType: 'solid', fgColor: { rgb: 'CAEEFB' } }, border: BORDER_THIN_AUTO_TOP, alignment: CENTER_WRAP };
+  if (col <= 49) // AL–AX (totales): gris
+    return { font: FONT_HEADER_ARIAL_BLANCA, fill: { patternType: 'solid', fgColor: { rgb: 'AEAEAE' } }, border: BORDER_THIN_AUTO_TOP, alignment: CENTER_WRAP };
+  // AY: azul oscuro
+  return { font: FONT_HEADER_ARIAL_BLANCA, fill: { patternType: 'solid', fgColor: { rgb: '0E2841' } }, border: BORDER_THIN_AUTO_TOP, alignment: CENTER_WRAP };
+};
+
+// Estilo de celda de datos (filas 7+) por columna.
+const dataStyleFor = (col: number) => {
+  if (col === 7 || col === 8) // H, I (Orden Interna / Cuenta Contable): durazno
+    return { font: FONT_DATA, fill: { patternType: 'solid', fgColor: { rgb: 'F6C6AD' } }, border: BORDER_DATA };
+  if (col >= 13 && col <= 24) // N–Y precios: formato contable
+    return { font: FONT_DATA, border: BORDER_DATA, numFmt: FMT_CONTABLE };
+  if (col >= 37 && col <= 49) // AL–AX totales: gris claro + contable
+    return { font: FONT_DATA, fill: { patternType: 'solid', fgColor: { rgb: 'D9D9D9' } }, border: BORDER_DATA, numFmt: FMT_CONTABLE };
+  if (col === 12) // M Tarifas: contable
+    return { font: FONT_DATA, border: BORDER_DATA, numFmt: FMT_CONTABLE };
+  return { font: FONT_DATA, border: BORDER_DATA };
+};
+
+const HEADERS_PXQ = [
+  'Contrato ', 'Contratista', 'Necesidad', 'Subnecesidad', 'Item', 'Zona ', 'Estación / Línea',
+  'Orden Interna', 'Cuenta Contable', 'Aplica Ajuste Tarifario\r\nSI / NO', 'Fecha del Ajuste Tarifario',
+  'Aplica Reajuste de tarifas por tablas salariales\r\nSI / NO', 'Tarifas 2026',
+  ' Precio enero año 1 ', ' Precio febrero año 1 ', ' Precio marzo año 1 ', ' Precio abril año 1 ',
+  ' Precio mayo año 1 ', ' Precio junio año 1 ', ' Precio julio año 1 ', ' Precio agosto año 1 ',
+  ' Precio septiembre año 1 ', ' Precio octubre año 1 ', ' Precio noviembre año 1 ', ' Precio diciembre año 1 ',
+  'Cantidad enero año 1', 'Cantidad febrero año 1', 'Cantidad marzo año 1', 'Cantidad abril año 1',
+  'Cantidad mayo año 1', 'Cantidad junio año 1', 'Cantidad julio año 1', 'Cantidad agosto año 1',
+  'Cantidad septiembre año 1', 'Cantidad octubre año 1', 'Cantidad noviembre año 1', 'Cantidad diciembre año 1',
+  'Total enero año 1', 'Total febrero año 1', 'Total marzo año 1', 'Total abril año 1', 'Total mayo año 1',
+  'Total junio año 1', 'Total julio año 1', 'Total agosto año 1', 'Total septiembre año 1',
+  'Total octubre año 1', 'Total noviembre año 1', 'Total diciembre año 1', 'Total año 1', 'Observaciones',
+];
+
+const COL_WIDTHS_PXQ: (number | undefined)[] = [
+  29.71, 24.14, 29.43, 53.86, 17.57, 21.86, 14, 16.29, 11.43, 16.57, 24.14, 24.14, 19.14,
+  14.71, 17.57, 19.43, 13.57, 13.57, 13.57, 13.14, 13.14, 13.14, 13.14, 13.14, 18,
+  undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined,
+  17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 37.86,
+];
+
 export const exportOpexToExcel = (actividades: ActividadAmbiental[]) => {
   // Filter only activities that have OPEX data
   const opexActivities = actividades.filter(a => !!a.opexDataRaw && parseOpex(a.opexDataRaw) !== null);
@@ -15,10 +99,10 @@ export const exportOpexToExcel = (actividades: ActividadAmbiental[]) => {
     return;
   }
 
-  // Format data for Excel
-  const excelData = opexActivities.map(item => {
+  // Una fila (arreglo de 51 columnas, A–AY) por actividad, según la plantilla PXQ.
+  const excelRows = opexActivities.map(item => {
     const opx = parseOpex(item.opexDataRaw);
-    
+
     // Factores IVA (por ítem) e IPC (por mes) guardados en la planeación.
     const ivaFactorFor = (p: any) => {
       const aplicaIva = typeof p?.aplicaIva === 'boolean'
@@ -81,149 +165,104 @@ export const exportOpexToExcel = (actividades: ActividadAmbiental[]) => {
       return { precio, cantidad, total };
     };
 
-    const ene = getMonthData("Enero");
-    const feb = getMonthData("Febrero");
-    const mar = getMonthData("Marzo");
-    const abr = getMonthData("Abril");
-    const may = getMonthData("Mayo");
-    const jun = getMonthData("Junio");
-    const jul = getMonthData("Julio");
-    const ago = getMonthData("Agosto");
-    const sep = getMonthData("Septiembre");
-    const oct = getMonthData("Octubre");
-    const nov = getMonthData("Noviembre");
-    const dic = getMonthData("Diciembre");
+    const mesesData = MESES_LABEL.map(m => getMonthData(m));
+    const totalAnio1 = mesesData.reduce((s, d) => s + d.total, 0);
 
-    const totalAnio1 = ene.total + feb.total + mar.total + abr.total + may.total + jun.total
-      + jul.total + ago.total + sep.total + oct.total + nov.total + dic.total;
+    // Tarifa base (col M): precio unitario del primer mes con datos.
+    const primerMesConDatos = mesesData.find(d => d.total > 0);
+    const tarifaBase = primerMesConDatos ? primerMesConDatos.precio : 0;
 
-    return {
-      "Línea Operativa": item.lineaOperativa || "",
-      "Fuente": (item as any).fuentePresupuesto || opx.fuentePresupuesto || "OPEX",
-      "Tipo Planeación": (item as any).tipoPlaneacion || opx.tipoPlaneacion || "Plan",
-      "Año": (item as any).anioPlaneacion || opx.anioPlaneacion || "",
-      "Usuario Registra": item.responsable || "Sistema",
-      "Zona": opx.zona || item.zona,
-      "Tipo Lugar": opx.tipoLugar || "Estación",
-      "Estación / PK": item.estacion || opx.pk || "",
-      "Moneda": "COP",
-      "Unidad de Medida": opx.unidadMedida || "UN",
-      "Proceso abastecimiento": opx.procesoAbastecimiento || "",
-      "No. de contrato": opx.contrato || item.contrato || "",
-      "Objeto": opx.objeto || "",
-      "Proveedor": opx.proveedor || "",
-      "Fecha inicio contrato": opx.fechaInicio || item.fechaInicio,
-      "Fecha final contrato": opx.fechaFin || item.fechaFin,
-      "Administrador": opx.administrador || "",
-      "Supervisor técnico": opx.supervisor || "",
-      "Estado del contrato": opx.estadoContrato || "",
-      "Necesidad": opx.necesidad || "",
-      "Subnecesidad": opx.subnecesidad || "",
-      // Compensaciones metadata (empty for non-compensaciones)
-      "ID Obligación": opx.obligacion?.id || "",
-      "Fecha creación obligación": opx.obligacion?.fechaCreacion || "",
-      "Tipo acto": opx.obligacion?.actoAdministrativo?.tipo || "",
-      "Número acto": opx.obligacion?.actoAdministrativo?.numero || "",
-      "Fecha acto": opx.obligacion?.actoAdministrativo?.fecha || "",
-      "Permiso": opx.obligacion?.permiso || "",
-      "Autoridad ambiental": opx.obligacion?.autoridad || "",
-      "Jurisdicción - Corporación": opx.obligacion?.jurisdiccion?.corporacion || "",
-      "Jurisdicción - Departamento": opx.obligacion?.jurisdiccion?.departamento || "",
-      "Jurisdicción - Municipio": opx.obligacion?.jurisdiccion?.municipio || "",
-      "Jurisdicción - Vereda/Predio": opx.obligacion?.jurisdiccion?.veredaPredio || "",
-      "Expediente": opx.obligacion?.expediente || "",
-      "Categoría compensación": opx.obligacion?.categoria || "",
-      "Sistema": opx.sistema || "",
-      "Sector": opx.sector || "",
-      "Asignación de recursos": opx.asignacionRecursos === true ? "Sí" : opx.asignacionRecursos === false ? "No" : "",
-      "Saldo disponible": opx.saldoDisponible || 0,
-      "Años planeados": opx.aniosAPlanear || "",
-      "Contrato": opx.contratoSeleccionado || "",
-      "Total Año 2": Array.isArray(opx.programacionY2) ? opx.programacionY2.reduce((s: number, p: any) => s + (p.total || 0), 0) : 0,
-      "Total Año 3": Array.isArray(opx.programacionY3) ? opx.programacionY3.reduce((s: number, p: any) => s + (p.total || 0), 0) : 0,
+    // Ajuste tarifario (cols J/K): IPC configurado en la planeación.
+    const ipcActivo = !!opx.ipcGlobalActivo && (opx.ipcGlobalPorcentaje ?? 0) > 0
+      && Array.isArray(opx.ipcMeses) && opx.ipcMeses.length > 0;
+    let fechaAjuste: Date | '' = '';
+    if (ipcActivo) {
+      const anio = Number((item as any).anioPlaneacion || opx.anioPlaneacion) || new Date().getFullYear();
+      // Mediodía para que la conversión a serial de Excel no corra el día por zona horaria.
+      fechaAjuste = new Date(anio, Math.min(...(opx.ipcMeses as number[])), 1, 12);
+    }
 
-      "Precio enero año 1": ene.precio, "Precio febrero año 1": feb.precio, "Precio marzo año 1": mar.precio,
-      "Precio abril año 1": abr.precio, "Precio mayo año 1": may.precio, "Precio junio año 1": jun.precio,
-      "Precio julio año 1": jul.precio, "Precio agosto año 1": ago.precio, "Precio septiembre año 1": sep.precio,
-      "Precio octubre año 1": oct.precio, "Precio noviembre año 1": nov.precio, "Precio diciembre año 1": dic.precio,
-
-      "Cantidad enero año 1": ene.cantidad, "Cantidad febrero año 1": feb.cantidad, "Cantidad marzo año 1": mar.cantidad,
-      "Cantidad abril año 1": abr.cantidad, "Cantidad mayo año 1": may.cantidad, "Cantidad junio año 1": jun.cantidad,
-      "Cantidad julio año 1": jul.cantidad, "Cantidad agosto año 1": ago.cantidad, "Cantidad septiembre año 1": sep.cantidad,
-      "Cantidad octubre año 1": oct.cantidad, "Cantidad noviembre año 1": nov.cantidad, "Cantidad diciembre año 1": dic.cantidad,
-
-      "Total enero año 1": ene.total, "Total febrero año 1": feb.total, "Total marzo año 1": mar.total,
-      "Total abril año 1": abr.total, "Total mayo año 1": may.total, "Total junio año 1": jun.total,
-      "Total julio año 1": jul.total, "Total agosto año 1": ago.total, "Total septiembre año 1": sep.total,
-      "Total octubre año 1": oct.total, "Total noviembre año 1": nov.total, "Total diciembre año 1": dic.total,
-
-      "Total año 1": totalAnio1 || item.presupuestoPlan || 0,
-
-      "Total equivalente enero año 1 Ajustado2": 0, "Total equivalente febrero año 1 Ajustado3": 0,
-      "Total equivalente marzo año 1 Ajustado4": 0, "Total equivalente abril año 1 Ajustado5": 0,
-      "Total equivalente mayo año 1 Ajustado6": 0, "Total equivalente junio año 1 Ajustado7": 0,
-      "Total equivalente julio año 1 Ajustado8": 0, "Total equivalente agosto año 1 Ajustado9": 0,
-      "Total equivalente septiembre año 1 Ajustado10": 0, "Total equivalente octubre año 1 Ajustado11": 0,
-      "Total equivalente noviembre año 1 Ajustado12": 0, "Total equivalente diciembre año 1 Ajustado13": 0,
-      "Total equivalente año 1 Ajustado14": 0,
-
-      // Notas libres al final (antes "Descripción de la necesidad").
-      "Observaciones": opx.descripcionNecesidad || ""
-    };
+    return [
+      opx.contrato || item.contrato || '',                        // A  Contrato
+      opx.proveedor || '',                                        // B  Contratista
+      opx.necesidad || '',                                        // C  Necesidad
+      opx.subnecesidad || '',                                     // D  Subnecesidad
+      item.lineaOperativa || '',                                  // E  Item
+      opx.zona || item.zona || '',                                // F  Zona
+      item.estacion || opx.pk || '',                              // G  Estación / Línea
+      '',                                                         // H  Orden Interna
+      '',                                                         // I  Cuenta Contable
+      ipcActivo ? 'SI' : 'NO',                                    // J  Aplica Ajuste Tarifario
+      fechaAjuste,                                                // K  Fecha del Ajuste Tarifario
+      'NO',                                                       // L  Reajuste tablas salariales
+      tarifaBase,                                                 // M  Tarifas 2026
+      ...mesesData.map(d => d.precio),                            // N–Y  Precios
+      ...mesesData.map(d => d.cantidad),                          // Z–AK Cantidades
+      ...mesesData.map(d => d.total),                             // AL–AW Totales
+      totalAnio1 || item.presupuestoPlan || 0,                    // AX Total año 1
+      opx.descripcionNecesidad || '',                             // AY Observaciones
+    ];
   });
 
-  // Create workbook and worksheet
-  const worksheet = XLSX.utils.json_to_sheet(excelData);
-  const workbook = XLSX.utils.book_new();
+  // ── Construcción de la hoja "PXQ " (estructura fija de la plantilla) ──
+  // Filas 1–5: caja IPC/TRM y notas. Fila 6: encabezados. Fila 7+: datos.
+  const aoa: any[][] = [[], [], [], [], [], HEADERS_PXQ, ...excelRows];
+  const worksheet = XLSX.utils.aoa_to_sheet(aoa);
 
-  // Enhance cell formatting and styles
-  const keys = Object.keys(excelData[0]);
-  const range = XLSX.utils.decode_range(worksheet['!ref'] || 'A1:A1');
-  
-  for (let R = range.s.r; R <= range.e.r; ++R) {
-    for (let C = range.s.c; C <= range.e.c; ++C) {
-      const cellAddress = XLSX.utils.encode_cell({ r: R, c: C });
-      if (!worksheet[cellAddress]) continue;
+  const setCell = (addr: string, v: any, t: 'n' | 's', s: any, z?: string) => {
+    worksheet[addr] = { v, t, s, ...(z ? { z } : {}) };
+  };
 
-      const isHeader = R === 0;
-      const columnName = keys[C];
-      const isCurrency = columnName && (columnName.includes("Precio") || columnName.includes("Total"));
+  // Caja IPC / TRM (M3:N4): naranja con borde medio alrededor.
+  const FILL_NARANJA = { patternType: 'solid', fgColor: { rgb: 'FFC000' } };
+  const medium = { style: 'medium', color: { auto: 1 } } as const;
+  setCell('M3', 'IPC', 's', { font: FONT_DATA, fill: FILL_NARANJA, border: { left: medium, top: medium } });
+  setCell('N3', 1.038, 'n', { font: FONT_DATA, fill: FILL_NARANJA, border: { right: medium, top: medium } });
+  setCell('M4', 'TRM', 's', { font: FONT_DATA, fill: FILL_NARANJA, border: { left: medium, bottom: medium } });
+  setCell('N4', 4150, 'n', { font: FONT_DATA, fill: FILL_NARANJA, border: { right: medium, bottom: medium } });
 
-      if (isCurrency && !isHeader) {
-        worksheet[cellAddress].z = '"$"#,##0.00'; // Formato moneda colombiana
-      }
+  // Notas de la fila 5 (celdas combinadas N5:Y5 y AL5:AX5).
+  const FILL_BLANCO = { patternType: 'solid', fgColor: { rgb: 'FFFFFF' } };
+  const bordeInferior = { bottom: { style: 'thin', color: { auto: 1 } } };
+  const notaPreciosStyle = {
+    font: { italic: true, sz: 11, color: { rgb: '0070C0' }, name: 'Aptos Narrow' },
+    fill: FILL_BLANCO, border: bordeInferior, alignment: { horizontal: 'center' },
+  };
+  const notaTotalesStyle = {
+    font: { bold: true, sz: 11, color: { rgb: 'FF0000' }, name: 'Aptos Narrow' },
+    fill: FILL_BLANCO, border: bordeInferior, alignment: { horizontal: 'center' },
+  };
+  setCell('N5', 'Los precios deben incluir IVA, así mismo proyectar los reajustes de IPC y tarifas de acuerdo con la fecha que aplique a cada contrato', 's', notaPreciosStyle);
+  for (let c = 14; c <= 24; c++) setCell(XLSX.utils.encode_cell({ r: 4, c }), '', 's', { fill: FILL_BLANCO, border: bordeInferior });
+  setCell('AL5', 'Casillas formuladas (Precio x Cantidad)', 's', notaTotalesStyle);
+  for (let c = 38; c <= 49; c++) setCell(XLSX.utils.encode_cell({ r: 4, c }), '', 's', { fill: FILL_BLANCO, border: bordeInferior });
+  worksheet['!merges'] = [
+    { s: { r: 4, c: 13 }, e: { r: 4, c: 24 } },   // N5:Y5
+    { s: { r: 4, c: 37 }, e: { r: 4, c: 49 } },   // AL5:AX5
+  ];
 
-      worksheet[cellAddress].s = {
-        font: {
-          bold: isHeader,
-          color: isHeader ? { rgb: "FFFFFF" } : { rgb: "000000" },
-          name: "Calibri",
-          sz: 11
-        },
-        fill: isHeader ? { fgColor: { rgb: "00B050" } } : undefined, // Header color: verde standard (00B050)
-        border: {
-          top: { style: 'thin', color: { auto: 1 } },
-          bottom: { style: 'thin', color: { auto: 1 } },
-          left: { style: 'thin', color: { auto: 1 } },
-          right: { style: 'thin', color: { auto: 1 } }
-        },
-        alignment: {
-          vertical: "center",
-          horizontal: isHeader || columnName?.includes("Cantidad") ? "center" : (isCurrency ? "right" : "left"),
-          wrapText: true
-        }
-      };
+  // Estilos de encabezados (fila 6) y datos (filas 7+).
+  for (let c = 0; c < HEADERS_PXQ.length; c++) {
+    const headerAddr = XLSX.utils.encode_cell({ r: 5, c });
+    if (worksheet[headerAddr]) worksheet[headerAddr].s = headerStyleFor(c);
+
+    const dataStyle = dataStyleFor(c);
+    for (let r = 0; r < excelRows.length; r++) {
+      const addr = XLSX.utils.encode_cell({ r: 6 + r, c });
+      if (!worksheet[addr]) worksheet[addr] = { v: '', t: 's' };
+      worksheet[addr].s = dataStyle;
+      if (dataStyle.numFmt) worksheet[addr].z = dataStyle.numFmt;
+      if (c === 10 && worksheet[addr].v instanceof Date) worksheet[addr].z = 'm/d/yy';
     }
   }
 
-  const defaultWidth = { wch: 18 };
-  const largeWidth = { wch: 35 };
-  worksheet['!cols'] = keys.map(k => k.includes("Objeto") || k.includes("Descripción") || k.includes("Proceso") ? largeWidth : defaultWidth);
+  worksheet['!cols'] = COL_WIDTHS_PXQ.map(w => (w == null ? ({} as any) : { wch: w }));
+  worksheet['!rows'] = [{ hpt: 15 }, { hpt: 15 }, { hpt: 15 }, { hpt: 15 }, { hpt: 15 }, { hpt: 43.5 }];
+  worksheet['!ref'] = XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: 5 + excelRows.length, c: HEADERS_PXQ.length - 1 } });
 
-  XLSX.utils.book_append_sheet(workbook, worksheet, "Plantilla OPEX");
-
-  // Export
-  XLSX.writeFile(workbook, "Plantilla_OPEX_Exportada.xlsx");
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, worksheet, 'PXQ ');
+  XLSX.writeFile(workbook, 'Plantilla_OPEX_Exportada.xlsx', { cellDates: true });
 };
 
 // ── Internal detail export ────────────────────────────────────
