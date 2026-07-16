@@ -100,7 +100,8 @@ export const exportOpexToExcel = (actividades: ActividadAmbiental[]) => {
   }
 
   // Una fila (arreglo de 51 columnas, A–AY) por actividad, según la plantilla PXQ.
-  const excelRows = opexActivities.map(item => {
+  // Servicios E e ICAs se desglosan: una fila por cada ítem de la planeación.
+  const excelRows = opexActivities.flatMap(item => {
     const opx = parseOpex(item.opexDataRaw);
 
     // Factores IVA (por ítem) e IPC (por mes) guardados en la planeación.
@@ -165,43 +166,104 @@ export const exportOpexToExcel = (actividades: ActividadAmbiental[]) => {
       return { precio, cantidad, total };
     };
 
-    const mesesData = MESES_LABEL.map(m => getMonthData(m));
-    const totalAnio1 = mesesData.reduce((s, d) => s + d.total, 0);
+    // Datos mensuales de UN solo ítem (para el desglose de Servicios E / ICAs).
+    const getMonthDataForItem = (mesNombre: string, itemKey: string) => {
+      const match = opx.meses?.find((m: any) => m.mes.toLowerCase() === mesNombre.toLowerCase());
+      const mesIndex = MESES_LABEL.findIndex(m => m.toLowerCase() === mesNombre.toLowerCase());
+      const entry = (Array.isArray(match?.preciosIndividuales) ? match.preciosIndividuales : [])
+        .find((p: any) => p.key === itemKey);
+      if (!entry) return { precio: 0, cantidad: 0, total: 0 };
 
-    // Tarifa base (col M): precio unitario del primer mes con datos.
-    const primerMesConDatos = mesesData.find(d => d.total > 0);
-    const tarifaBase = primerMesConDatos ? primerMesConDatos.precio : 0;
+      const cant = Number(entry.cantidad) || 0;
+      const frec = Number(entry.frecuencia) || 1;
+      const precioBase = Number(entry.precio) || 0;
+      const totalGuardado = Number(entry.total) || 0;
+
+      let total: number;
+      let cantidad = cant;
+      if (cant > 0 && precioBase > 0) {
+        total = precioBase * cant * frec * ivaFactorFor(entry) * ipcFactorFor(mesIndex);
+      } else {
+        // Diferidos (cantidad 0) o sin precio digitado: usar el total guardado.
+        total = totalGuardado;
+      }
+      if (cantidad === 0 && total > 0) cantidad = 1;
+      const precio = cantidad > 0 ? total / cantidad : 0;
+      return { precio, cantidad, total };
+    };
+
+    const anioPlaneacion = Number((item as any).anioPlaneacion || opx.anioPlaneacion) || 0;
 
     // Ajuste tarifario (cols J/K): IPC configurado en la planeación.
     const ipcActivo = !!opx.ipcGlobalActivo && (opx.ipcGlobalPorcentaje ?? 0) > 0
       && Array.isArray(opx.ipcMeses) && opx.ipcMeses.length > 0;
     let fechaAjuste: Date | '' = '';
     if (ipcActivo) {
-      const anio = Number((item as any).anioPlaneacion || opx.anioPlaneacion) || new Date().getFullYear();
+      const anio = anioPlaneacion || new Date().getFullYear();
       // Mediodía para que la conversión a serial de Excel no corra el día por zona horaria.
       fechaAjuste = new Date(anio, Math.min(...(opx.ipcMeses as number[])), 1, 12);
     }
 
-    return [
-      opx.contrato || item.contrato || '',                        // A  Contrato
-      opx.proveedor || '',                                        // B  Contratista
-      opx.necesidad || '',                                        // C  Necesidad
-      opx.subnecesidad || '',                                     // D  Subnecesidad
-      item.lineaOperativa || '',                                  // E  Item
-      opx.zona || item.zona || '',                                // F  Zona
-      item.estacion || opx.pk || '',                              // G  Estación / Línea
-      '',                                                         // H  Orden Interna
-      '',                                                         // I  Cuenta Contable
-      ipcActivo ? 'SI' : 'NO',                                    // J  Aplica Ajuste Tarifario
-      fechaAjuste,                                                // K  Fecha del Ajuste Tarifario
-      'NO',                                                       // L  Reajuste tablas salariales
-      tarifaBase,                                                 // M  Tarifas 2026
-      ...mesesData.map(d => d.precio),                            // N–Y  Precios
-      ...mesesData.map(d => d.cantidad),                          // Z–AK Cantidades
-      ...mesesData.map(d => d.total),                             // AL–AW Totales
-      totalAnio1 || item.presupuestoPlan || 0,                    // AX Total año 1
-      opx.descripcionNecesidad || '',                             // AY Observaciones
-    ];
+    // Contrato/Contratista. Para ICAs se asignan por año de planeación:
+    // 2026 → ESTUDIOS TECNICOS SAS (cto. 8000008649); 2027+ → Nuevo contrato (cto. 000).
+    const esIcas = item.lineaOperativa === 'ICAs';
+    const contrato = esIcas
+      ? (anioPlaneacion === 2026 ? '8000008649' : '000')
+      : (opx.contrato || item.contrato || '');
+    const contratista = esIcas
+      ? (anioPlaneacion === 2026 ? 'ESTUDIOS TECNICOS SAS' : 'Nuevo contrato')
+      : (opx.proveedor || '');
+
+    const buildRow = (nombreItem: string, mesesData: { precio: number; cantidad: number; total: number }[]) => {
+      const totalAnio1 = mesesData.reduce((s, d) => s + d.total, 0);
+      // Tarifa base (col M): precio unitario del primer mes con datos.
+      const primerMesConDatos = mesesData.find(d => d.total > 0);
+      const tarifaBase = primerMesConDatos ? primerMesConDatos.precio : 0;
+      return [
+        contrato,                                                 // A  Contrato
+        contratista,                                              // B  Contratista
+        opx.necesidad || '',                                      // C  Necesidad
+        opx.subnecesidad || '',                                   // D  Subnecesidad
+        nombreItem,                                               // E  Item
+        opx.zona || item.zona || '',                              // F  Zona
+        item.estacion || opx.pk || '',                            // G  Estación / Línea
+        '',                                                       // H  Orden Interna
+        '',                                                       // I  Cuenta Contable
+        ipcActivo ? 'SI' : 'NO',                                  // J  Aplica Ajuste Tarifario
+        fechaAjuste,                                              // K  Fecha del Ajuste Tarifario
+        'NO',                                                     // L  Reajuste tablas salariales
+        tarifaBase,                                               // M  Tarifas 2026
+        ...mesesData.map(d => d.precio),                          // N–Y  Precios
+        ...mesesData.map(d => d.cantidad),                        // Z–AK Cantidades
+        ...mesesData.map(d => d.total),                           // AL–AW Totales
+        totalAnio1,                                               // AX Total año 1
+        opx.descripcionNecesidad || '',                           // AY Observaciones
+      ];
+    };
+
+    // Servicios E e ICAs: una fila por ítem, con su cantidad/precio/total mensual.
+    const conDesglose = item.lineaOperativa === 'Servicios E' || esIcas;
+    if (conDesglose) {
+      // Unión de todos los ítems presentes en cualquier mes (nombre del primero encontrado).
+      const itemsUnicos = new Map<string, string>();
+      for (const mes of (opx.meses ?? []) as any[]) {
+        for (const p of (Array.isArray(mes?.preciosIndividuales) ? mes.preciosIndividuales : [])) {
+          if (p?.key && !itemsUnicos.has(p.key)) itemsUnicos.set(p.key, String(p.nombre ?? p.key));
+        }
+      }
+      if (itemsUnicos.size > 0) {
+        return [...itemsUnicos.entries()].map(([key, nombre]) =>
+          buildRow(nombre, MESES_LABEL.map(m => getMonthDataForItem(m, key))),
+        );
+      }
+      // Sin desglose guardado: cae a la fila única por actividad.
+    }
+
+    const mesesData = MESES_LABEL.map(m => getMonthData(m));
+    const fila = buildRow(item.lineaOperativa || '', mesesData);
+    // Respaldo del total anual con el presupuesto guardado (solo fila única).
+    if (!fila[49]) fila[49] = item.presupuestoPlan || 0;
+    return [fila];
   });
 
   // ── Construcción de la hoja "PXQ " (estructura fija de la plantilla) ──
