@@ -214,14 +214,33 @@ export const exportOpexToExcel = (actividades: ActividadAmbiental[]) => {
       ? (anioPlaneacion === 2026 ? 'ESTUDIOS TECNICOS SAS' : 'Nuevo contrato')
       : (opx.proveedor || '');
 
-    const buildRow = (nombreItem: string, mesesData: { precio: number; cantidad: number; total: number }[]) => {
+    // Contratista/contrato de un ítem ICAs: primero lo etiquetado en el JSON
+    // (campos contratista/contrato del ítem), luego la vigencia en el key/nombre
+    // (ICA 2026 → ESTUDIOS TECNICOS SAS; ICA 2027 → Nuevo contrato) y por último
+    // el proveedor/contrato propio de la planeación (ítems custom, p. ej. SGS).
+    const contratoPorItem = (key: string, nombre: string, entry: any): { contrato: string; contratista: string } => {
+      if (entry?.contratista || entry?.contrato) {
+        return { contratista: entry.contratista || contratista, contrato: entry.contrato || contrato };
+      }
+      const texto = `${key} ${nombre}`;
+      if (/ICA[ -]?2026/i.test(texto)) return { contratista: 'ESTUDIOS TECNICOS SAS', contrato: '8000008649' };
+      if (/ICA[ -]?2027/i.test(texto)) return { contratista: 'Nuevo contrato', contrato: '000' };
+      return { contratista: opx.proveedor || contratista, contrato: opx.contrato || item.contrato || contrato };
+    };
+
+    const buildRow = (
+      nombreItem: string,
+      mesesData: { precio: number; cantidad: number; total: number }[],
+      contratoRow = contrato,
+      contratistaRow = contratista,
+    ) => {
       const totalAnio1 = mesesData.reduce((s, d) => s + d.total, 0);
       // Tarifa base (col M): precio unitario del primer mes con datos.
       const primerMesConDatos = mesesData.find(d => d.total > 0);
       const tarifaBase = primerMesConDatos ? primerMesConDatos.precio : 0;
       return [
-        contrato,                                                 // A  Contrato
-        contratista,                                              // B  Contratista
+        contratoRow,                                              // A  Contrato
+        contratistaRow,                                           // B  Contratista
         opx.necesidad || '',                                      // C  Necesidad
         opx.subnecesidad || '',                                   // D  Subnecesidad
         nombreItem,                                               // E  Item
@@ -244,17 +263,20 @@ export const exportOpexToExcel = (actividades: ActividadAmbiental[]) => {
     // Servicios E e ICAs: una fila por ítem, con su cantidad/precio/total mensual.
     const conDesglose = item.lineaOperativa === 'Servicios E' || esIcas;
     if (conDesglose) {
-      // Unión de todos los ítems presentes en cualquier mes (nombre del primero encontrado).
-      const itemsUnicos = new Map<string, string>();
+      // Unión de todos los ítems presentes en cualquier mes (primer registro encontrado).
+      const itemsUnicos = new Map<string, { nombre: string; entry: any }>();
       for (const mes of (opx.meses ?? []) as any[]) {
         for (const p of (Array.isArray(mes?.preciosIndividuales) ? mes.preciosIndividuales : [])) {
-          if (p?.key && !itemsUnicos.has(p.key)) itemsUnicos.set(p.key, String(p.nombre ?? p.key));
+          if (p?.key && !itemsUnicos.has(p.key)) itemsUnicos.set(p.key, { nombre: String(p.nombre ?? p.key), entry: p });
         }
       }
       if (itemsUnicos.size > 0) {
-        return [...itemsUnicos.entries()].map(([key, nombre]) =>
-          buildRow(nombre, MESES_LABEL.map(m => getMonthDataForItem(m, key))),
-        );
+        return [...itemsUnicos.entries()].map(([key, { nombre, entry }]) => {
+          const asignacion = esIcas
+            ? contratoPorItem(key, nombre, entry)
+            : { contrato, contratista };
+          return buildRow(nombre, MESES_LABEL.map(m => getMonthDataForItem(m, key)), asignacion.contrato, asignacion.contratista);
+        });
       }
       // Sin desglose guardado: cae a la fila única por actividad.
     }
