@@ -1,5 +1,5 @@
 import React from 'react';
-import { makeStyles, shorthands, Button } from '@fluentui/react-components';
+import { makeStyles, shorthands, mergeClasses, Button } from '@fluentui/react-components';
 import { ArrowRight16Regular } from '@fluentui/react-icons';
 import { CENIT_COLORS } from '../../theme/cenitTheme';
 
@@ -66,6 +66,32 @@ const useStyles = makeStyles({
         marginBottom: '16px',
         maxWidth: '90%',
     },
+    cardDisabled: {
+        cursor: 'default',
+        ':hover': {
+            transform: 'none',
+            boxShadow: CENIT_COLORS.cardShadow,
+            '& .bgImage': {
+                transform: 'none',
+            },
+        },
+    },
+    badge: {
+        position: 'absolute',
+        top: '20px',
+        right: '20px',
+        zIndex: 3,
+        fontSize: '11px',
+        fontWeight: '700',
+        letterSpacing: '0.06em',
+        textTransform: 'uppercase',
+        color: 'white',
+        backgroundColor: 'rgba(255,255,255,0.18)',
+        backdropFilter: 'blur(6px)',
+        ...shorthands.padding('5px', '12px'),
+        borderRadius: '20px',
+        ...shorthands.border('1px', 'solid', 'rgba(255,255,255,0.35)'),
+    },
     button: {
         backgroundColor: CENIT_COLORS.green,
         color: '#0033A0', // Text color matching the brand blue for contrast on green
@@ -88,6 +114,10 @@ interface FeatureCardProps {
     gradient?: string;
     actionLabel?: string;
     onClick?: () => void;
+    /** Tarjeta placeholder: sin acción, sin hover-lift */
+    disabled?: boolean;
+    /** Chip superior derecho, p.ej. "Próximamente" */
+    badge?: string;
 }
 
 export const FeatureCard: React.FC<FeatureCardProps> = ({
@@ -96,14 +126,20 @@ export const FeatureCard: React.FC<FeatureCardProps> = ({
     imageUrl,
     gradient,
     actionLabel = 'Ver más',
-    onClick
+    onClick,
+    disabled = false,
+    badge,
 }) => {
     const styles = useStyles();
 
     const [imgError, setImgError] = React.useState(false);
 
     return (
-        <div className={styles.card} onClick={onClick}>
+        <div
+            className={mergeClasses(styles.card, disabled && styles.cardDisabled)}
+            onClick={disabled ? undefined : onClick}
+        >
+            {badge && <span className={styles.badge}>{badge}</span>}
             {/* Si tenemos imagen y no ha fallado, la mostramos. Si falla, mostramos el div con gradiente */}
             {!imgError && imageUrl ? (
                 <img
@@ -125,13 +161,15 @@ export const FeatureCard: React.FC<FeatureCardProps> = ({
             <div className={styles.content}>
                 <span className={styles.title}>{title}</span>
                 <span className={styles.description}>{description}</span>
-                <Button
-                    className={styles.button}
-                    icon={<ArrowRight16Regular />}
-                    iconPosition="after"
-                >
-                    {actionLabel}
-                </Button>
+                {!disabled && (
+                    <Button
+                        className={styles.button}
+                        icon={<ArrowRight16Regular />}
+                        iconPosition="after"
+                    >
+                        {actionLabel}
+                    </Button>
+                )}
             </div>
         </div>
     );

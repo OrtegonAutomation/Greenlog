@@ -23,6 +23,11 @@ import {
   DismissCircleRegular,
   ClipboardTaskRegular,
   ShieldPersonRegular,
+  ChevronDownRegular,
+  AlertUrgentRegular,
+  DropRegular,
+  DeleteRegular,
+  WarningRegular,
 } from '@fluentui/react-icons';
 import { SeccionApp } from '../../types';
 import { Dashboard } from '../Dashboard/Dashboard';
@@ -176,6 +181,45 @@ const useStyles = makeStyles({
       width: '3px',
       borderRadius: '0 4px 4px 0',
       background: CENIT_COLORS.green,
+    },
+  },
+  navGroupHeaderActive: {
+    color: '#fff',
+    fontWeight: '600',
+  },
+  navChevron: {
+    flexShrink: 0,
+    fontSize: '14px',
+    color: 'rgba(255,255,255,0.45)',
+    transition: 'transform 0.25s cubic-bezier(0.16,1,0.3,1)',
+  },
+  navChevronOpen: {
+    transform: 'rotate(180deg)',
+  },
+  navGroupChildren: {
+    display: 'flex',
+    flexDirection: 'column',
+    ...shorthands.gap('2px'),
+    paddingLeft: '14px',
+    overflow: 'hidden',
+    animationName: {
+      from: { opacity: '0', transform: 'translateY(-6px)' },
+      to: { opacity: '1', transform: 'translateY(0)' },
+    },
+    animationDuration: '0.22s',
+    animationFillMode: 'both',
+  },
+  navChild: {
+    ...shorthands.padding('8px', '12px'),
+    fontSize: '13px',
+  },
+  navChildDisabled: {
+    cursor: 'default',
+    color: 'rgba(255,255,255,0.32)',
+    ':hover': {
+      background: 'transparent',
+      color: 'rgba(255,255,255,0.32)',
+      transform: 'none',
     },
   },
   navIcon: { flexShrink: 0, fontSize: '19px', color: 'inherit' },
@@ -477,12 +521,43 @@ const useStyles = makeStyles({
 // ── Items de navegación ───────────────────────────────────────
 interface NavItemDef { id: SeccionApp; label: string; icon: React.ReactNode; badge?: string; }
 
-const NAV_ITEMS: NavItemDef[] = [
-  { id: 'dashboard', label: 'Inicio', icon: <GridRegular /> },
-  { id: 'planeacion', label: 'Planeación', icon: <CalendarLtrRegular /> },
-  { id: 'ejecucion', label: 'Ejecución', icon: <PlayCircleRegular /> },
-  { id: 'reportes', label: 'Reportes', icon: <DataBarVerticalRegular /> },
-  { id: 'administracion', label: 'Administración', icon: <ShieldPersonRegular /> },
+// Hijos de un grupo: con `seccion` navegan; sin ella son placeholders de Fase 2.
+interface NavChildDef {
+  id: string;
+  seccion?: SeccionApp;
+  label: string;
+  icon: React.ReactNode;
+  disabled?: boolean;
+}
+type NavEntryDef =
+  | ({ kind: 'item' } & NavItemDef)
+  | { kind: 'group'; id: string; label: string; icon: React.ReactNode; children: NavChildDef[] };
+
+const NAV_ENTRIES: NavEntryDef[] = [
+  { kind: 'item', id: 'dashboard', label: 'Inicio', icon: <GridRegular /> },
+  {
+    kind: 'group',
+    id: 'presupuestal',
+    label: 'Planeación Presupuestal',
+    icon: <CalendarLtrRegular />,
+    children: [
+      { id: 'planeacion', seccion: 'planeacion', label: 'Planeación', icon: <CalendarLtrRegular /> },
+      { id: 'ejecucion', seccion: 'ejecucion', label: 'Ejecución', icon: <PlayCircleRegular /> },
+      { id: 'reportes', seccion: 'reportes', label: 'Reportes', icon: <DataBarVerticalRegular /> },
+    ],
+  },
+  {
+    kind: 'group',
+    id: 'eventos',
+    label: 'Eventos Ambientales',
+    icon: <AlertUrgentRegular />,
+    children: [
+      { id: 'aguas', label: 'Aguas', icon: <DropRegular />, disabled: true },
+      { id: 'residuos', label: 'Residuos', icon: <DeleteRegular />, disabled: true },
+      { id: 'contingencias', label: 'Contingencias', icon: <WarningRegular />, disabled: true },
+    ],
+  },
+  { kind: 'item', id: 'administracion', label: 'Administración', icon: <ShieldPersonRegular /> },
 ];
 
 const BREADCRUMBS: Record<SeccionApp, string> = {
@@ -615,11 +690,41 @@ export const AppShell: React.FC<AppShellProps> = ({ onBack }) => {
   // solo-visualización a Planeación).
   const esVisor = !!currentUser?.visor && !isAdmin;
   const puedeVerPlaneacion = !esVisor || !!currentUser?.verPlaneacion;
-  const navItems = NAV_ITEMS.filter(item => {
-    if (item.id === 'ejecucion' || item.id === 'administracion') return isAdmin;
-    if (item.id === 'planeacion') return puedeVerPlaneacion;
+  const puedeVerSeccion = (id: SeccionApp) => {
+    if (id === 'ejecucion' || id === 'administracion') return isAdmin;
+    if (id === 'planeacion') return puedeVerPlaneacion;
     return true;
+  };
+  const navEntries = NAV_ENTRIES.flatMap<NavEntryDef>(entry => {
+    if (entry.kind === 'item') return puedeVerSeccion(entry.id) ? [entry] : [];
+    const children = entry.children.filter(c => !c.seccion || puedeVerSeccion(c.seccion));
+    return children.length > 0 ? [{ ...entry, children }] : [];
   });
+
+  // Grupos desplegados; el grupo de la sección activa inicia abierto.
+  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>(() => {
+    // Presupuestal abierto por defecto: es la sección principal hoy y el tour
+    // guiado apunta a sus ítems (#nav-planeacion, #nav-reportes…).
+    const initial: Record<string, boolean> = { presupuestal: true };
+    const current = getSectionFromPath() ?? 'dashboard';
+    for (const entry of NAV_ENTRIES) {
+      if (entry.kind === 'group' && entry.children.some(c => c.seccion === current)) {
+        initial[entry.id] = true;
+      }
+    }
+    return initial;
+  });
+  const toggleGroup = (id: string) =>
+    setExpandedGroups(prev => ({ ...prev, [id]: !prev[id] }));
+
+  // Al navegar (tarjetas de Inicio, deep-links…), abrir el grupo de la sección destino.
+  useEffect(() => {
+    for (const entry of NAV_ENTRIES) {
+      if (entry.kind === 'group' && entry.children.some(c => c.seccion === seccion)) {
+        setExpandedGroups(prev => (prev[entry.id] ? prev : { ...prev, [entry.id]: true }));
+      }
+    }
+  }, [seccion]);
 
   const navigateSection = useCallback((next: SeccionApp, replace = false) => {
     setSeccion(next);
@@ -763,26 +868,87 @@ export const AppShell: React.FC<AppShellProps> = ({ onBack }) => {
 
         {/* Navigation */}
         <nav className={styles.nav}>
-          {navItems.map((item) => {
-            const active = seccion === item.id;
+          {navEntries.map((entry) => {
+            if (entry.kind === 'item') {
+              const active = seccion === entry.id;
+              return (
+                <div
+                  key={entry.id}
+                  id={`nav-${entry.id}`}
+                  className={mergeClasses(styles.navItem, active && styles.navItemActive)}
+                  onClick={() => navigateSection(entry.id)}
+                  role="button"
+                  tabIndex={0}
+                >
+                  <span className={styles.navIcon}>{entry.icon}</span>
+                  {!collapsed && (
+                    <>
+                      <span className={styles.navLabel}>{entry.label}</span>
+                      {entry.badge && <span className={styles.navBadge}>{entry.badge}</span>}
+                    </>
+                  )}
+                  {active && <div className={styles.activeIndicator} />}
+                </div>
+              );
+            }
+
+            const groupActive = entry.children.some(c => c.seccion === seccion);
+            const open = !!expandedGroups[entry.id];
             return (
-              <div
-                key={item.id}
-                id={`nav-${item.id}`}
-                className={mergeClasses(styles.navItem, active && styles.navItemActive)}
-                onClick={() => navigateSection(item.id)}
-                role="button"
-                tabIndex={0}
-              >
-                <span className={styles.navIcon}>{item.icon}</span>
-                {!collapsed && (
-                  <>
-                    <span className={styles.navLabel}>{item.label}</span>
-                    {item.badge && <span className={styles.navBadge}>{item.badge}</span>}
-                  </>
+              <React.Fragment key={entry.id}>
+                <div
+                  id={`nav-group-${entry.id}`}
+                  className={mergeClasses(styles.navItem, groupActive && styles.navGroupHeaderActive)}
+                  onClick={() => toggleGroup(entry.id)}
+                  role="button"
+                  tabIndex={0}
+                  aria-expanded={open}
+                >
+                  <span className={styles.navIcon}>{entry.icon}</span>
+                  {!collapsed && (
+                    <>
+                      <span className={styles.navLabel}>{entry.label}</span>
+                      <span className={mergeClasses(styles.navChevron, open && styles.navChevronOpen)}>
+                        <ChevronDownRegular />
+                      </span>
+                    </>
+                  )}
+                  {groupActive && <div className={styles.activeIndicator} />}
+                </div>
+                {!collapsed && open && (
+                  <div className={styles.navGroupChildren}>
+                    {entry.children.map(child => {
+                      const childActive = !!child.seccion && seccion === child.seccion;
+                      const item = (
+                        <div
+                          key={child.id}
+                          id={`nav-${child.id}`}
+                          className={mergeClasses(
+                            styles.navItem,
+                            styles.navChild,
+                            childActive && styles.navItemActive,
+                            child.disabled && styles.navChildDisabled,
+                          )}
+                          onClick={child.seccion ? () => navigateSection(child.seccion!) : undefined}
+                          role="button"
+                          tabIndex={child.disabled ? -1 : 0}
+                          aria-disabled={child.disabled}
+                        >
+                          <span className={styles.navIcon}>{child.icon}</span>
+                          <span className={styles.navLabel}>{child.label}</span>
+                          {child.disabled && <span className={styles.navBadge}>Pronto</span>}
+                          {childActive && <div className={styles.activeIndicator} />}
+                        </div>
+                      );
+                      return child.disabled ? (
+                        <Tooltip key={child.id} content="Próximamente — Fase 2" relationship="description">
+                          {item}
+                        </Tooltip>
+                      ) : item;
+                    })}
+                  </div>
                 )}
-                {active && <div className={styles.activeIndicator} />}
-              </div>
+              </React.Fragment>
             );
           })}
         </nav>

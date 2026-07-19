@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   makeStyles, shorthands, tokens,
   Title1, Title3, Body1, Caption1,
@@ -6,6 +6,7 @@ import {
 } from '@fluentui/react-components';
 import {
   ArrowRight24Regular,
+  ArrowLeft16Regular,
 } from '@fluentui/react-icons';
 import { useActividades } from '../../hooks/useActividades';
 import { useAuth } from '../../auth/AuthContext';
@@ -128,6 +129,23 @@ const useStyles = makeStyles({
     gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
     gap: '24px',
     [MEDIA.mobile]: { gridTemplateColumns: '1fr', gap: '14px' },
+    animationName: {
+      from: { opacity: '0', transform: 'translateY(12px)' },
+      to: { opacity: '1', transform: 'translateY(0)' },
+    },
+    animationDuration: '0.35s',
+    animationFillMode: 'both',
+    animationTimingFunction: 'cubic-bezier(0.16,1,0.3,1)',
+  },
+  sectionTitleRow: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '16px',
+    flexWrap: 'wrap',
+  },
+  backButton: {
+    borderRadius: '20px',
+    fontWeight: '600',
   },
 
   // Footer / Certifications
@@ -172,6 +190,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
   const { actividades } = useActividades();
   const { currentUser, isAdmin } = useAuth();
   const esVisor = !!currentUser?.visor && !isAdmin;
+  // Sección expandida en "Nuestros Módulos" (null = vista de secciones)
+  const [seccionAbierta, setSeccionAbierta] = useState<'presupuestal' | 'eventos' | null>(null);
 
   // KPIs con datos reales de la planeación 2027 (misma fuente que Reportes).
   const stats = useMemo(() => {
@@ -244,49 +264,119 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
         />
       </div>
 
-      {/* Modules Grid (según el rol del usuario) */}
+      {/* Modules Grid: dos secciones (Planeación Presupuestal / Eventos
+          Ambientales) que al hacer click se expanden a sus módulos */}
       <div className={styles.modulesSection}>
-        <Title1 className={styles.sectionTitle}>Nuestros Módulos</Title1>
-        <div className={styles.modulesGrid}>
-          {(!esVisor || currentUser?.verPlaneacion) && (
+        <div className={styles.sectionTitleRow}>
+          {seccionAbierta !== null && (
+            <Button
+              className={styles.backButton}
+              appearance="outline"
+              icon={<ArrowLeft16Regular />}
+              onClick={() => setSeccionAbierta(null)}
+            >
+              Volver
+            </Button>
+          )}
+          <Title1 className={styles.sectionTitle}>
+            {seccionAbierta === 'presupuestal' ? 'Planeación Presupuestal'
+              : seccionAbierta === 'eventos' ? 'Eventos Ambientales'
+              : 'Nuestros Módulos'}
+          </Title1>
+        </div>
+
+        {seccionAbierta === null && (
+          <div className={styles.modulesGrid} key="secciones">
             <FeatureCard
-              title="Planeación Ambiental"
-              description="Gestiona y programa las actividades de mantenimiento y control ambiental."
-              actionLabel="Ver Planeación"
+              title="Planeación Presupuestal"
+              description="Planeación, ejecución y reportes del presupuesto ambiental."
+              actionLabel="Ver módulos"
               imageUrl="https://images.unsplash.com/photo-1542601906990-b4d3fb778b09?q=80&w=2626&auto=format&fit=crop"
               gradient="linear-gradient(135deg, #16a34a 0%, #059669 100%)"
-              onClick={() => onNavigate('planeacion')}
+              onClick={() => setSeccionAbierta('presupuestal')}
             />
-          )}
-          {isAdmin && (
             <FeatureCard
-              title="Ejecución y Seguimiento"
-              description="Monitoreo en tiempo real del avance en campo y cumplimiento de metas."
-              actionLabel="Ver Ejecución"
-              imageUrl="https://sinnaps.com/wp-content/uploads/2017/09/dc1pt-pxsaqkcn_.jpg-large.jpg"
-              gradient="linear-gradient(135deg, #0056D2 0%, #0033A0 100%)"
-              onClick={() => onNavigate('ejecucion')}
+              title="Eventos Ambientales"
+              description="Gestión de aguas, residuos y contingencias ambientales."
+              actionLabel="Ver módulos"
+              imageUrl="https://images.unsplash.com/photo-1500534314209-a25ddb2bd429?q=80&w=2670&auto=format&fit=crop"
+              gradient="linear-gradient(135deg, #0d9488 0%, #0e7490 100%)"
+              onClick={() => setSeccionAbierta('eventos')}
             />
-          )}
-          <FeatureCard
-            title="Reportes e Indicadores"
-            description="Análisis detallado de KPIs, cumplimiento normativo y estadísticas."
-            actionLabel="Ver Reportes"
-            imageUrl="https://images.unsplash.com/photo-1551288049-bebda4e38f71?q=80&w=2670&auto=format&fit=crop"
-            gradient="linear-gradient(135deg, #002266 0%, #172554 100%)"
-            onClick={() => onNavigate('reportes')}
-          />
-          {isAdmin && (
+            {isAdmin && (
+              <FeatureCard
+                title="Administración"
+                description="Congela la matriz financiera y gestiona usuarios, roles y permisos por zona."
+                actionLabel="Ver Administración"
+                imageUrl="https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?q=80&w=2670&auto=format&fit=crop"
+                gradient="linear-gradient(135deg, #5b3fd6 0%, #3b2a8f 100%)"
+                onClick={() => onNavigate('administracion')}
+              />
+            )}
+          </div>
+        )}
+
+        {seccionAbierta === 'presupuestal' && (
+          <div className={styles.modulesGrid} key="presupuestal">
+            {(!esVisor || currentUser?.verPlaneacion) && (
+              <FeatureCard
+                title="Planeación Ambiental"
+                description="Gestiona y programa las actividades de mantenimiento y control ambiental."
+                actionLabel="Ver Planeación"
+                imageUrl="https://images.unsplash.com/photo-1542601906990-b4d3fb778b09?q=80&w=2626&auto=format&fit=crop"
+                gradient="linear-gradient(135deg, #16a34a 0%, #059669 100%)"
+                onClick={() => onNavigate('planeacion')}
+              />
+            )}
+            {isAdmin && (
+              <FeatureCard
+                title="Ejecución y Seguimiento"
+                description="Monitoreo en tiempo real del avance en campo y cumplimiento de metas."
+                actionLabel="Ver Ejecución"
+                imageUrl="https://sinnaps.com/wp-content/uploads/2017/09/dc1pt-pxsaqkcn_.jpg-large.jpg"
+                gradient="linear-gradient(135deg, #0056D2 0%, #0033A0 100%)"
+                onClick={() => onNavigate('ejecucion')}
+              />
+            )}
             <FeatureCard
-              title="Administración"
-              description="Congela la matriz financiera y gestiona usuarios, roles y permisos por zona."
-              actionLabel="Ver Administración"
-              imageUrl="https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?q=80&w=2670&auto=format&fit=crop"
-              gradient="linear-gradient(135deg, #5b3fd6 0%, #3b2a8f 100%)"
-              onClick={() => onNavigate('administracion')}
+              title="Reportes e Indicadores"
+              description="Análisis detallado de KPIs, cumplimiento normativo y estadísticas."
+              actionLabel="Ver Reportes"
+              imageUrl="https://images.unsplash.com/photo-1551288049-bebda4e38f71?q=80&w=2670&auto=format&fit=crop"
+              gradient="linear-gradient(135deg, #002266 0%, #172554 100%)"
+              onClick={() => onNavigate('reportes')}
             />
-          )}
-        </div>
+          </div>
+        )}
+
+        {seccionAbierta === 'eventos' && (
+          <div className={styles.modulesGrid} key="eventos">
+            <FeatureCard
+              title="Aguas"
+              description="Captación, tratamiento, monitoreo y vertimiento de aguas."
+              imageUrl="https://images.unsplash.com/photo-1505118380757-91f5f5632de0?q=80&w=2670&auto=format&fit=crop"
+              gradient="linear-gradient(135deg, #0891b2 0%, #155e75 100%)"
+              disabled
+              badge="Próximamente"
+            />
+            <FeatureCard
+              title="Residuos"
+              description="Clasificación, almacenamiento, tratamiento y disposición final de residuos."
+              imageUrl="https://images.unsplash.com/photo-1532996122724-e3c354a0b15b?q=80&w=2670&auto=format&fit=crop"
+              gradient="linear-gradient(135deg, #059669 0%, #065f46 100%)"
+              disabled
+              badge="Próximamente"
+            />
+            <FeatureCard
+              title="Contingencias"
+              description="Prevención, atención y cierre de eventos ambientales."
+              imageUrl="https://images.unsplash.com/photo-1473116763249-2faaef81ccda?q=80&w=2670&auto=format&fit=crop"
+              gradient="linear-gradient(135deg, #d97706 0%, #b45309 100%)"
+              disabled
+              badge="Próximamente"
+            />
+          </div>
+        )}
       </div>
 
       {/* Footer Certifications */}
