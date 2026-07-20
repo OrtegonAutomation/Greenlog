@@ -14,8 +14,8 @@ import { CENIT_COLORS } from '../../theme/cenitTheme';
 import { StatCard } from '../common/StatCard';
 import { FeatureCard } from '../common/FeatureCard';
 import { SeccionApp } from '../../types';
-import { actividadesAnio, total2027, fmtB, fmtPct } from '../../utils/reportesAggregations';
-import { TOTAL_2026 } from '../../data/baseline2026';
+import { actividadesEnAnio, totalAnio, anioVigente, fmtB, fmtPct } from '../../utils/reportesAggregations';
+import { useBaseComparacion } from '../../services/SnapshotService';
 import { MEDIA } from '../../hooks/useResponsive';
 
 // ── Estilos ───────────────────────────────────────────────────
@@ -193,16 +193,19 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
   // Sección expandida en "Nuestros Módulos" (null = vista de secciones)
   const [seccionAbierta, setSeccionAbierta] = useState<'presupuestal' | 'eventos' | null>(null);
 
-  // KPIs con datos reales de la planeación 2027 (misma fuente que Reportes).
+  // KPIs con datos reales de la planeación vigente (misma fuente que Reportes).
+  // El año se deriva automáticamente: el mayor con planeación registrada.
+  const anio = anioVigente(actividades);
+  const base = useBaseComparacion(actividades, anio - 1);
   const stats = useMemo(() => {
-    const acts = actividadesAnio(actividades, 2027);
-    const presupuesto2027 = total2027(acts);
-    const crecimiento = TOTAL_2026 > 0 ? (presupuesto2027 - TOTAL_2026) / TOTAL_2026 : null;
+    const acts = actividadesEnAnio(actividades, anio);
+    const presupuesto = totalAnio(acts, anio);
+    const crecimiento = base.total > 0 ? (presupuesto - base.total) / base.total : null;
     const zonas = new Set(acts.map(a => a.zona).filter(Boolean)).size;
     const estaciones = new Set(acts.map(a => a.estacion).filter(Boolean)).size;
     const lineas = new Set(acts.map(a => a.lineaOperativa).filter(Boolean)).size;
-    return { total: acts.length, presupuesto2027, crecimiento, zonas, estaciones, lineas };
-  }, [actividades]);
+    return { total: acts.length, presupuesto, crecimiento, zonas, estaciones, lineas };
+  }, [actividades, anio, base.total]);
 
   return (
     <div className={styles.root}>
@@ -245,17 +248,17 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
         <StatCard
           value={stats.total.toString()}
           label="Actividades planeadas"
-          sub="Actividades ambientales de la planeación 2027"
+          sub={`Actividades ambientales de la planeación ${anio}`}
         />
         <StatCard
-          value={fmtB(stats.presupuesto2027)}
-          label="Presupuesto 2027"
+          value={fmtB(stats.presupuesto)}
+          label={`Presupuesto ${anio}`}
           sub={`OPEX planeado en ${stats.lineas} líneas operativas`}
         />
         <StatCard
           value={fmtPct(stats.crecimiento)}
-          label="Variación vs 2026"
-          sub={`Frente a la línea base 2026 (${fmtB(TOTAL_2026)})`}
+          label={`Variación vs ${anio - 1}`}
+          sub={`Frente a la línea base ${anio - 1} (${fmtB(base.total)})`}
         />
         <StatCard
           value={`${stats.estaciones}`}

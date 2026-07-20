@@ -21,11 +21,14 @@ import {
 } from '@fluentui/react-components';
 import {
   LockClosedRegular, LockOpenRegular, PersonAddRegular, PeopleTeamRegular, GridRegular,
-  CopyRegular, DeleteRegular, KeyRegular,
+  CopyRegular, DeleteRegular, KeyRegular, CalendarLockRegular,
 } from '@fluentui/react-icons';
 import { useAuth } from '../../auth/AuthContext';
 import { getSupabaseClient, isSupabaseEnabled } from '../../services/supabaseClient';
 import { ConfigService, usePresupuestoCongelado } from '../../services/ConfigService';
+import { SnapshotService, SnapshotAnual } from '../../services/SnapshotService';
+import { useActividades } from '../../hooks/useActividades';
+import { aniosDisponibles, anioVigente, baseVivaAnio, actividadesEnAnio, fmtB } from '../../utils/reportesAggregations';
 import { MSG_MATRIZ_ENVIADA } from '../../config/presupuesto';
 import { LINEAS_GESTION_AMBIENTAL, TODAS_LINEAS_AMBIENTALES } from '../../data/equipoAmbiental';
 import { MEDIA } from '../../hooks/useResponsive';
@@ -86,6 +89,7 @@ export const AdminModule: React.FC = () => {
   const { congelado, cargando: cargandoConfig, setCongelado } = usePresupuestoCongelado();
 
   const { currentUser } = useAuth();
+  const { actividadesGlobal } = useActividades();
   const [usuarios, setUsuarios] = useState<UsuarioRow[]>([]);
   const [credencial, setCredencial] = useState<{ email: string; pwd: string } | null>(null);
   // Zonas de planeación por usuario (derivadas de greenlog_usuario_ambitos).
@@ -132,6 +136,66 @@ export const AdminModule: React.FC = () => {
       setGuardando(false);
     }
   }, [setCongelado]);
+
+  // ── Snapshots anuales ("Bloquear año") ──
+  // Congela el agregado Zona×Línea de lo planeado tipo "Plan" del año elegido;
+  // Reportes lo usa como base de comparación de años siguientes.
+  const aniosSnapshot = useMemo(() => {
+    const anios = aniosDisponibles(actividadesGlobal);
+    return anios.length > 0 ? anios : [anioVigente(actividadesGlobal)];
+  }, [actividadesGlobal]);
+  const [anioSnapshot, setAnioSnapshot] = useState<number | null>(null);
+  const anioSnapshotEf = anioSnapshot ?? aniosSnapshot[aniosSnapshot.length - 1];
+  const [snapshotActual, setSnapshotActual] = useState<SnapshotAnual | null>(null);
+  const [cargandoSnapshot, setCargandoSnapshot] = useState(false);
+  const [dialogoBloquear, setDialogoBloquear] = useState(false);
+  const [dialogoDesbloquear, setDialogoDesbloquear] = useState(false);
+
+  const refrescarSnapshot = useCallback(async (anio: number) => {
+    setCargandoSnapshot(true);
+    try { setSnapshotActual(await SnapshotService.getSnapshot(anio)); }
+    finally { setCargandoSnapshot(false); }
+  }, []);
+  useEffect(() => { void refrescarSnapshot(anioSnapshotEf); }, [anioSnapshotEf, refrescarSnapshot]);
+
+  // Lo que se congelaría hoy para el año elegido (solo tipo Plan).
+  const previaSnapshot = useMemo(() => {
+    const celdas = baseVivaAnio(actividadesGlobal, anioSnapshotEf);
+    const total = celdas.reduce((s, c) => s + c.valor, 0);
+    const nActividades = actividadesEnAnio(actividadesGlobal, anioSnapshotEf)
+      .filter(a => ((a.tipoPlaneacion as string) ?? 'Plan') === 'Plan').length;
+    return { celdas, total, nActividades };
+  }, [actividadesGlobal, anioSnapshotEf]);
+
+  const bloquearAnio = useCallback(async () => {
+    setGuardando(true);
+    setMensaje(null);
+    try {
+      await SnapshotService.congelarAnio(anioSnapshotEf, previaSnapshot.celdas, previaSnapshot.total, previaSnapshot.nActividades, currentUser?.email);
+      setMensaje({ ok: true, texto: `Año ${anioSnapshotEf} bloqueado: Reportes lo usará como base de comparación (${fmtB(previaSnapshot.total)} tipo Plan).` });
+      setDialogoBloquear(false);
+      await refrescarSnapshot(anioSnapshotEf);
+    } catch (e: any) {
+      setMensaje({ ok: false, texto: `No se pudo bloquear el año: ${e.message}` });
+    } finally {
+      setGuardando(false);
+    }
+  }, [anioSnapshotEf, previaSnapshot, currentUser?.email, refrescarSnapshot]);
+
+  const desbloquearAnio = useCallback(async () => {
+    setGuardando(true);
+    setMensaje(null);
+    try {
+      await SnapshotService.descongelarAnio(anioSnapshotEf);
+      setMensaje({ ok: true, texto: `Año ${anioSnapshotEf} desbloqueado: Reportes volverá a usar la base en vivo (tipo Plan).` });
+      setDialogoDesbloquear(false);
+      await refrescarSnapshot(anioSnapshotEf);
+    } catch (e: any) {
+      setMensaje({ ok: false, texto: `No se pudo desbloquear el año: ${e.message}` });
+    } finally {
+      setGuardando(false);
+    }
+  }, [anioSnapshotEf, refrescarSnapshot]);
 
   /** Reemplaza los ámbitos de planeador de un usuario por las líneas de gestión en la zona dada. */
   const asignarZonaPlaneador = useCallback(async (usuarioId: string, zona: string) => {
@@ -385,6 +449,92 @@ export const AdminModule: React.FC = () => {
         </div>
         {!supabaseOk && <Caption1 style={{ color: '#c05a1e' }}>Modo mock: el estado se controla con la constante local del código.</Caption1>}
       </Card>
+
+      {/* 1b. Bloquear año (snapshot de base para Reportes) */}
+      <Card className={styles.card}>
+        <Title3 style={{ color: '#003057' }}>
+          <CalendarLockRegular style={{ marginRight: 8 }} />
+          Base de comparación por año
+        </Title3>
+        <Caption1 style={{ color: tokens.colorNeutralForeground3 }}>
+          Al bloquear un año se congela lo planeado tipo <b>Plan</b> (sin Adicional ni Emergencia) como base de
+          comparación en Reportes. Si un año no está bloqueado, Reportes compara contra lo planeado en vivo.
+          La base 2026 es la matriz estática de la Plantilla OPEX y no requiere bloqueo.
+        </Caption1>
+        <div className={styles.filaCongelar}>
+          <Caption1 style={{ fontWeight: 600 }}>Año:</Caption1>
+          <Select value={String(anioSnapshotEf)} onChange={(_, d) => setAnioSnapshot(Number(d.value))} disabled={guardando}>
+            {aniosSnapshot.map(y => <option key={y} value={y}>{y}</option>)}
+          </Select>
+          {cargandoSnapshot ? <Spinner size="tiny" /> : snapshotActual ? (
+            <Badge appearance="filled" color="danger">
+              Bloqueado{snapshotActual.creadoEn ? ` el ${new Date(snapshotActual.creadoEn).toLocaleDateString('es-CO')}` : ''} — {fmtB(snapshotActual.total)}
+            </Badge>
+          ) : (
+            <Badge appearance="filled" color="success">Sin bloquear (base en vivo)</Badge>
+          )}
+          <Button appearance="primary" icon={<CalendarLockRegular />}
+            disabled={guardando || !supabaseOk || previaSnapshot.total <= 0}
+            onClick={() => setDialogoBloquear(true)}>
+            {snapshotActual ? `Reemplazar bloqueo de ${anioSnapshotEf}` : `Bloquear año ${anioSnapshotEf}`}
+          </Button>
+          {snapshotActual && (
+            <Button appearance="secondary" disabled={guardando || !supabaseOk} onClick={() => setDialogoDesbloquear(true)}>
+              Desbloquear
+            </Button>
+          )}
+        </div>
+        <Caption1 style={{ color: tokens.colorNeutralForeground3 }}>
+          Se congelaría hoy: {fmtB(previaSnapshot.total)} en {previaSnapshot.nActividades} actividades tipo Plan de {anioSnapshotEf}.
+        </Caption1>
+        {!supabaseOk && <Caption1 style={{ color: '#c05a1e' }}>Modo mock: los snapshots requieren Supabase.</Caption1>}
+      </Card>
+
+      {/* Diálogo de confirmación: bloquear año */}
+      <Dialog open={dialogoBloquear} onOpenChange={(_, d) => setDialogoBloquear(d.open)}>
+        <DialogSurface>
+          <DialogBody>
+            <DialogTitle>Bloquear año {anioSnapshotEf}</DialogTitle>
+            <DialogContent>
+              <Body1 style={{ display: 'block', marginBottom: 8 }}>
+                Se congelará como base de comparación: <b>{fmtB(previaSnapshot.total)}</b> en{' '}
+                <b>{previaSnapshot.nActividades}</b> actividades tipo Plan de {anioSnapshotEf}.
+              </Body1>
+              {snapshotActual && (
+                <Caption1 style={{ color: '#c05a1e' }}>
+                  Ya existe un bloqueo del {snapshotActual.creadoEn ? new Date(snapshotActual.creadoEn).toLocaleDateString('es-CO') : '—'} ({fmtB(snapshotActual.total)}): será reemplazado.
+                </Caption1>
+              )}
+            </DialogContent>
+            <DialogActions>
+              <Button appearance="secondary" onClick={() => setDialogoBloquear(false)}>Cancelar</Button>
+              <Button appearance="primary" disabled={guardando} onClick={() => void bloquearAnio()}>
+                {guardando ? <Spinner size="tiny" /> : 'Bloquear'}
+              </Button>
+            </DialogActions>
+          </DialogBody>
+        </DialogSurface>
+      </Dialog>
+
+      {/* Diálogo de confirmación: desbloquear año */}
+      <Dialog open={dialogoDesbloquear} onOpenChange={(_, d) => setDialogoDesbloquear(d.open)}>
+        <DialogSurface>
+          <DialogBody>
+            <DialogTitle>Desbloquear año {anioSnapshotEf}</DialogTitle>
+            <DialogContent>
+              <Body1>
+                Se eliminará el snapshot congelado y Reportes volverá a comparar contra lo planeado en vivo (tipo Plan) de {anioSnapshotEf}.
+              </Body1>
+            </DialogContent>
+            <DialogActions>
+              <Button appearance="secondary" onClick={() => setDialogoDesbloquear(false)}>Cancelar</Button>
+              <Button appearance="primary" disabled={guardando} onClick={() => void desbloquearAnio()}>
+                {guardando ? <Spinner size="tiny" /> : 'Desbloquear'}
+              </Button>
+            </DialogActions>
+          </DialogBody>
+        </DialogSurface>
+      </Dialog>
 
       {/* 2. Nuevo usuario */}
       <Card className={styles.card}>

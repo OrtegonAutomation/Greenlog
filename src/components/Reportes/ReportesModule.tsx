@@ -18,11 +18,13 @@ import { useActividades } from '../../hooks/useActividades';
 import { CENIT_COLORS } from '../../theme/cenitTheme';
 import { MEDIA } from '../../hooks/useResponsive';
 import {
-  actividadesAnio, resumenComparacion, comparacionPorZona, comparacionPorLinea,
+  actividadesEnAnio, resumenComparacion, comparacionPorZona, comparacionPorLinea,
   paretoLineas, concentracionTop, cajaMensual, dependenciaProveedores,
   exposicionPorLinea, heatmapZonaLinea, fmtB, fmtPct,
-  baseline2026Filtrada, mapPorZona, mapPorLinea, porZona2027, total2027, porLineaDeMes, MES_ABBR,
+  filtrarCeldas, mapPorZona, mapPorLinea, porZonaAnio, totalAnio, porLineaDeMes, MES_ABBR,
+  aniosDisponibles, anioVigente,
 } from '../../utils/reportesAggregations';
+import { useBaseComparacion } from '../../services/SnapshotService';
 import { exportReporteToExcel } from '../../utils/exportReporte';
 import { ColombiaMapa } from './ColombiaMapa';
 
@@ -223,7 +225,7 @@ const colorCalor = (t: number): string => {
   return `rgb(${c[0]},${c[1]},${c[2]})`;
 };
 // Vistas del reporte (navegación por flechas).
-const VISTAS = ['Explora por zona', 'Comparación 2026 vs 2027', 'Análisis por zona', 'Dependencia de proveedores'];
+const VISTAS = ['Explora por zona', 'Comparación de años', 'Análisis por zona', 'Dependencia de proveedores'];
 // Umbrales de riesgo de concentración por proveedor (% del gasto).
 const UMBRAL_ALTO = 20, UMBRAL_MEDIO = 5;
 const riesgoProveedor = (pct: number) => pct > UMBRAL_ALTO
@@ -245,12 +247,12 @@ const BarLabel = ({ x, y, width, value }: any) => (
   <text x={Number(x) + Number(width) / 2} y={Number(y) - 6} textAnchor="middle"
     fontSize={10} fontWeight={800} fill="#003057">{fmtB(Number(value))}</text>
 );
-// Tooltip de la comparación por línea: series + % de variación vs 2026.
-const TTComparacion = ({ active, payload, label }: any) => {
+// Tooltip de la comparación por línea: series + % de variación vs el año base.
+const TTComparacion = ({ active, payload, label, kBase, kPlan }: any) => {
   if (!active || !payload?.length) return null;
   const g = (k: string) => Number(payload.find((p: any) => p.dataKey === k)?.value ?? 0);
-  const y2026 = g('2026'), y2027 = g('2027');
-  const pct = y2026 > 0 ? (y2027 - y2026) / y2026 : null;
+  const vBase = g(kBase), vPlan = g(kPlan);
+  const pct = vBase > 0 ? (vPlan - vBase) / vBase : null;
   return (
     <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 8, padding: '8px 10px', fontSize: 12, boxShadow: '0 4px 16px rgba(0,0,0,0.1)' }}>
       <div style={{ fontWeight: 700, marginBottom: 4 }}>{label}</div>
@@ -314,63 +316,82 @@ export const ReportesModule: React.FC = () => {
   }, [vista]);
   const [filtroTipo, setFiltroTipo] = useState('Todos'); // Todos | OPEX | CAPEX
 
-  // Opciones de filtro (de todas las actividades 2027, sin filtrar).
+  // ── Selector de años ──
+  // Año planeado (default: vigente = mayor año con planeación) y año base de
+  // comparación (default: año anterior; también puede elegirse otro anterior).
+  const anios = useMemo(() => aniosDisponibles(actividades), [actividades]);
+  const [anioPlanSel, setAnioPlanSel] = useState<number | null>(null);
+  const [anioBaseSel, setAnioBaseSel] = useState<number | null>(null);
+  const anioPlan = anioPlanSel ?? anioVigente(actividades);
+  const anioBase = (anioBaseSel !== null && anioBaseSel < anioPlan) ? anioBaseSel : anioPlan - 1;
+  const opcionesAnioPlan = useMemo(
+    () => [...new Set([...anios, anioVigente(actividades)])].sort((a, b) => a - b),
+    [anios, actividades]);
+  const opcionesAnioBase = useMemo(
+    () => [...new Set([2026, ...anios])].filter(y => y < anioPlan).sort((a, b) => a - b),
+    [anios, anioPlan]);
+
+  // Base de comparación del año elegido: 2026 estática; 2027+ snapshot congelado
+  // desde Administración o, si no existe, agregado vivo solo tipo "Plan".
+  const base = useBaseComparacion(actividades, anioBase);
+
+  // Opciones de filtro (de todas las actividades del año, sin filtrar).
   const opciones = useMemo(() => {
-    const base = actividadesAnio(actividades, 2027);
-    const lineas = [...new Set(base.map(a => a.lineaOperativa).filter(Boolean))].sort();
-    const zonas = [...new Set(base.map(a => a.zona).filter(Boolean))].sort();
-    const tipos = [...new Set(base.map(a => (a.fuentePresupuesto as string) || 'OPEX'))].sort();
+    const acts = actividadesEnAnio(actividades, anioPlan);
+    const lineas = [...new Set(acts.map(a => a.lineaOperativa).filter(Boolean))].sort();
+    const zonas = [...new Set(acts.map(a => a.zona).filter(Boolean))].sort();
+    const tipos = [...new Set(acts.map(a => (a.fuentePresupuesto as string) || 'OPEX'))].sort();
     return { lineas, zonas, tipos };
-  }, [actividades]);
+  }, [actividades, anioPlan]);
 
   const R = useMemo(() => {
-    const acts = actividadesAnio(actividades, 2027).filter(a =>
+    const acts = actividadesEnAnio(actividades, anioPlan).filter(a =>
       (filtroLinea === 'Todas' || a.lineaOperativa === filtroLinea) &&
       (filtroZona === 'Todas' || a.zona === filtroZona) &&
       (filtroTipo === 'Todos' || ((a.fuentePresupuesto as string) || 'OPEX') === filtroTipo));
 
-    // Base 2026 filtrada por zona/línea. El tipo CAPEX/OPEX no aplica a la base (es OPEX):
-    // si se filtra CAPEX, no hay base 2026 comparable -> base vacía.
+    // Base filtrada por zona/línea. El tipo CAPEX/OPEX no aplica a la base (es OPEX):
+    // si se filtra CAPEX, no hay base comparable -> base vacía.
     const baseAplica = filtroTipo !== 'CAPEX';
-    const baseCeldas = baseAplica ? baseline2026Filtrada(filtroZona, filtroLinea) : [];
+    const baseCeldas = baseAplica ? filtrarCeldas(base.celdas, filtroZona, filtroLinea) : [];
     const baseZona = mapPorZona(baseCeldas);
     const baseLinea = mapPorLinea(baseCeldas);
     const totalBase = baseCeldas.reduce((s, c) => s + c.valor, 0);
 
     // Presupuesto por zona para el MAPA: respeta filtros de línea/tipo pero NO el de zona,
     // para que el mapa siempre muestre todas las zonas y se pueda clicar cualquiera.
-    const actsSinZona = actividadesAnio(actividades, 2027).filter(a =>
+    const actsSinZona = actividadesEnAnio(actividades, anioPlan).filter(a =>
       (filtroLinea === 'Todas' || a.lineaOperativa === filtroLinea) &&
       (filtroTipo === 'Todos' || ((a.fuentePresupuesto as string) || 'OPEX') === filtroTipo));
-    const mapaPorZona = porZona2027(actsSinZona);
+    const mapaPorZona = porZonaAnio(actsSinZona, anioPlan);
 
-    const resumen = resumenComparacion(acts, totalBase);
-    const compZona = comparacionPorZona(acts, baseZona);
-    const compLinea = comparacionPorLinea(acts, baseLinea);
-    const pareto = paretoLineas(acts);
-    const caja = cajaMensual(acts);
-    const proveedores = dependenciaProveedores(acts);
-    const exposicion = exposicionPorLinea(acts);
-    const heat = heatmapZonaLinea(acts, 100); // todas las líneas operativas, no solo el top
-    const conc = concentracionTop(acts, 3);
+    const resumen = resumenComparacion(acts, anioPlan, totalBase);
+    const compZona = comparacionPorZona(acts, anioPlan, baseZona);
+    const compLinea = comparacionPorLinea(acts, anioPlan, baseLinea);
+    const pareto = paretoLineas(acts, anioPlan);
+    const caja = cajaMensual(acts, anioPlan);
+    const proveedores = dependenciaProveedores(acts, anioPlan);
+    const exposicion = exposicionPorLinea(acts, anioPlan);
+    const heat = heatmapZonaLinea(acts, anioPlan, 100); // todas las líneas operativas, no solo el top
+    const conc = concentracionTop(acts, anioPlan, 3);
     // Todas las líneas operativas del ámbito, ordenadas de mayor a menor presupuesto.
     const lineasOrdenadas = pareto.filas;
-    const totalNacional = total2027(actsSinZona) || 1;
-    const participacion = (resumen.total2027 / totalNacional) * 100;
-    // Crecimiento por zona para la etiqueta del mapa (2027 vs base 2026, respeta línea/tipo).
-    const baseMapaCeldas = filtroTipo !== 'CAPEX' ? baseline2026Filtrada('Todas', filtroLinea) : [];
-    const base2026Zona = mapPorZona(baseMapaCeldas);
+    const totalNacional = totalAnio(actsSinZona, anioPlan) || 1;
+    const participacion = (resumen.totalPlan / totalNacional) * 100;
+    // Crecimiento por zona para la etiqueta del mapa (año planeado vs base, respeta línea/tipo).
+    const baseMapaCeldas = filtroTipo !== 'CAPEX' ? filtrarCeldas(base.celdas, 'Todas', filtroLinea) : [];
+    const baseZonaMapa = mapPorZona(baseMapaCeldas);
     const crecimientoPorZona: Record<string, number | null> = {};
     const deltaPorZona: Record<string, number> = {};
     for (const z of Object.keys(mapaPorZona)) {
-      const b = base2026Zona[z] ?? 0;
+      const b = baseZonaMapa[z] ?? 0;
       crecimientoPorZona[z] = b > 0 ? (mapaPorZona[z] - b) / b : null;
       deltaPorZona[z] = mapaPorZona[z] - b;
     }
     const nEstaciones = new Set(acts.map(a => a.estacion).filter(Boolean)).size;
     const resumenAmbito = { participacion, nActividades: acts.length, nEstaciones, rubroTop: pareto.filas[0]?.nombre ?? '—' };
     return { acts, resumen, compZona, compLinea, pareto, caja, proveedores, exposicion, heat, conc, mapaPorZona, lineasOrdenadas, resumenAmbito, crecimientoPorZona, deltaPorZona };
-  }, [actividades, filtroLinea, filtroZona, filtroTipo]);
+  }, [actividades, anioPlan, base.celdas, filtroLinea, filtroZona, filtroTipo]);
 
   const { resumen, compZona, compLinea, pareto, caja, proveedores, exposicion, heat, conc } = R;
 
@@ -383,13 +404,13 @@ export const ReportesModule: React.FC = () => {
       <div className={styles.headerLeft}>
         <Title2 style={{ color: '#003057', fontWeight: 700 }}>Reportes — Análisis financiero OPEX</Title2>
         <Body1 style={{ color: tokens.colorNeutralForeground2 }}>
-          Comparación presupuestal 2026 vs 2027, concentración, caja, riesgo contractual y proveedores.
+          Comparación presupuestal {anioBase} vs {anioPlan}, concentración, caja, riesgo contractual y proveedores.
         </Body1>
       </div>
       <Button appearance="secondary" icon={<ArrowTrendingLinesRegular />} id="reportes-descargar"
         disabled={cargando || R.acts.length === 0}
         style={{ borderRadius: 8 }}
-        onClick={() => exportReporteToExcel(actividades, 2027)}>
+        onClick={() => exportReporteToExcel(actividades, anioPlan, { celdas: base.celdas, anioBase })}>
         Descargar reporte
       </Button>
     </div>
@@ -413,6 +434,19 @@ export const ReportesModule: React.FC = () => {
         </span>
       )}
       <div className={styles.filterItem}>
+        <span className={styles.filterLabel}>Año planeado</span>
+        <Select size="small" value={String(anioPlan)} onChange={(_, d) => setAnioPlanSel(Number(d.value))} style={{ minWidth: 84 }}>
+          {opcionesAnioPlan.map(y => <option key={y} value={y}>{y}</option>)}
+        </Select>
+      </div>
+      <div className={styles.filterItem}>
+        <span className={styles.filterLabel}>Comparar contra</span>
+        <Select size="small" value={String(anioBase)} onChange={(_, d) => setAnioBaseSel(Number(d.value))} style={{ minWidth: 84 }}>
+          {!opcionesAnioBase.includes(anioBase) && <option value={anioBase}>{anioBase}</option>}
+          {opcionesAnioBase.map(y => <option key={y} value={y}>{y}</option>)}
+        </Select>
+      </div>
+      <div className={styles.filterItem}>
         <span className={styles.filterLabel}>Tipo de presupuesto</span>
         <Select size="small" value={filtroTipo} onChange={(_, d) => setFiltroTipo(d.value)} style={{ minWidth: 120 }}>
           <option value="Todos">Todos</option>
@@ -425,7 +459,12 @@ export const ReportesModule: React.FC = () => {
         </Button>
       )}
       {filtroTipo === 'CAPEX' && (
-        <Caption1 style={{ color: '#c05a1e' }}>La línea base 2026 es OPEX; la comparación no aplica para CAPEX.</Caption1>
+        <Caption1 style={{ color: '#c05a1e' }}>La línea base {anioBase} es OPEX; la comparación no aplica para CAPEX.</Caption1>
+      )}
+      {filtroTipo !== 'CAPEX' && base.origen === 'viva' && !base.cargando && (
+        <Caption1 style={{ color: '#c05a1e' }}>
+          Base {anioBase} sin congelar: se compara contra lo planeado tipo Plan de ese año. Un administrador puede bloquearla en Administración.
+        </Caption1>
       )}
     </div>
   );
@@ -438,7 +477,7 @@ export const ReportesModule: React.FC = () => {
         <Card className={styles.chartCard} style={{ alignItems: 'center', padding: '64px 24px' }}>
           <Spinner size="large" label="Cargando información del presupuesto…" />
           <Caption1 style={{ color: tokens.colorNeutralForeground3, marginTop: 12 }}>
-            Preparando la comparación 2026 vs 2027 con los datos actuales.
+            Preparando la comparación {anioBase} vs {anioPlan} con los datos actuales.
           </Caption1>
         </Card>
       </div>
@@ -457,7 +496,7 @@ export const ReportesModule: React.FC = () => {
           <Caption1 style={{ color: tokens.colorNeutralForeground3, textAlign: 'center', maxWidth: 460 }}>
             {errorCarga
               ? errorCarga
-              : 'Aún no hay planeaciones registradas para 2027. El análisis financiero se mostrará cuando existan actividades.'}
+              : `Aún no hay planeaciones registradas para ${anioPlan}. El análisis financiero se mostrará cuando existan actividades.`}
           </Caption1>
         </Card>
       </div>
@@ -478,7 +517,7 @@ export const ReportesModule: React.FC = () => {
           {VISTAS.map((t, i) => (
             <span key={t} className={mergeClasses(styles.navDot, vista === i && styles.navDotActiva)} title={t} onClick={() => irAVista(i)} />
           ))}
-          <Caption1 className={styles.navTitulo}>{VISTAS[vista]}</Caption1>
+          <Caption1 className={styles.navTitulo}>{vista === 1 ? `Comparación ${anioBase} vs ${anioPlan}` : VISTAS[vista]}</Caption1>
         </div>
         <Button appearance="subtle" icon={<ChevronRightRegular />} iconPosition="after" disabled={vista === VISTAS.length - 1} onClick={() => irAVista(vista + 1)}>
           <span className={styles.navBtnText}>Siguiente</span>
@@ -506,10 +545,10 @@ export const ReportesModule: React.FC = () => {
             <div style={{ background: AZUL_OSCURO, borderRadius: 14, padding: '12px 14px', color: '#fff', display: 'flex', alignItems: 'center', gap: 12, boxShadow: '0 6px 20px rgba(17,34,64,0.25)', flex: 1 }}>
               <div style={{ flexShrink: 0, width: 38, height: 38, borderRadius: '50%', border: '3px solid #0fd5e7', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, fontWeight: 800 }}>$</div>
               <div style={{ minWidth: 0 }}>
-                <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 0.6, opacity: 0.85 }}>PRESUPUESTO 2027</div>
-                <div style={{ fontSize: 22, fontWeight: 800, lineHeight: 1.15, whiteSpace: 'nowrap' }}>{fmtB(resumen.total2027)} <span style={{ fontSize: 12, opacity: 0.7 }}>COP</span></div>
+                <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 0.6, opacity: 0.85 }}>PRESUPUESTO {anioPlan}</div>
+                <div style={{ fontSize: 22, fontWeight: 800, lineHeight: 1.15, whiteSpace: 'nowrap' }}>{fmtB(resumen.totalPlan)} <span style={{ fontSize: 12, opacity: 0.7 }}>COP</span></div>
                 <div style={{ fontSize: 13, marginTop: 2 }}>
-                  <span style={{ opacity: 0.8 }}>vs. 2026 </span>
+                  <span style={{ opacity: 0.8 }}>vs. {anioBase} </span>
                   <span style={{ color: '#4ade80', fontWeight: 800 }}>{(resumen.crecimiento ?? 0) >= 0 ? '↑' : '↓'} {fmtPct(resumen.crecimiento)}</span>
                 </div>
               </div>
@@ -523,7 +562,7 @@ export const ReportesModule: React.FC = () => {
                 <MoneyRegular fontSize={24} style={{ opacity: 0.85, flexShrink: 0 }} />
               </div>
               <div style={{ fontSize: 11, marginTop: 3, opacity: 0.9 }}>
-                2027 ({fmtB(resumen.total2027)}) frente a la base 2026 ({fmtB(resumen.total2026)})
+                {anioPlan} ({fmtB(resumen.totalPlan)}) frente a la base {anioBase} ({fmtB(resumen.totalBase)})
               </div>
             </div>
             </div>
@@ -531,11 +570,11 @@ export const ReportesModule: React.FC = () => {
           {/* Evolución 2026 vs 2027 con badge de crecimiento al lado */}
           <Card className={mergeClasses(styles.chartCard, styles.heroChartCard)}>
             <span className={styles.chartTitle} style={{ fontSize: 14 }}>Evolución presupuesto {filtroZona !== 'Todas' ? `— ${filtroZona}` : ''}</span>
-            <span className={styles.chartHint} style={{ marginBottom: 4 }}>Base 2026 vs 2027 (miles de millones COP).</span>
+            <span className={styles.chartHint} style={{ marginBottom: 4 }}>Base {anioBase} vs {anioPlan} (miles de millones COP).</span>
             <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 108px', alignItems: 'center', gap: 10 }}>
               <div style={{ minWidth: 0 }}>
                 <ResponsiveContainer width="100%" height={150}>
-                  <BarChart data={[{ nombre: '2026', valor: resumen.total2026 }, { nombre: '2027', valor: resumen.total2027 }]} margin={{ top: 18, left: 0, right: 10 }}>
+                  <BarChart data={[{ nombre: String(anioBase), valor: resumen.totalBase }, { nombre: String(anioPlan), valor: resumen.totalPlan }]} margin={{ top: 18, left: 0, right: 10 }}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} />
                     <XAxis dataKey="nombre" tick={{ fontSize: 11, fontWeight: 700 }} />
                     <YAxis tickFormatter={(v: number) => `$${(v / 1e9).toFixed(0)}`} tick={{ fontSize: 10 }} width={34} />
@@ -551,7 +590,7 @@ export const ReportesModule: React.FC = () => {
                 <div style={{ fontSize: 17, fontWeight: 800, color: (resumen.crecimiento ?? 0) >= 0 ? VERDE : ROJO }}>
                   {(resumen.crecimiento ?? 0) >= 0 ? '↑' : '↓'} {fmtPct(resumen.crecimiento)}
                 </div>
-                <div style={{ fontSize: 10.5, color: '#0f5132', marginTop: 2, lineHeight: 1.25 }}>Crecimiento frente a 2026</div>
+                <div style={{ fontSize: 10.5, color: '#0f5132', marginTop: 2, lineHeight: 1.25 }}>Crecimiento frente a {anioBase}</div>
               </div>
             </div>
           </Card>
@@ -559,7 +598,7 @@ export const ReportesModule: React.FC = () => {
 
           <Card className={mergeClasses(styles.chartCard, styles.heroChartCard)} style={{ marginTop: 10 }}>
             <span className={styles.chartTitle} style={{ fontSize: 14 }}>Líneas operativas {filtroZona !== 'Todas' ? `— ${filtroZona}` : ''}</span>
-            <span className={styles.chartHint} style={{ marginBottom: 4 }}>Presupuesto 2027 por línea operativa. Clic para filtrar.</span>
+            <span className={styles.chartHint} style={{ marginBottom: 4 }}>Presupuesto {anioPlan} por línea operativa. Clic para filtrar.</span>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 4 }}>
               {R.lineasOrdenadas.map(f => {
                 const mayor = R.lineasOrdenadas[0]?.valor || 1;
@@ -588,7 +627,7 @@ export const ReportesModule: React.FC = () => {
         {/* Título flotante en la esquina superior derecha del mapa */}
         <div className={styles.heroCaption}>
           <div className={styles.heroTitle} style={{ margin: '0 0 2px' }}>Resumen<br />General</div>
-          <span className={styles.eyebrow}>Presupuesto 2026 vs 2027</span>
+          <span className={styles.eyebrow}>Presupuesto {anioBase} vs {anioPlan}</span>
         </div>
       </div>
       )}
@@ -606,7 +645,7 @@ export const ReportesModule: React.FC = () => {
         {/* Título flotante de la vista de comparación */}
         <div className={styles.heroCaption}>
           <div className={styles.heroTitle} style={{ margin: '0 0 2px' }}>Análisis</div>
-          <span className={styles.eyebrow}>Presupuesto 2026 vs 2027</span>
+          <span className={styles.eyebrow}>Presupuesto {anioBase} vs {anioPlan}</span>
         </div>
 
         {/* Gráficas de comparación a la izquierda */}
@@ -614,7 +653,7 @@ export const ReportesModule: React.FC = () => {
           {/* Variación total del ámbito: % y a cuánto refiere en dinero */}
           <div className={styles.bigCard} style={{ marginBottom: 6, flexDirection: 'row', alignItems: 'center', gap: 14, flexWrap: 'wrap', padding: '8px 12px' }}>
             <div>
-              <div className={styles.miniLabel}>Variación total vs 2026</div>
+              <div className={styles.miniLabel}>Variación total vs {anioBase}</div>
               <div style={{ fontSize: 22, fontWeight: 800, color: (resumen.crecimiento ?? 0) >= 0 ? VERDE : ROJO }}>{fmtPct(resumen.crecimiento)}</div>
             </div>
             <div>
@@ -622,32 +661,32 @@ export const ReportesModule: React.FC = () => {
               <div style={{ fontSize: 22, fontWeight: 800, color: AZUL_OSCURO }}>{fmtB(resumen.delta)}</div>
             </div>
             <Caption1 style={{ color: tokens.colorNeutralForeground3, maxWidth: 190, fontSize: 11 }}>
-              2027 ({fmtB(resumen.total2027)}) frente a la base 2026 ({fmtB(resumen.total2026)}).
+              {anioPlan} ({fmtB(resumen.totalPlan)}) frente a la base {anioBase} ({fmtB(resumen.totalBase)}).
             </Caption1>
           </div>
 
           <Card className={mergeClasses(styles.chartCard, styles.heroChartCard)}>
-            <span className={styles.chartTitle} style={{ fontSize: 14 }}>Comparación por línea operativa {filtroMes ? `— ${filtroMes} 2027` : ''}</span>
-            <span className={styles.chartHint} style={{ marginBottom: 4 }}>{filtroMes ? `Presupuesto 2027 de ${filtroMes} por línea. Clic en una barra para filtrar.` : '2026 (base) vs 2027 y variación (Δ), de mayor a menor 2027. Clic en una barra para filtrar.'}</span>
+            <span className={styles.chartTitle} style={{ fontSize: 14 }}>Comparación por línea operativa {filtroMes ? `— ${filtroMes} ${anioPlan}` : ''}</span>
+            <span className={styles.chartHint} style={{ marginBottom: 4 }}>{filtroMes ? `Presupuesto ${anioPlan} de ${filtroMes} por línea. Clic en una barra para filtrar.` : `${anioBase} (base) vs ${anioPlan} y variación (Δ), de mayor a menor ${anioPlan}. Clic en una barra para filtrar.`}</span>
             <ResponsiveContainer width="100%" height={235}>
               <BarChart data={filtroMes
-                  ? Object.entries(porLineaDeMes(R.acts, MES_ABBR.indexOf(filtroMes))).sort((a, b) => b[1] - a[1]).map(([nombre, v]) => ({ nombre, [`2027 ${filtroMes}`]: v }))
-                  : [...compLinea].sort((a, b) => b.y2027 - a.y2027).map(c => ({ nombre: c.nombre, '2026': c.y2026, '2027': c.y2027, 'Variación': c.delta }))}
+                  ? Object.entries(porLineaDeMes(R.acts, anioPlan, MES_ABBR.indexOf(filtroMes))).sort((a, b) => b[1] - a[1]).map(([nombre, v]) => ({ nombre, [`${anioPlan} ${filtroMes}`]: v }))
+                  : [...compLinea].sort((a, b) => b.plan - a.plan).map(c => ({ nombre: c.nombre, [String(anioBase)]: c.base, [String(anioPlan)]: c.plan, 'Variación': c.delta }))}
                 layout="vertical" margin={{ left: 4, right: 14 }} barGap={1} style={{ cursor: 'pointer' }}
                 onClick={(st: any) => { const n = st?.activeLabel; if (n) toggleLinea(String(n)); }}>
                 <CartesianGrid stroke="#dbe2ea" horizontal={true} vertical={true} />
                 <XAxis type="number" tickFormatter={fmtAxis} tick={{ fontSize: 10 }} />
                 <YAxis type="category" dataKey="nombre" width={118} tick={{ fontSize: 9.5 }} interval={0} />
-                <RTooltip content={filtroMes ? <TT /> : <TTComparacion />} />
+                <RTooltip content={filtroMes ? <TT /> : <TTComparacion kBase={String(anioBase)} kPlan={String(anioPlan)} />} />
                 <ReferenceLine x={0} stroke="#999" />
                 {filtroMes ? (
-                  <Bar dataKey={`2027 ${filtroMes}`} fill={AZUL} radius={[0, 3, 3, 0]} barSize={14} style={{ cursor: 'pointer' }} onClick={(d: any) => { const n = d?.nombre ?? d?.payload?.nombre; if (n) toggleLinea(n); }} />
+                  <Bar dataKey={`${anioPlan} ${filtroMes}`} fill={AZUL} radius={[0, 3, 3, 0]} barSize={14} style={{ cursor: 'pointer' }} onClick={(d: any) => { const n = d?.nombre ?? d?.payload?.nombre; if (n) toggleLinea(n); }} />
                 ) : (<>
-                {/* Barra 2026 con la variación apilada encima (2026 + Δ = 2027) */}
-                <Bar dataKey="2026" stackId="base" fill="#9db8d6" barSize={9} style={{ cursor: 'pointer' }} onClick={(d: any) => { const n = d?.nombre ?? d?.payload?.nombre; if (n) toggleLinea(n); }} />
+                {/* Barra base con la variación apilada encima (base + Δ = plan) */}
+                <Bar dataKey={String(anioBase)} stackId="base" fill="#9db8d6" barSize={9} style={{ cursor: 'pointer' }} onClick={(d: any) => { const n = d?.nombre ?? d?.payload?.nombre; if (n) toggleLinea(n); }} />
                 <Bar dataKey="Variación" stackId="base" fill={NARANJA} radius={[0, 3, 3, 0]} barSize={9} style={{ cursor: 'pointer' }} onClick={(d: any) => { const n = d?.nombre ?? d?.payload?.nombre; if (n) toggleLinea(n); }} />
-                {/* Barra 2027 independiente al lado */}
-                <Bar dataKey="2027" fill={AZUL} radius={[0, 3, 3, 0]} barSize={9} style={{ cursor: 'pointer' }} onClick={(d: any) => { const n = d?.nombre ?? d?.payload?.nombre; if (n) toggleLinea(n); }} />
+                {/* Barra del año planeado independiente al lado */}
+                <Bar dataKey={String(anioPlan)} fill={AZUL} radius={[0, 3, 3, 0]} barSize={9} style={{ cursor: 'pointer' }} onClick={(d: any) => { const n = d?.nombre ?? d?.payload?.nombre; if (n) toggleLinea(n); }} />
                 </>)}
               </BarChart>
             </ResponsiveContainer>
@@ -655,13 +694,13 @@ export const ReportesModule: React.FC = () => {
             {!filtroMes && (
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px 16px', marginTop: 8, paddingLeft: 4 }}>
                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11, color: tokens.colorNeutralForeground2 }}>
-                  <span style={{ width: 11, height: 11, borderRadius: 2, background: '#9db8d6' }} /> Base 2026
+                  <span style={{ width: 11, height: 11, borderRadius: 2, background: '#9db8d6' }} /> Base {anioBase}
                 </span>
                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11, color: tokens.colorNeutralForeground2 }}>
-                  <span style={{ width: 11, height: 11, borderRadius: 2, background: NARANJA }} /> Variación (Δ vs 2026)
+                  <span style={{ width: 11, height: 11, borderRadius: 2, background: NARANJA }} /> Variación (Δ vs {anioBase})
                 </span>
                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11, color: tokens.colorNeutralForeground2 }}>
-                  <span style={{ width: 11, height: 11, borderRadius: 2, background: AZUL }} /> Total 2027
+                  <span style={{ width: 11, height: 11, borderRadius: 2, background: AZUL }} /> Total {anioPlan}
                 </span>
               </div>
             )}
@@ -698,7 +737,7 @@ export const ReportesModule: React.FC = () => {
         {/* Planeado por zona (barras horizontales, mayor a menor) */}
         <Card className={styles.chartCard}>
           <span className={styles.chartTitle}>Planeado por zona</span>
-          <span className={styles.chartHint}>Presupuesto 2027 por zona, de mayor a menor. Clic en una barra para filtrar.</span>
+          <span className={styles.chartHint}>Presupuesto {anioPlan} por zona, de mayor a menor. Clic en una barra para filtrar.</span>
           <ResponsiveContainer width="100%" height={340}>
             <BarChart data={Object.entries(R.mapaPorZona).sort((a, b) => b[1] - a[1]).map(([nombre, valor]) => ({ nombre, valor }))}
               layout="vertical" margin={{ left: 4, right: 54 }} style={{ cursor: 'pointer' }}
@@ -707,7 +746,7 @@ export const ReportesModule: React.FC = () => {
               <XAxis type="number" tickFormatter={fmtAxis} tick={{ fontSize: 10 }} />
               <YAxis type="category" dataKey="nombre" width={76} tick={{ fontSize: 11 }} interval={0} />
               <RTooltip content={<TT />} />
-              <Bar dataKey="valor" name="Planeado 2027" radius={[0, 4, 4, 0]}>
+              <Bar dataKey="valor" name={`Planeado ${anioPlan}`} radius={[0, 4, 4, 0]}>
                 {Object.entries(R.mapaPorZona).sort((a, b) => b[1] - a[1]).map(([nombre]) => (
                   <Cell key={nombre} fill={AZUL} opacity={filtroZona !== 'Todas' && filtroZona !== nombre ? 0.35 : 1} />
                 ))}
@@ -853,7 +892,7 @@ export const ReportesModule: React.FC = () => {
 
       <div style={{ textAlign: 'center' }}>
         <Caption1 style={{ color: tokens.colorNeutralForeground3 }}>
-          Valores en COP (MM = miles de millones). 2027 en vivo desde la app; 2026 línea base (Plantilla OPEX).
+          Valores en COP (MM = miles de millones). {anioPlan} en vivo desde la app; base {anioBase} {base.origen === 'estatica' ? 'línea base (Plantilla OPEX)' : base.origen === 'snapshot' ? 'congelada desde Administración' : 'en vivo (solo tipo Plan)'}.
         </Caption1>
       </div>
     </div>
