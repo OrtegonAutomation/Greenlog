@@ -459,10 +459,10 @@ interface Props {
 }
 
 const STEPS = [
-  { label: 'Zona', icon: '📍' },
-  { label: 'Estación', icon: '🏭' },
-  { label: 'Parámetros', icon: '🧪' },
-  { label: 'Programación', icon: '📅' },
+  { label: 'Zona' },
+  { label: 'Estación' },
+  { label: 'Parámetros' },
+  { label: 'Programación' },
 ];
 
 export const MonitoreosWizard: React.FC<Props> = ({ open, onClose, onComplete, initialData }) => {

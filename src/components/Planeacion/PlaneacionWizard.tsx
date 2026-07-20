@@ -21,6 +21,24 @@ import {
   EditRegular,
   AddRegular,
   DeleteRegular,
+  BeakerRegular,
+  ClipboardTaskRegular,
+  RecycleRegular,
+  LeafOneRegular,
+  LeafTwoRegular,
+  MoneyRegular,
+  DataBarVerticalRegular,
+  MapRegular,
+  PaymentRegular,
+  LaptopRegular,
+  WrenchRegular,
+  PinRegular,
+  LightbulbRegular,
+  ArrowTrendingRegular,
+  ReceiptRegular,
+  VehicleTruckRegular,
+  ArrowRepeatAllRegular,
+  WarningRegular,
 } from '@fluentui/react-icons';
 import { MonitoreosMatrizService, MonitoreoRow, invalidateMonitoreosCache } from '../../services/MonitoreosMatrizService';
 import { SupabaseService } from '../../services/SupabaseService';
@@ -449,19 +467,40 @@ export const CONTRATOS_COMPENSACIONES = ['BQS'];
 
 const getStepLabels = (isMonitoreo: boolean, isCompensaciones: boolean) => {
   const base = [
-    { label: 'Línea',         icon: '📋' },
-    { label: 'Zona',          icon: '📍' },
-    { label: 'Lugar',         icon: '🏭' },
+    { label: 'Línea' },
+    { label: 'Zona' },
+    { label: 'Lugar' },
   ];
   if (isCompensaciones) {
-    base.push({ label: 'Descripción',   icon: '📄' });
+    base.push({ label: 'Descripción' });
   }
-  base.push({ label: 'Clasificación', icon: '⚙️' });
-  base.push({ label: 'Datos auxiliares', icon: '🗂️' });
-  base.push({ label: isMonitoreo ? 'Parámetros' : 'Ítems', icon: '🧪' });
-  base.push({ label: 'Programación',  icon: '📅' });
+  base.push({ label: 'Clasificación' });
+  base.push({ label: 'Datos auxiliares' });
+  base.push({ label: isMonitoreo ? 'Parámetros' : 'Ítems' });
+  base.push({ label: 'Programación' });
   return base;
 };
+
+// Icono SVG (Fluent) por línea operativa para las tarjetas del Step 0.
+// Las líneas custom (sin entrada aquí) usan el pin genérico.
+const LINEA_ICONS: Record<string, React.ReactNode> = {
+  'Monitoreos': <BeakerRegular />,
+  'ICAs': <ClipboardTaskRegular />,
+  'Residuos peligrosos': <RecycleRegular />,
+  'Servicios E': <LeafOneRegular />,
+  'Compensaciones estaciones': <LeafTwoRegular />,
+  'Compensaciones provisiones': <MoneyRegular />,
+  'Estudios Ambientales': <DataBarVerticalRegular />,
+  'Hojas de Ruta Sostenibilidad Ambiental': <MapRegular />,
+  'Pagos': <PaymentRegular />,
+  'Herramienta Digital': <LaptopRegular />,
+  'Servicios Generales': <WrenchRegular />,
+};
+
+// Icono inline dentro de textos (alineado con la tipografía)
+const InlineIcon: React.FC<{ children: React.ReactNode }> = ({ children }) => (
+  <span style={{ verticalAlign: '-2px', marginRight: '4px', display: 'inline-flex' }}>{children}</span>
+);
 
 // ── Styles ──
 
@@ -2791,7 +2830,7 @@ export const PlaneacionWizard: React.FC<Props> = ({
     const cfg: LineaPlaneacionConfig = {
       value: newLineaNombre.trim().toLowerCase().replace(/\s+/g, '_') as LineaOperativa,
       label: newLineaNombre.trim(),
-      icon: '📌',
+      icon: 'custom',
       descripcion: newLineaDesc.trim() || newLineaNombre.trim(),
       usaMatriz: false,
       lugarPorDefecto: newLineaLugar,
@@ -3095,7 +3134,7 @@ export const PlaneacionWizard: React.FC<Props> = ({
                           )}
                           onClick={() => handleSelectLinea(cfg)}
                         >
-                          <div className={styles.lineaIcon}>{cfg.icon}</div>
+                          <div className={styles.lineaIcon}>{LINEA_ICONS[cfg.value] ?? <PinRegular />}</div>
                           <div className={styles.lineaInfo}>
                             <Body2 style={{ fontWeight: '600', lineHeight: '1.3' }}>{cfg.label}</Body2>
                             <Caption1 style={{ color: tokens.colorNeutralForeground3, lineHeight: '1.3' }}>
@@ -3182,7 +3221,7 @@ export const PlaneacionWizard: React.FC<Props> = ({
                                   <td className={styles.paramTd}>{it.unidad}</td>
                                   <td className={styles.paramTd}>{fmtCOP(it.precio)}</td>
                                   <td className={styles.paramTd}>
-                                    <Button appearance="subtle" size="small" onClick={() => handleRemoveTempItem(it.id)}>✕</Button>
+                                    <Button appearance="subtle" size="small" onClick={() => handleRemoveTempItem(it.id)} icon={<DismissRegular />} />
                                   </td>
                                 </tr>
                               ))}
@@ -3590,7 +3629,7 @@ export const PlaneacionWizard: React.FC<Props> = ({
                 {isItemsReselect && (
                   <div style={{ marginTop: '8px', marginBottom: '8px', padding: '10px 12px', borderRadius: '8px', background: 'rgba(0,176,80,0.08)', border: '1px solid rgba(0,176,80,0.25)' }}>
                     <Caption1 style={{ color: '#003057', fontWeight: 600 }}>
-                      🔁 Reselección para Año {tabAnio} — esta selección reemplaza la del año anterior solo para el Año {tabAnio}.
+                      <InlineIcon><ArrowRepeatAllRegular /></InlineIcon>Reselección para Año {tabAnio} — esta selección reemplaza la del año anterior solo para el Año {tabAnio}.
                     </Caption1>
                   </div>
                 )}
@@ -3600,7 +3639,7 @@ export const PlaneacionWizard: React.FC<Props> = ({
                   {selectedLinea?.value !== 'Hojas de Ruta Sostenibilidad Ambiental' && (
                     <div className={styles.ajustesGroup}>
                       <Checkbox
-                        label="📈 Aplicar IPC"
+                        label={<><InlineIcon><ArrowTrendingRegular /></InlineIcon>Aplicar IPC</>}
                         checked={ipcGlobalActivo}
                         onChange={(_, d) => setIpcGlobalActivo(!!d.checked)}
                       />
@@ -3621,7 +3660,7 @@ export const PlaneacionWizard: React.FC<Props> = ({
                   )}
                   <div className={styles.ajustesGroup}>
                     <Checkbox
-                      label="🧾 Aplicar IVA"
+                      label={<><InlineIcon><ReceiptRegular /></InlineIcon>Aplicar IVA</>}
                       checked={ivaGlobalActivo}
                       onChange={(_, d) => setIvaGlobalActivo(!!d.checked)}
                     />
@@ -4069,7 +4108,7 @@ export const PlaneacionWizard: React.FC<Props> = ({
                       }}
                     />
                     <Caption1 style={{ fontWeight: '700', color: '#003057' }}>
-                      🚐 Logística
+                      <InlineIcon><VehicleTruckRegular /></InlineIcon>Logística
                     </Caption1>
                     <Caption1 style={{ color: tokens.colorNeutralForeground3 }}>
                       {selectedLogistica.size === 0 ? '(no incluida)' : `${selectedLogistica.size} de ${ITEMS_LOGISTICA.length} seleccionados`}
@@ -4329,17 +4368,17 @@ export const PlaneacionWizard: React.FC<Props> = ({
                   {' '}El total se calcula automáticamente.
                   {ipcGlobalActivo && ipcGlobalPorcentaje > 0 && (
                     <span style={{ display: 'block', marginTop: '4px', color: CENIT_COLORS.blueBrand, fontWeight: 600 }}>
-                      💡 Marca los meses a partir de los cuales aplicar el ajuste de IPC (+{ipcGlobalPorcentaje}%). El precio de esos meses se multiplicará por {(1 + ipcGlobalPorcentaje / 100).toFixed(2)}.
+                      <InlineIcon><LightbulbRegular /></InlineIcon>Marca los meses a partir de los cuales aplicar el ajuste de IPC (+{ipcGlobalPorcentaje}%). El precio de esos meses se multiplicará por {(1 + ipcGlobalPorcentaje / 100).toFixed(2)}.
                     </span>
                   )}
                   {ivaGlobalActivo && ivaGlobalPorcentaje > 0 && (
                     <span style={{ display: 'block', marginTop: '4px', color: CENIT_COLORS.green, fontWeight: 600 }}>
-                      💡 Marca IVA en cada ítem o parámetro que lo requiera. El ajuste (+{ivaGlobalPorcentaje}%) aplica a todos los meses programados de esa fila.
+                      <InlineIcon><LightbulbRegular /></InlineIcon>Marca IVA en cada ítem o parámetro que lo requiera. El ajuste (+{ivaGlobalPorcentaje}%) aplica a todos los meses programados de esa fila.
                     </span>
                   )}
                   {isPagosDiferidosDisponible && pagosDiferidosActivo && (
                     <span style={{ display: 'block', marginTop: '4px', color: CENIT_COLORS.blueBrand, fontWeight: 600 }}>
-                      💡 Para cada ítem define un % asignado, selecciona los meses y usa “Diferir pagos” para repartirlo.
+                      <InlineIcon><LightbulbRegular /></InlineIcon>Para cada ítem define un % asignado, selecciona los meses y usa “Diferir pagos” para repartirlo.
                     </span>
                   )}
                 </Caption1>
@@ -4413,7 +4452,7 @@ export const PlaneacionWizard: React.FC<Props> = ({
                           title={pending ? 'Aún no llegas a este año' : done ? 'Año ya planeado' : 'Año actual'}
                         >
                           <span>
-                            {done && '✓ '}Año {n} — {anioPlaneacion + (n - 1)}
+                            {done && <InlineIcon><CheckmarkRegular /></InlineIcon>}Año {n} — {anioPlaneacion + (n - 1)}
                           </span>
                           <span style={{ fontSize: '10px', fontWeight: 500, opacity: 0.85 }}>
                             {n === 1 ? 'mensualizado' : 'anualizado'} · {fmtCOP(totalAnio)}
@@ -4433,7 +4472,7 @@ export const PlaneacionWizard: React.FC<Props> = ({
                     color: '#a4262c', fontSize: '13px', fontWeight: 600,
                     marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px',
                   }}>
-                    ⚠️ El total planeado ({fmtCOP(valorTotal)}) excede el saldo disponible ({fmtCOP(saldoDisponible)}). Reduce cantidades para poder completar.
+                    <WarningRegular style={{ flexShrink: 0 }} /> El total planeado ({fmtCOP(valorTotal)}) excede el saldo disponible ({fmtCOP(saldoDisponible)}). Reduce cantidades para poder completar.
                   </div>
                 )}
 
@@ -4463,7 +4502,7 @@ export const PlaneacionWizard: React.FC<Props> = ({
                     fontWeight: 600,
                     marginBottom: '12px',
                   }}>
-                    ⚠️ Hay pagos diferidos que superan el porcentaje asignado:{' '}
+                    <InlineIcon><WarningRegular /></InlineIcon>Hay pagos diferidos que superan el porcentaje asignado:{' '}
                     {pagosDiferidosErrores.map(err =>
                       `${err.nombre} (${fmtPct(err.programado)} de ${fmtPct(err.asignado)})`
                     ).join('; ')}. Ajusta los porcentajes mensuales para completar.
@@ -4532,7 +4571,7 @@ export const PlaneacionWizard: React.FC<Props> = ({
                     {ipcGlobalActivo && ipcGlobalPorcentaje > 0 && selectedLinea?.value !== 'Hojas de Ruta Sostenibilidad Ambiental' && (
                       <details className={styles.mobItemAcc}>
                         <summary className={styles.mobItemSummary}>
-                          <span className={styles.mobItemName}>📈 Aplicar IPC (+{ipcGlobalPorcentaje}%) por mes</span>
+                          <span className={styles.mobItemName}><InlineIcon><ArrowTrendingRegular /></InlineIcon>Aplicar IPC (+{ipcGlobalPorcentaje}%) por mes</span>
                           <span className={styles.mobItemTotal} style={{ color: CENIT_COLORS.blueBrand }}>{ipcMeses.size}/12</span>
                         </summary>
                         <div className={styles.mobIpcGrid}>
@@ -4568,7 +4607,7 @@ export const PlaneacionWizard: React.FC<Props> = ({
                       return (
                         <details key={item.key} className={styles.mobItemAcc}>
                           <summary className={styles.mobItemSummary}>
-                            <span className={styles.mobItemName}>{isLog && '🚐 '}{item.nombre}</span>
+                            <span className={styles.mobItemName}>{isLog && <InlineIcon><VehicleTruckRegular /></InlineIcon>}{item.nombre}</span>
                             <span
                               className={styles.mobItemTotal}
                               style={rowTotal > 0 ? { color: CENIT_COLORS.greenDark } : { color: 'rgba(0,0,0,0.35)', fontWeight: 500 }}
@@ -4752,7 +4791,7 @@ export const PlaneacionWizard: React.FC<Props> = ({
                       {ipcGlobalActivo && ipcGlobalPorcentaje > 0 && selectedLinea?.value !== 'Hojas de Ruta Sostenibilidad Ambiental' && (
                         <tr>
                           <th className={styles.progMatrixIpcThItem} title={`Marca los meses donde aplicar +${ipcGlobalPorcentaje}% de IPC`}>
-                            📈 Aplicar IPC (+{ipcGlobalPorcentaje}%) →
+                            <InlineIcon><ArrowTrendingRegular /></InlineIcon>Aplicar IPC (+{ipcGlobalPorcentaje}%) →
                           </th>
                           {MESES_SHORT.map((_, i) => (
                             <th key={i} className={styles.progMatrixIpcTh}>
@@ -4788,7 +4827,7 @@ export const PlaneacionWizard: React.FC<Props> = ({
                             {/* Item name + editable unit price */}
                             <td className={styles.progMatrixItemTd}>
                               <div style={{ fontWeight: '600', color: '#003057', marginBottom: '4px', fontSize: '12px', lineHeight: '1.3' }}>
-                                {isLog && <span style={{ marginRight: '4px', fontSize: '10px' }}>🚐</span>}
+                                {isLog && <InlineIcon><VehicleTruckRegular /></InlineIcon>}
                                 {item.nombre}
                               </div>
                               {isIcas && !item.key.includes('::') && item.key.includes('-2026') && (
@@ -4976,7 +5015,7 @@ export const PlaneacionWizard: React.FC<Props> = ({
             <div className={styles.footerTotals}>
               {step === STEP_PROGRAMACION && isIcas && icasDesglosadoKeys.size > 0 && (
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#a4262c', fontWeight: 600, fontSize: '12px', marginRight: '8px' }}>
-                  ⚠️ Une los ítems de ICAs ("Unir en un ítem") para poder completar.
+                  <WarningRegular style={{ flexShrink: 0 }} /> Une los ítems de ICAs ("Unir en un ítem") para poder completar.
                 </div>
               )}
               {step === STEP_PROGRAMACION && (
