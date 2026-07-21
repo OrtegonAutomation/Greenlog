@@ -549,7 +549,7 @@ const NAV_ENTRIES: NavEntryDef[] = [
   {
     kind: 'group',
     id: 'eventos',
-    label: 'Eventos Ambientales',
+    label: 'Desempeño Ambiental',
     icon: <AlertUrgentRegular />,
     children: [
       { id: 'aguas', label: 'Aguas', icon: <DropRegular />, disabled: true },

@@ -283,7 +283,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
           )}
           <Title1 className={styles.sectionTitle}>
             {seccionAbierta === 'presupuestal' ? 'Planeación Presupuestal'
-              : seccionAbierta === 'eventos' ? 'Eventos Ambientales'
+              : seccionAbierta === 'eventos' ? 'Desempeño Ambiental'
               : 'Nuestros Módulos'}
           </Title1>
         </div>
@@ -299,7 +299,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
               onClick={() => setSeccionAbierta('presupuestal')}
             />
             <FeatureCard
-              title="Eventos Ambientales"
+              title="Desempeño Ambiental"
               description="Gestión de aguas, residuos y contingencias ambientales."
               actionLabel="Ver módulos"
               imageUrl="https://images.unsplash.com/photo-1500534314209-a25ddb2bd429?q=80&w=2670&auto=format&fit=crop"
