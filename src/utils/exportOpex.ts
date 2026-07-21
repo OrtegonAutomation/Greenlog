@@ -202,11 +202,17 @@ export const exportOpexToExcel = (actividades: ActividadAmbiental[]) => {
     // Ajuste tarifario (cols J/K): IPC configurado en la planeación.
     const ipcActivo = !!opx.ipcGlobalActivo && (opx.ipcGlobalPorcentaje ?? 0) > 0
       && Array.isArray(opx.ipcMeses) && opx.ipcMeses.length > 0;
+    // Monitoreos y RESPEL: la fecha del ajuste tarifario es fija el 1 de
+    // septiembre del año de planeación (p. ej. 1/09/2027), por indicación de
+    // planeación. Las demás líneas usan el primer mes con IPC.
+    const fechaAjusteFijaSep = item.lineaOperativa === 'Monitoreos'
+      || item.lineaOperativa === 'Residuos peligrosos';
     let fechaAjuste: Date | '' = '';
     if (ipcActivo) {
       const anio = anioPlaneacion || new Date().getFullYear();
       // Mediodía para que la conversión a serial de Excel no corra el día por zona horaria.
-      fechaAjuste = new Date(anio, Math.min(...(opx.ipcMeses as number[])), 1, 12);
+      const mesAjuste = fechaAjusteFijaSep ? 8 /* Septiembre */ : Math.min(...(opx.ipcMeses as number[]));
+      fechaAjuste = new Date(anio, mesAjuste, 1, 12);
     }
 
     // Contrato/Contratista. Para ICAs se asignan por año de planeación:
