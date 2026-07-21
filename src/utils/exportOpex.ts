@@ -90,7 +90,8 @@ const HEADERS_PXQ = [
 const COL_WIDTHS_PXQ: (number | undefined)[] = [
   29.71, 24.14, 29.43, 53.86, 17.57, 21.86, 14, 16.29, 11.43, 16.57, 24.14, 24.14, 19.14,
   14.71, 17.57, 19.43, 13.57, 13.57, 13.57, 13.14, 13.14, 13.14, 13.14, 13.14, 18,
-  undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined,
+  // Z–AK Cantidades: ancho visible (antes quedaban sin ancho asignado).
+  12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12,
   17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 37.86,
 ];
 
@@ -333,6 +334,14 @@ export const exportOpexToExcel = (actividades: ActividadAmbiental[]) => {
     { s: { r: 4, c: 37 }, e: { r: 4, c: 49 } },   // AL5:AX5
   ];
 
+  // Índices de columna de cada grupo mensual (0-based): la plantilla intercala
+  // 12 precios (N–Y), 12 cantidades (Z–AK) y 12 totales (AL–AW), un mes por
+  // posición. El total del mes i sale de Precio(i) × Cantidad(i).
+  const COL_PRECIO_INI = 13;   // N
+  const COL_CANT_INI = 25;     // Z
+  const COL_TOTAL_INI = 37;    // AL
+  const COL_TOTAL_ANIO = 49;   // AX
+
   // Estilos de encabezados (fila 6) y datos (filas 7+).
   for (let c = 0; c < HEADERS_PXQ.length; c++) {
     const headerAddr = XLSX.utils.encode_cell({ r: 5, c });
@@ -345,6 +354,24 @@ export const exportOpexToExcel = (actividades: ActividadAmbiental[]) => {
       worksheet[addr].s = dataStyle;
       if (dataStyle.numFmt) worksheet[addr].z = dataStyle.numFmt;
       if (c === 10 && worksheet[addr].v instanceof Date) worksheet[addr].z = 'm/d/yy';
+
+      // Totales mensuales (AL–AW) como fórmula =Precio×Cantidad. El precio de la
+      // celda ya es el unitario efectivo (incluye IVA/IPC y diferidos con cant=1),
+      // así que la fórmula reproduce exactamente el total calculado. Se conserva
+      // el valor numérico como caché para quien abra sin recalcular.
+      if (c >= COL_TOTAL_INI && c <= COL_TOTAL_INI + 11) {
+        const mesIdx = c - COL_TOTAL_INI;
+        const precioAddr = XLSX.utils.encode_cell({ r: 6 + r, c: COL_PRECIO_INI + mesIdx });
+        const cantAddr = XLSX.utils.encode_cell({ r: 6 + r, c: COL_CANT_INI + mesIdx });
+        const total = Number(worksheet[addr].v) || 0;
+        worksheet[addr] = { t: 'n', f: `${precioAddr}*${cantAddr}`, v: total, s: dataStyle, z: dataStyle.numFmt };
+      } else if (c === COL_TOTAL_ANIO) {
+        // Total año 1 (AX) = suma de los 12 totales mensuales de la fila.
+        const desde = XLSX.utils.encode_cell({ r: 6 + r, c: COL_TOTAL_INI });
+        const hasta = XLSX.utils.encode_cell({ r: 6 + r, c: COL_TOTAL_INI + 11 });
+        const total = Number(worksheet[addr].v) || 0;
+        worksheet[addr] = { t: 'n', f: `SUM(${desde}:${hasta})`, v: total, s: dataStyle, z: dataStyle.numFmt };
+      }
     }
   }
 
