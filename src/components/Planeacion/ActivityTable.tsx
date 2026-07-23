@@ -221,6 +221,7 @@ export const ActivityTable: React.FC<ActivityTableProps> = ({ actividades, carga
   const [filtroAnio, setFiltroAnio] = useState<number | null>(null);
   const [filtroZona, setFiltroZona] = useState<string>('Todas');
   const [filtroLinea, setFiltroLinea] = useState<string>('Todas');
+  const [filtroSubnecesidad, setFiltroSubnecesidad] = useState<string>('Todas');
 
   // Compute available years from the data
   const aniosDisponibles = useMemo(() => {
@@ -242,6 +243,21 @@ export const ActivityTable: React.FC<ActivityTableProps> = ({ actividades, carga
     [actividades],
   );
 
+  // Subnecesidad de cada actividad (vive dentro de opexDataRaw). Se parsea una
+  // sola vez por actividad y se indexa por id para el filtro y la lista.
+  const subnecesidadPorId = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const a of actividades) {
+      const sub = (parseOpex(a.opexDataRaw)?.subnecesidad ?? '').trim();
+      if (sub) m.set(a.id, sub);
+    }
+    return m;
+  }, [actividades]);
+  const subnecesidadesDisponibles = useMemo(
+    () => [...new Set(subnecesidadPorId.values())].sort((a, b) => a.localeCompare(b, 'es')),
+    [subnecesidadPorId],
+  );
+
   const filtradas = useMemo(() => {
     const q = search.toLowerCase().trim();
     return actividades.filter((a) => {
@@ -250,6 +266,7 @@ export const ActivityTable: React.FC<ActivityTableProps> = ({ actividades, carga
       if (filtroAnio !== null && (a as any).anioPlaneacion !== filtroAnio) return false;
       if (filtroZona !== 'Todas' && a.zona !== filtroZona) return false;
       if (filtroLinea !== 'Todas' && a.lineaOperativa !== filtroLinea) return false;
+      if (filtroSubnecesidad !== 'Todas' && (subnecesidadPorId.get(a.id) ?? '') !== filtroSubnecesidad) return false;
       if (!q) return true;
       return (
         a.tarea.toLowerCase().includes(q) ||
@@ -260,7 +277,7 @@ export const ActivityTable: React.FC<ActivityTableProps> = ({ actividades, carga
         (a.contrato ?? '').toLowerCase().includes(q)
       );
     });
-  }, [actividades, search, filtroEstado, filtroAnio, filtroZona, filtroLinea]);
+  }, [actividades, search, filtroEstado, filtroAnio, filtroZona, filtroLinea, filtroSubnecesidad, subnecesidadPorId]);
 
   return (
     <div className={styles.root}>
@@ -335,6 +352,19 @@ export const ActivityTable: React.FC<ActivityTableProps> = ({ actividades, carga
           >
             <option value="Todas">Todas las líneas</option>
             {lineasDisponibles.map(l => <option key={l} value={l}>{l}</option>)}
+          </Select>
+        )}
+
+        {subnecesidadesDisponibles.length > 0 && (
+          <Select
+            size="small"
+            aria-label="Filtrar por subnecesidad"
+            value={filtroSubnecesidad}
+            onChange={(_, d) => setFiltroSubnecesidad(d.value)}
+            style={{ minWidth: 0, maxWidth: 220 }}
+          >
+            <option value="Todas">Todas las subnecesidades</option>
+            {subnecesidadesDisponibles.map(s => <option key={s} value={s}>{s}</option>)}
           </Select>
         )}
 
